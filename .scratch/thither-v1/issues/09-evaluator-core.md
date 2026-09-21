@@ -6,7 +6,9 @@ Blocked by: 05, 07
 
 ## Question
 
-Implement and test `execute(program)`'s value handling and lifecycle per `dsl.md` §1 "Transitions" and "Lifecycle", excluding the operations themselves (tickets 10–11).
+Implement and test `execute(program)`'s value handling and lifecycle per `dsl.md` §1 "Transitions" and "Lifecycle", excluding the operations themselves (tickets 10–11). `execute` is a method of the env-bound interpreter and creates its own fresh empty working stack; the `Stack` is a mutable array (ticket 04's answer, [ADR 0005](../../../docs/adr/0005-extensible-interpreter-environment.md)).
+
+This ticket also owns the shared **error primitives** the operations depend on, because unwinding is a §6 evaluation concern and 10/11 fail through it: the `E` constructor over the closed `ErrorType` vocabulary (in `types.ts`), and `unwind(stack)` — pop to the nearest valid `S`, retain everything below, push `E`. Operation handlers (10/11) call `unwind` when they generate an evaluation error; they do not reimplement it. Ticket 13 then *verifies* the vocabulary is complete and the not-rolled-back property holds across real operations.
 
 Rules in scope:
 

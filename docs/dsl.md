@@ -88,7 +88,7 @@ Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or dedu
 
 ## 2. Source syntax and parsing
 
-A program is built one item at a time: `parse(program, tokenOrValue) -> program'`. The core parses a **single** item per call and never tokenizes a multi-item string. Hosts split user input on JavaScript whitespace (`\s`) and append the resulting tokens in order.
+A program is built one item at a time: `append(program, tokenOrValue) -> program'`. The core parses a **single** item per call and never tokenizes a multi-item string. Hosts split user input on JavaScript whitespace (`\s`) and append the resulting tokens in order.
 
 Each appended item is either:
 
@@ -121,7 +121,7 @@ A leading double dot escapes a dot-prefixed token by removing one leading dot an
 ..     -> literal .
 ```
 
-Escaped tokens are not interpreted again as operations. An unrecognized, unescaped dot-prefixed operation parses to `E`. Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
+Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to `E`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
 The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them; only `.$` uses the suffix.
 
@@ -154,7 +154,7 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 ### Supplied structured values
 
-Validate supplied values in the core, not the browser client. Reject malformed required structures. Preserve unknown object fields as uninterpreted data rather than silently deleting them; they do not acquire execution semantics.
+Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics.
 
 Normalize each supplied `S`'s target dimensions and focus by the rules of section 3. Reject dimension strings containing internal whitespace after trimming. Normalization does not change target order, destination text, argument spelling, or `R.inputs`.
 
