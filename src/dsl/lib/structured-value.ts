@@ -1,7 +1,7 @@
 // dsl.md §2 "Supplied structured values" and §6 — validate and normalize a
 // structured (object) value supplied to `append`. This is the structured-value
 // half of the parse step; the string-token half is token-parsing. It reuses the
-// destination seam (ticket 06) and the normalization seam (07's own file) and
+// destination seam (ticket 06) and the dimension seam (07's own file) and
 // knows nothing of the stack, evaluation, or matching.
 //
 // Phase rule (dsl.md §6): every rejection here happens at *parse* time, so it is
@@ -26,7 +26,7 @@ import type {
   ThitherError,
 } from "../types.ts";
 import { validateDestination } from "./destination.ts";
-import { normalizeDimensions } from "./normalization.ts";
+import { isValidDimension, normalizeDimensions } from "./dimension.ts";
 
 function parseError(description: string): ThitherError {
   return ["E", { type: "parse_error", description }];
@@ -71,10 +71,12 @@ function validateState(body: unknown): State | undefined {
   if (!Array.isArray(targets) || !isStringArray(focus)) {
     return undefined;
   }
-  const normalizedFocus = normalizeDimensions(focus);
-  if (normalizedFocus === undefined) {
+  // Validate first (the parser's gate), then normalize (a total transform): an
+  // internal-whitespace dimension is invalid (dsl.md §3), so the whole value is.
+  if (!focus.every(isValidDimension)) {
     return undefined;
   }
+  const normalizedFocus = normalizeDimensions(focus);
 
   const normalizedTargets: Target[] = [];
   // Detect duplicate normalized dimension sets *after* normalization; the sorted,
@@ -90,10 +92,10 @@ function validateState(body: unknown): State | undefined {
     if (!isStringArray(dimensions) || typeof destination !== "string") {
       return undefined;
     }
-    const normalizedDimensions = normalizeDimensions(dimensions);
-    if (normalizedDimensions === undefined) {
+    if (!dimensions.every(isValidDimension)) {
       return undefined;
     }
+    const normalizedDimensions = normalizeDimensions(dimensions);
     const validatedDestination = validateDestination(destination);
     if (validatedDestination === undefined) {
       return undefined;

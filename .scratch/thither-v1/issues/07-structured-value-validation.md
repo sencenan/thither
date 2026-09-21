@@ -26,15 +26,18 @@ This is also the entry point the client reuses to validate manually supplied res
 
 Implemented the structured-value half of parse across two modules (both DOM-free leaves; boundaries clean):
 
-**`src/dsl/lib/normalization.ts`** (its own file per ticket 04's seam map, so ops 10/11 can mint `NormDim`s without structured-value validation):
+**`src/dsl/lib/dimension.ts`** (the `normalization` module in ticket 04's seam map, renamed in review now that it also validates; its own file so ops 10/11 can normalize without structured-value validation). **Validation and normalization are kept as separate concerns** so normalization has no failure mode:
 
-- `normalizeDimension(raw) -> NormDim | undefined` - trim, then reject internal whitespace (`\s`), then locale-independent `toLowerCase()`. `undefined` signals invalid. Diacritics are preserved (`Café` -> `café`), matching §3's "diacritic normalization disabled".
-- `normalizeDimensions(raw[]) -> readonly NormDim[] | undefined` - normalize each, then dedupe and sort by default UTF-16 order (`[...new Set(x)].sort()`); dedup/sort happen *after* normalization so `Git`/`git` collapse. Returns `undefined` if any member is invalid.
+- `isValidDimension(raw) -> boolean` - the parser's validity gate: false when the dimension holds internal whitespace after trimming (dsl.md §3, invalid, not a split). This is the *only* dimension-validity rule.
+- `normalizeDimension(raw) -> NormDim` - **total**: trim, then locale-independent `toLowerCase()`. Never fails (rejecting a malformed dimension is `isValidDimension`'s job). Diacritics preserved (`Café` -> `café`).
+- `normalizeDimensions(raw[]) -> readonly NormDim[]` - **total**: normalize each, then dedupe and sort by default UTF-16 order (`[...new Set(x)].sort()`); dedup/sort happen *after* normalization so `Git`/`git` collapse.
+
+The parser validates then normalizes; the matcher (ticket 08) only normalizes, and so inherits no `undefined` to handle.
 
 **`src/dsl/lib/structured-value.ts`** - `validateStructured(value: unknown) -> ProgramItem` (the item `append` puts into a program), dispatching on the `["S"|"R"|"E", body]` sigil. The per-sigil validators return a concrete `State`/`Result`/`ThitherError` or `undefined` (the same verdict shape as ticket 06's `validateDestination`, and avoiding the vague `Envelope` type); `validateStructured` turns `undefined` into a generated `parse_error` (§6 phase rule, confirmed with you). A *valid* supplied `E` is returned as itself.
 
 - **Top-level shape:** must be a 2-element array with a string sigil. This is what makes standalone `t`/`T`/`m`/`M` and a bare literal array all fall to `parse_error` (their head isn't a sigil string, or the arity is wrong) - dsl.md §1's "cannot appear as standalone values".
-- **`S`:** normalizes focus and each target's dimensions via the normalization seam, validates each destination via **ticket 06** (`validateDestination`), enforces uniqueness of normalized dimension sets using the sorted-list JSON as a canonical key (duplicates invalid whether or not destinations differ; no merge/pick), preserves target order, and drops unknown fields by rebuilding from `targets`/`focus` only.
+- **`S`:** for focus and each target's dimensions, gates on `isValidDimension` (internal whitespace -> `parse_error`) then normalizes via the normalization seam, validates each destination via **ticket 06** (`validateDestination`), enforces uniqueness of normalized dimension sets using the sorted-list JSON as a canonical key (duplicates invalid whether or not destinations differ; no merge/pick), preserves target order, and drops unknown fields by rebuilding from `targets`/`focus` only.
 - **`E`:** the weaker §6 rule - only string `type` + `description` required, `type` **not** checked against the vocabulary (another version's error round-trips), extra diagnostic fields preserved via a detaching shallow copy.
 - **`R` (per the shallow decision we agreed):** shape-checked only - `matches` an array of 4-tuples `[string, string[], string[], object]`, `inputs` a string array. **No normalization** (inputs/dims kept verbatim) and **no destination re-validation**, because a produced `R` legitimately holds partially-rendered, post-substitution destinations (§5) and `R.inputs` must stay in original spelling (§2). Unknown fields on `R` dropped.
 
