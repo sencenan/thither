@@ -1,19 +1,10 @@
 // dsl.md §2 "Supplied structured values" and §6 — validate and normalize a
-// structured (object) value supplied to `append`. This is the structured-value
-// half of the parse step; the string-token half is token-parsing. It reuses the
-// destination seam (ticket 06) and the dimension seam (07's own file) and
-// knows nothing of the stack, evaluation, or matching.
+// structured (object) value supplied to `append`.
 //
-// Phase rule (dsl.md §6): every rejection here happens at *parse* time, so it is
-// always `parse_error`, whatever the cause. The evaluation-phase types
-// (`invalid_destination`, `missing_operand`, `ambiguous_set`) never originate here
-// — the same malformed destination is `parse_error` inside a supplied `S` and
-// `invalid_destination` only as a `.set` operand.
-//
-// The per-sigil validators answer with a concrete value or `undefined` (the same
-// verdict shape as ticket 06's `validateDestination`); `validateStructured` turns
-// an `undefined` into the `parse_error` and returns a `ProgramItem` — the thing
-// `append` puts into a program.
+// Phase rule (dsl.md §6): every rejection here happens at parse time, so it is
+// always `parse_error` whatever the cause. The same malformed destination is
+// `parse_error` inside a supplied `S` but `invalid_destination` as a `.set`
+// operand, so the evaluation-phase types never originate here.
 
 import type {
   Dim,
@@ -40,13 +31,9 @@ function isStringArray(value: unknown): value is readonly string[] {
   return Array.isArray(value) && value.every((member) => typeof member === "string");
 }
 
-// Validate a supplied structured value into the program item it becomes: a
-// normalized `S`/`R`, the supplied `E` itself, or a generated `parse_error` `E`.
 export function validateStructured(value: unknown): ProgramItem {
-  // Only ["S"|"R"|"E", body] is a top-level value. A standalone `t`, `T`, `m`,
-  // `M`, or a literal array fails this shape (`t`/`m`/`M` are arrays whose head is
-  // not a sigil string; `T` and `L` have the wrong arity or head), so they all
-  // land on the same parse_error path dsl.md §1 requires.
+  // A standalone `t`, `T`, `m`, `M`, or literal array fails this shape, which is
+  // how dsl.md §1's "cannot appear as standalone values" is enforced.
   if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== "string") {
     return parseError("a structured value must be an [sigil, body] pair");
   }
@@ -71,18 +58,14 @@ function validateState(body: unknown): State | undefined {
   if (!Array.isArray(targets) || !isStringArray(focus)) {
     return undefined;
   }
-  // Validate first (the parser's gate), then normalize (a total transform): an
-  // internal-whitespace dimension is invalid (dsl.md §3), so the whole value is.
   if (!focus.every(isValidDimension)) {
     return undefined;
   }
   const normalizedFocus = normalizeDimensions(focus);
 
   const normalizedTargets: Target[] = [];
-  // Detect duplicate normalized dimension sets *after* normalization; the sorted,
-  // deduped NormDim list is already canonical, so its JSON is a sound identity key
-  // (dsl.md §2). Duplicates are invalid whether or not destinations differ; do not
-  // merge or pick.
+  // A normalized dimension list is sorted and deduped, so its JSON is a sound
+  // identity key. Duplicates invalidate the value rather than merging (dsl.md §2).
   const seenDimensionSets = new Set<string>();
   for (const target of targets) {
     if (!Array.isArray(target) || target.length !== 2) {
@@ -108,17 +91,13 @@ function validateState(body: unknown): State | undefined {
     normalizedTargets.push([normalizedDimensions, validatedDestination]);
   }
 
-  // Rebuilding from only targets/focus drops any unknown fields (dsl.md §2), and
-  // preserves target order — normalization reorders dimensions *within* a target,
-  // never the targets themselves.
+  // Rebuilding from targets/focus alone is what drops unknown fields (dsl.md §2).
   return ["S", { targets: normalizedTargets, focus: normalizedFocus }];
 }
 
-// dsl.md §2 keeps R.inputs and match contents verbatim, and §5 lets a produced
-// match hold a partially-rendered (post-substitution, possibly invalid) URL, so
-// this validates the *shape* only — never re-normalizing or re-validating a
-// destination — and passes match contents through untouched. Required fields are
-// checked; unknown fields on R are dropped.
+// Shape-checked only: §5 lets a produced match hold a partially-rendered,
+// post-substitution destination, and §2 keeps `inputs` in original spelling, so
+// re-validating or re-normalizing here would reject valid results.
 function validateResult(body: unknown): Result | undefined {
   if (!isObject(body)) {
     return undefined;
@@ -144,11 +123,9 @@ function validateResult(body: unknown): Result | undefined {
   return ["R", { matches: validatedMatches as MatchSet, inputs: inputs as readonly Dim[] }];
 }
 
-// dsl.md §6 holds a supplied `E` to a weaker rule than a generated one: it needs
-// only a string `type` and string `description`, its `type` is *not* checked
-// against the vocabulary (so another version's error round-trips), and its extra
-// diagnostic fields are preserved uninterpreted. A shallow copy detaches it from
-// the caller's object while keeping every field.
+// dsl.md §6 holds a supplied `E` to a weaker rule than a generated one: its
+// `type` is not checked against the vocabulary, so another version's error
+// round-trips, and its extra diagnostic fields are preserved uninterpreted.
 function validateSuppliedError(body: unknown): ThitherError | undefined {
   if (!isObject(body)) {
     return undefined;
