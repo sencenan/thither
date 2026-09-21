@@ -9,7 +9,7 @@ Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 ### Targets and matching
 
 **Dimension (dim)**:
-A short label used to recall and select a target, such as `company`, `personal`, or `git`. Dimensions are stored lowercase, trimmed, and without spaces.
+A short label used to recall and select a target, such as `company`, `personal`, or `git`. Dimensions are stored lowercase, trimmed, and without whitespace.
 _Avoid_: Tag keyword
 
 **Target**:
@@ -17,7 +17,7 @@ An association between a set of dimensions and a single destination template. Ta
 _Avoid_: Navigation mapping
 
 **Target set**:
-A collection of targets available for matching and modification.
+A collection of targets available for matching and modification, with at most one target for each normalized dimension set.
 
 **Destination template**:
 A target's URL pattern whose anonymous `{}` placeholders are filled left-to-right by supplied arguments using literal substitution. A slash in an argument introduces a path segment. A plain URL is a destination template with zero placeholders.

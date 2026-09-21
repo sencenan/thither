@@ -4,11 +4,11 @@ Status: agreed core semantics; remaining precision questions are listed at the e
 
 This document specifies Axon's stack-based language for maintaining targets, setting focus, and resolving navigation inputs. Domain terminology is defined in [CONTEXT.md](../CONTEXT.md).
 
-Browser integration, HTTP behavior, persistence, authentication, deployment, and the host interpreter API are outside this specification. Examples supply state explicitly; how an interface supplies that state is a separate concern.
+Browser integration, HTTP behavior, persistence, authentication, deployment, and the concrete host interpreter interface are outside this specification. Every evaluation starts with an empty data stack, and the interpreter executes the whole supplied program. Examples below supply state as the program's first item. See [browser-client.md](browser-client.md) for one host's contract.
 
 ## Evaluation rules — one-page reference
 
-**Setup:** Parse the entire program first; any parse error prevents execution. Append `.$` unless the final parsed item is already that operation. Start with an empty stack and evaluate left to right.
+**Setup:** Build the program by parsing one token or structured value at a time; an unparsable item becomes an `E` value in the stream. Append `.$` unless the final parsed item is already that operation. Start with an empty data stack and evaluate left to right.
 
 **Notation:** Rightmost is top. `K` is a preserved stack prefix; `S` is state, `R` a result, `E` an error, `L` an ordered literal array, and `x` any ordinary literal (`d`, `u`, or `p`). Terminal rules take priority.
 
@@ -20,6 +20,7 @@ Browser integration, HTTP behavior, persistence, authentication, deployment, and
 | `[K]`, top is not `L` | `x` | `[K, [x]]` | Start a literal array; also applies to an empty stack. |
 | `[K]` | `S` | `[K, S]` | Push state separately. |
 | `[K]` | `R` | `[K, R]` | Push result and stop. |
+| `[K]` | `E` | `[K, E]` | Push an explicit error and stop without unwinding. |
 | `[K, S, L]` | `.set` | `[K, S']` or `[K, S, E]` | Extract destination; 0 matches inserts, 1 updates URL only, more than 1 errors. |
 | `[K, S, L]` | `.rm` | `[K, S']` | Remove all complete-query matches; no explicit dimensions or 0 matches is a no-op. |
 | `[K, S]` | `.rm` | `[K, S]` | No explicit dimensions: leave state unchanged. |
@@ -38,16 +39,19 @@ Browser integration, HTTP behavior, persistence, authentication, deployment, and
 
 **Shared rules**
 
-- Ordinary literals include `?` and URLs; `..rm` decodes to literal `.rm`. Standalone `t`, `T`, `m`, and `M` values are parse errors, not pushes.
-- Matching uses lowercase copies, prepends focus, and deduplicates. Stored dimensions are trimmed, lowercase, deduplicated, and alphabetically sorted; join each target's dimensions into one searchable string. Use fzf-style fuzzy matching/ranking, not its query operators.
+- Ordinary literals include `?` and URLs; `..rm` decodes to literal `.rm`. Standalone `t`, `T`, `m`, and `M` values parse to `E`, not pushes.
+- Matching uses lowercase copies, prepends focus, and deduplicates. Stored dimensions are trimmed, lowercase, deduplicated, and sorted by JavaScript's default string order; join each target's dimensions with spaces into one searchable string. Fuzzy-match each query dimension independently against that entire string, require all query dimensions to match, and sum their scores. Preserve target-set order on equal scores. Disable diacritic normalization and fzf query operators.
 - Produce one match per selected target, including incomplete ones. Fill original `{}` placeholders left-to-right with literal, case-preserved arguments; do not URL-encode. Ignore extras; leave missing placeholders intact. `hint.argDelta = supplied arguments − placeholders`; each `m` stores only applied arguments. Keep fuzzy rank order in `R`; `R.inputs` excludes focus and arguments.
-- **Error unwinding:** Pop until the nearest `S` is on top, retaining everything below it, then push `E` and stop. If no `S` exists, end with `[E]`. Earlier successful changes survive; a failing operation must preserve its own input state.
+- **Error unwinding:** Pop until the nearest `S` is on top, retaining everything below it, then push `E` and stop. If no `S` exists, end with `[E]`. Earlier successful changes survive; a failing operation must preserve its own input state. An error carries a machine-readable `type` and a human-readable `description`.
+- **Destination validation:** render every `{}` with the probe token `axon`, then validate the result with the WHATWG `URL` parser; store the original template text. Placeholders are allowed in any position.
 
 The numbered sections below expand these rules and define result presentation and remaining precision questions.
 
 ## 1. Model and notation
 
-A program is a stream of values and operations. The interpreter parses the **entire program before executing any of it**, then evaluates the parsed stream from left to right against a fresh data stack.
+A program is a stream of values and operations. The interpreter evaluates the whole program as given, from left to right, against a fresh empty data stack.
+
+A program is built by appending items one at a time. An item is a string token or a structured value. The interpreter applies the same language rules to every item, whatever its origin. How a host obtains those items is outside this specification.
 
 The rightmost stack element is the top. Transition notation is:
 
@@ -70,20 +74,29 @@ Square brackets in transition diagrams describe values; they are not necessarily
 | `t` | Target | `[[d], p]`, also permitting a plain URL in the destination slot. |
 | `T` | Target set | `[t]`. |
 | `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
-| `m` | Match | `[u_or_p, [d], [args], hint]`. Missing arguments may leave a partially rendered template in the first slot. |
+| `m` | Match | `[u_or_p, [d], [args], hint]`, where `hint` carries at least `argDelta`, `positions`, and `scores`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
-| `E` | Error | `["E", {}]`; the object may carry diagnostics, whose fields are not yet specified. |
+| `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
 
 The `[d]` and `[args]` notation means an array, not necessarily a single element.
 
-`t` and `T` occur inside `S`; `m` and `M` occur inside `R`. They cannot appear as standalone program values. Such input is a parse error. `S` and `R` are permitted top-level JSON values.
+`t` and `T` occur inside `S`; `m` and `M` occur inside `R`. They cannot appear as standalone program values; such input parses to `E`. `S`, `R`, and `E` are permitted top-level JSON values.
 
 A match is a **selected target**, not necessarily a fully rendered destination. Producing an `R` does not itself mean navigation can proceed.
 
 ## 2. Source syntax and parsing
 
-The source consists of whitespace-separated ordinary literals and operations, plus complete JSON envelopes for `S` and `R`. Whitespace inside a JSON envelope belongs to that JSON value rather than separating program values.
+A program is built one item at a time: `parse(program, tokenOrValue) -> program'`. The core parses a **single** item per call and never tokenizes a multi-item string. Hosts split user input on JavaScript whitespace (`\s`) and append the resulting tokens in order.
+
+Each appended item is either:
+
+- a **string token**, interpreted as one value's textual form: an ordinary literal, `?`, an escaped literal, or an operation; or
+- a **structured value** supplied as a JavaScript object, such as an `S`, `R`, or `E` envelope, normalized and validated on parse.
+
+Parsing is total: an item that is not a valid value parses to an `E` value appended to the program, rather than throwing or rejecting the whole program.
+
+Worked examples write structured values inline, such as `S company git .set`. That is notation for a supplied structured value followed by string tokens, not a claim that a host must serialize state into text.
 
 Supported operations are:
 
@@ -106,7 +119,7 @@ A leading double dot escapes a dot-prefixed token by removing one leading dot an
 ..$    -> literal .$
 ```
 
-Escaped tokens are not interpreted again as operations. An unrecognized, unescaped dot-prefixed operation is a syntax error.
+Escaped tokens are not interpreted again as operations. An unrecognized, unescaped dot-prefixed operation parses to `E`.
 
 Double-quoted standalone tokens are not an agreed quoting mechanism. Multiword literals are not part of this version: each argument is one space-separated literal.
 
@@ -141,28 +154,59 @@ Scheme-less destinations such as `example.com/path`, `/path/{}`, and `//example.
 
 Validation must account for `{}` rather than reject a template solely because it contains placeholders. Keep the original template text for literal substitution; validation must not silently encode or rewrite its placeholders.
 
+Validate by rendering, not by parsing the raw template: replace every `{}` with the probe token `axon`, then validate that rendered string with the standard WHATWG `URL` parser. Accept the destination when the rendered form parses and has an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of the probe. A template that renders invalid is rejected at validation time.
+
+Placeholders may appear in any position, including the scheme: `{}://example.com` renders as `axon://example.com` and is accepted. Substituting actual arguments can still produce a different, possibly invalid, URL at navigation time; template acceptance is not a promise about every rendered result.
+
+This validation rule applies wherever a destination is accepted, including `.set` operands and destinations inside supplied state.
+
+Examples of rejected templates:
+
+```text
+https://exa mple.com/{}
+example.com/{}
+```
+
+`{}://example.com` is accepted: it renders as `axon://example.com`, which parses.
+
 This is a language-level acceptance rule, not permission for a browser or other host to execute every accepted scheme. Host security policy remains outside this specification.
 
-### Whole-program parsing
+### Parse failures are values
 
-Malformed JSON, unsupported standalone intermediate values, and invalid operation syntax fail parsing before any evaluation occurs.
+Malformed structured values, unsupported standalone intermediate values, and invalid operation syntax parse to an `E` value in the program stream. They do not prevent construction of the program or execution of the items before them.
 
-This remains true for malformed source after a result-producing operation. Evaluation may ignore that suffix, but parsing does not.
+Execution therefore applies every item preceding the first `E`, then pushes that `E` and stops. Given previous state `S` and the input `git .rm @@bad`, the removal is applied and the final stack is `[S', E]`. Items after the first `E`, including any later `E`, are never reached: `[S, E, E']` cannot arise, because evaluation stops at the first one.
 
-Errors that depend on the current stack or an operation's operands are evaluation errors, not parse errors. For example, a valid ordinary token in `.set`'s destination position can parse successfully and then fail URL validation during evaluation.
+This replaces the earlier whole-program parse-before-execute rule. Appending text is not atomic: a later invalid token does not undo earlier valid mutations from the same input.
+
+Errors that depend on the current stack or an operation's operands remain evaluation errors. For example, a valid ordinary token in `.set`'s destination position parses successfully and can then fail URL validation during evaluation.
+
+### Supplied structured values
+
+Validate supplied values in the core, not the browser client. Reject malformed required structures. Preserve unknown object fields as uninterpreted data rather than silently deleting them; they do not acquire execution semantics.
+
+Normalize each supplied `S`'s target dimensions and focus with the same rules used by `.set` and `.@`: trim, lowercase, deduplicate, and sort. Reject dimension strings containing internal whitespace after trimming. Normalization does not change target order, destination text, argument spelling, or `R.inputs`.
+
+Within each target set, every normalized dimension set must be unique. Two targets with identical normalized dimensions make the value invalid, so it parses to `E`, whether their destinations differ or are identical. Detect duplicates after normalization; do not merge targets or choose one. Different `S` values in a program may independently contain the same dimension sets.
+
+For example, dimensions `["Git", " company ", "git"]` normalize to `["company", "git"]`. A second target with dimensions `["git", "company"]` in that same target set then makes the supplied state invalid, so appending it yields `E` at that position.
+
+Validation happens when an item is parsed, not when it is reached. An invalid value placed after a terminal result therefore still parses to `E`, but evaluation stops before reaching it.
+
+Hosts reuse this parse step to validate data they hold, such as manually supplied reset JSON. A value that parses to `E` must not replace persisted data.
 
 ## 3. Interpreter lifecycle
 
-1. Parse the entire source. On a parse error, execute nothing.
-2. Check the end of the parsed program. Append `.$` unless its last item is already the **operation** `.$`.
+1. Build the program by appending parsed items in order. An unparsable item becomes an `E` value at that position; earlier items remain executable. Execute the whole program as given.
+2. Check the end of the assembled program. Append `.$` unless its last item is already the **operation** `.$`.
 3. Start with an empty data stack.
 4. Evaluate values and operations from left to right.
-5. Stop immediately when an `R` reaches the stack top. Silently discard the remaining parsed program.
-6. Stop on an evaluation error after applying error unwinding.
+5. Stop immediately when an `R` or explicit `E` reaches the stack top. Silently discard the remaining parsed program. Pushing an explicit `E` does not unwind the stack.
+6. Stop on a generated evaluation error after applying error unwinding.
 
 An escaped literal `..$` does not count as the final search operation.
 
-`.$` may occur earlier in a syntactically valid program. Its result terminates evaluation; subsequent parsed values do not execute. Pushing an `R` literal also terminates evaluation.
+`.$` may occur earlier in a syntactically valid program. Its result terminates evaluation; subsequent parsed values do not execute. Pushing an `R` or `E` literal also terminates evaluation.
 
 The specification describes the final stack, without prescribing a host-language return type.
 
@@ -177,11 +221,12 @@ Let `x` be an ordinary literal (`d`, `u`, or `p`).
 
 The second rule also applies to an empty stack. Result/error termination takes precedence over these rules.
 
-Structured state and result values are pushed separately:
+Structured state, result, and error values are pushed separately:
 
 ```text
 [K] | S -> [K, S]
 [K] | R -> [K, R]             # then stop evaluation
+[K] | E -> [K, E]             # stop without error unwinding
 ```
 
 For example:
@@ -192,11 +237,13 @@ For example:
 [S, [company, git]]        | https://example.com/{}   -> [S, [company, git, https://example.com/{}]]
 ```
 
-Do not lowercase, alphabetically sort, or deduplicate an accumulated literal array. Those transformations would destroy argument spelling, ordering, and the boundary inferred by search.
+Do not lowercase, sort, or deduplicate an accumulated literal array. Those transformations would destroy argument spelling, ordering, and the boundary inferred by search.
 
 ## 5. Dimensions, focus, and fuzzy matching
 
-Stored dimensions are trimmed, lowercase, space-free, deduplicated, and alphabetically sorted. This gives equivalent dimension sets a consistent searchable representation. Focus is also a stored dimension list, not an argument list.
+Stored dimensions are trimmed, lowercase, whitespace-free, deduplicated, and deterministically sorted. Use JavaScript's standard `trim()` and locale-independent `toLowerCase()`, followed by default string sorting (lexicographic UTF-16 code-unit order). Do not use locale-sensitive lowercasing or collation. Internal whitespace is invalid, not a request to split one supplied dimension into several.
+
+This gives equivalent dimension sets a consistent searchable representation. Focus is also a stored dimension list, not an argument list. Target order itself is preserved; only each target's dimensions and the focus dimensions are sorted.
 
 To construct a matching query:
 
@@ -207,9 +254,11 @@ To construct a matching query:
 
 Focus is implicit fuzzy-search input, not an exact namespace or an access-control boundary. Setting focus replaces it; it does not prepend the previous focus.
 
-Each target's alphabetically sorted dimensions are joined with spaces into **one searchable string**. Matching and ranking use fzf-style fuzzy matching against that string. A fuzzy token may span dimension boundaries.
+Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. Fuzzy-match each deduplicated query dimension independently against that entire string. Select a target only when every query dimension matches, and sum their scores for ranking. Rank higher summed scores first; preserve the target's order in the input target set when scores are equal. A fuzzy token may span dimension boundaries.
 
-Do not import fzf's special query operators, such as negation, anchors, or exact-match syntax. They have no special query-language meaning here. Matching is case-insensitive.
+Query-dimension order does not affect complete-list selection or its summed score: both `git company` and `company git` can match the searchable string `company git`. Do not pass the whole space-joined query as a single ordered fuzzy pattern. Search's longest-prefix inference still follows the user's original token order when deciding which tokens are matching inputs rather than arguments.
+
+Do not import fzf's special query operators, such as negation, anchors, or exact-match syntax. They have no special query-language meaning here. Matching is case-insensitive, but diacritic normalization is disabled: `cafe` does not match `café` by treating `é` as `e`.
 
 No additional confidence threshold or winner-margin rule is applied. A first-ranked match is not automatically a unique match.
 
@@ -382,7 +431,14 @@ hint.argDelta = A - P
 appliedArgs   = first min(A, P) supplied arguments
 ```
 
-`hint.argDelta` is the argument-balance field used by this specification. Other hint fields may be added for debugging or custom presentation.
+`hint.argDelta` is the argument-balance field used by this specification.
+
+Each match also reports matching evidence, so a presentation layer can highlight what matched without re-running the matcher:
+
+- `hint.positions`: the ascending, deduplicated character indices matched within that target's space-joined searchable string, covering every query dimension. Because a fuzzy token may span dimension boundaries, these are string indices, not dimension indices.
+- `hint.scores`: the per-query-dimension scores in query order, whose sum is the match's ranking score.
+
+These fields are matching evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
 - `0`: exactly enough arguments.
 - Positive: extra arguments; ignore them during substitution.
@@ -422,7 +478,22 @@ A direct-navigation candidate requires exactly one selected target and a nonnega
 
 Any operation with no matching stack rule emits an evaluation error. Operand validation failures and ambiguous `.set` selection also emit evaluation errors.
 
-When emitting an error:
+An explicit `E` value is not a newly generated evaluation failure: push it and stop without unwinding. For example, `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
+
+Every error carries a machine-readable `type` from this closed vocabulary, plus a human-readable `description`:
+
+| `type` | Raised when |
+| --- | --- |
+| `parse_error` | The source fails to parse, including malformed JSON and invalid operation syntax. |
+| `invalid_value` | A supplied or prepared structured value fails validation, such as duplicate normalized dimension sets. |
+| `invalid_destination` | A URL or destination template fails render-then-parse validation. |
+| `missing_dimensions` | An operation requires at least one explicit dimension and none was supplied. |
+| `ambiguous_set` | `.set` matches more than one target. |
+| `invalid_stack` | An operation's required stack shape or operand types are absent. |
+
+Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail.
+
+When generating an evaluation error:
 
 1. Pop stack elements until the nearest valid `S` reaches the top, or until the stack is empty.
 2. Preserve that `S` and everything below it.
@@ -447,7 +518,7 @@ Operations must preserve their input state until they have succeeded. An ambiguo
 
 Earlier successful operations are **not rolled back** on a later evaluation error. The retained state is the nearest working state at the point of failure, not necessarily the initial state.
 
-A parse error is different: because parsing completes before evaluation starts, no earlier operation in that source has executed.
+A parse failure behaves like any other `E` value in the stream: items before it have already executed, and pushing it stops evaluation without unwinding. A program whose first item is an unparsable token evaluates to `[E]`.
 
 ## 9. Worked programs
 
@@ -537,7 +608,7 @@ The argument is the literal `.rm`; no removal operation executes.
 S0 git .$ S1 docs .$
 ```
 
-Parse the entire program, execute the first search, and stop with its `[S0, R]`. Do not push `S1` or execute the second search.
+Execute the first search and stop with `[S0, R]`. Do not push `S1` or execute the second search.
 
 ### Failed `.set` preserves prior work
 
@@ -553,10 +624,9 @@ The first `.@` sets focus and the second clears it. `.set` then fails due to amb
 
 The core transitions above are agreed. These details still need to be pinned down before an implementation claims exact compatibility:
 
-- **Fuzzy scoring:** concrete fzf-compatible algorithm/library/version, multi-token score aggregation, and deterministic tie-breaking. No extra confidence threshold or fzf query operators should be introduced while choosing these.
-- **URL parsing details:** the concrete URL standard/parser and precise structural validation of templates containing `{}`. Acceptance of any scheme, the explicit-scheme requirement, and support for placeholders are settled. Raw argument substitution can also produce unusual URLs; browser/security policy is outside this language specification.
-- **Character rules:** exact whitespace handling, Unicode lowercasing, and alphabetical collation. These must be consistent across stored dimensions and matching copies.
-- **Incoming state/result validation:** treatment of noncanonical dimension arrays, duplicate targets, and unknown fields in supplied JSON envelopes. Do not silently assume whether these are normalized or rejected.
-- **Error details:** diagnostic field names/codes and whether a literal `["E", {}]` may appear in source. Runtime-generated errors and their unwind behavior are defined above.
+- **Fuzzy scoring:** the browser client uses the npm `fzf` port as an ordinary dependency; its remaining algorithm configuration is settled with tests. Independent per-dimension matching with AND selection, summed scores, target-set order for ties, and disabled diacritic normalization are settled. No extra confidence threshold or fzf query operators should be introduced while choosing the remaining details.
+- **Incoming value validation:** exact structural checks for supplied state, result, and error envelopes, and for values such as accumulated literal arrays that have no textual form. Normalization, duplicate rejection, preservation of unknown fields, JavaScript whitespace, trimming, locale-independent lowercasing, and default string sorting are settled.
+- **Error details:** which conditions map to which `type`, and any further diagnostic fields such as source positions. The vocabulary, envelope shape, explicit-error handling, and unwind behavior are settled above.
+
 
 Implementation work should resolve these explicitly rather than changing the agreed operation semantics as a side effect.
