@@ -35,7 +35,7 @@ export type Target = readonly [dims: readonly NormDim[], destination: Template];
 export type TargetSet = readonly Target[];
 
 // State `S` = ["S", { targets, focus }]. The in-memory shape is the wire/JSON
-// shape (ADR-0003: the client treats envelopes as opaque JSON), so there is no
+// shape (ADR-0003: the client treats these values as opaque JSON), so there is no
 // serialization seam. `Target`/`TargetSet` appear only here, never in the
 // program- or stack-value union, which is how dsl.md §1's "t and T cannot appear
 // as standalone values" holds in the type system.
@@ -87,10 +87,6 @@ export type ThitherError = readonly [
   { readonly type: string; readonly description: string } & Extra,
 ];
 
-// The pushable/persisted values: what a host may supply and what the stack holds
-// besides an in-flight literal array.
-export type Envelope = State | Result | ThitherError;
-
 // An operation's name: the key a program item and the environment share. Open by
 // design: the built-in operations are dsl.md's four, a client may register more
 // (ADR-0005). ("Sigil" is reserved for a program item's position-0 tag, e.g.
@@ -100,8 +96,8 @@ export type Operation = string;
 // The operations the default environment binds; the closed default subset of Operation.
 export type BuiltinOperation = ".set" | ".rm" | ".@" | ".$";
 
-// Every program item is a ["sigil", body] tuple, the shape the wire envelopes
-// already take, so envelopes flatten straight into the union. A literal is
+// Every program item is a ["sigil", body] tuple, the shape the wire S/R/E values
+// already take, so they flatten straight into the union. A literal is
 // tagged rather than left bare because escaping collides its text with an
 // operation's: `..set` parses to the literal `.set`, whose string equals the
 // operation `.set`, so the sigil must be carried, not read from the text. The
@@ -121,8 +117,8 @@ export type Program = readonly ProgramItem[];
 // place and returns it for convenience. The values it holds stay readonly, so the
 // snapshots a client persists cannot be mutated (docs/code-standards.md "Types").
 // A single literal is never bare on it; it starts a one-element literal array
-// (dsl.md "[K], top is not L | x -> [K, [x]]"), so an element is an envelope or L.
-export type StackValue = Envelope | LiteralArray;
+// (dsl.md "[K], top is not L | x -> [K, [x]]"), so an element is an S/R/E value or L.
+export type StackValue = State | Result | ThitherError | LiteralArray;
 export type Stack = StackValue[];
 
 // An operation's behaviour: take the whole stack, mutate it (unwinding included),
