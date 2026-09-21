@@ -1,29 +1,50 @@
-// dsl.md "Core interface" (via browser-client.md) — the core's entire public surface.
+// browser-client.md "Core interface" — the core's entire public surface.
 //
-// Adding an export here is a specification change: browser-client.md names exactly
-// these four symbols. The value model behind them is designed in ticket 04 and the
-// behaviour implemented from ticket 05 onward; the placeholder types below are
-// deliberately opaque so no caller can start depending on a shape that is not yet
-// specified.
+// Adding an export here is a specification change: browser-client.md names this
+// surface. Behaviour is implemented from ticket 09 onward; the placeholders
+// below are deliberately inert so no caller depends on an unimplemented shape.
 
 import { invariant } from "../lib/invariant.ts";
+import type {
+  BuiltinOperation,
+  Interpreter,
+  InterpreterEnv,
+  OperationFn,
+  Stack,
+  State,
+} from "./types.ts";
 
-/** An immutable ordered list of values. Shape pinned down by ticket 04. */
-export type Program = readonly unknown[];
+export type {
+  Interpreter,
+  InterpreterEnv,
+  Operation,
+  OperationFn,
+  Program,
+  Stack,
+} from "./types.ts";
 
-/** A data stack produced by evaluation. Shape pinned down by ticket 04. */
-export type Stack = readonly unknown[];
+const unimplemented =
+  (op: BuiltinOperation): OperationFn =>
+  (_stack) => {
+    invariant(false, `operation ${op} is not implemented yet`);
+  };
 
-export const emptyProgram: Program = Object.freeze([]);
-
-export function parse(_program: Program, _item: unknown): Program {
-  invariant(false, "parse is not implemented yet (ticket 05)");
+/** An environment preloaded with dsl.md's four operations and the seed stack. */
+export function defaultEnv(): InterpreterEnv {
+  const seed: State = ["S", { targets: [], focus: [] }];
+  const initialStack: Stack = [seed];
+  return {
+    symbols: new Map<string, OperationFn>([
+      [".set", unimplemented(".set")],
+      [".rm", unimplemented(".rm")],
+      [".@", unimplemented(".@")],
+      [".$", unimplemented(".$")],
+    ]),
+    initialStack,
+  };
 }
 
-export function execute(_program: Program): Stack {
-  invariant(false, "execute is not implemented yet (ticket 09)");
-}
-
-export function initialStack(): Stack {
-  invariant(false, "initialStack is not implemented yet (ticket 09)");
+/** Bind an environment, producing an interpreter that speaks its symbol set. */
+export function createInterpreter(_env: InterpreterEnv): Interpreter {
+  invariant(false, "createInterpreter is not implemented yet (ticket 09)");
 }

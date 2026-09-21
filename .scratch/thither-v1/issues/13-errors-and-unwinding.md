@@ -6,7 +6,7 @@ Blocked by: 10, 11
 
 ## Question
 
-Implement and test error construction and unwinding per `dsl.md` §6.
+Verify error construction and unwinding compose correctly across the real operations, per `dsl.md` §6. The primitives themselves — the `E` constructor and `unwind(stack)` — are delivered by ticket 09, and the closed `ErrorType` union lives in `types.ts` (ticket 04's answer); this ticket proves they are complete and correct once 10/11 exist.
 
 The closed `type` vocabulary — `parse_error`, `invalid_value`, `invalid_destination`, `missing_dimensions`, `ambiguous_set`, `invalid_stack` — each paired with a human-readable `description`. Map every failure condition in the spec onto exactly one type. Adding a type is a specification change, so if a condition fits none of them, raise that on this ticket rather than inventing one.
 

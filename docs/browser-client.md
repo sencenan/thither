@@ -41,21 +41,26 @@ Keep program input in the URL after execution. Reloading executes it again again
 
 ## Core interface
 
-The core exposes a **program** as an immutable ordered list of values, built with one function and a constant:
+The core exposes an **interpreter**, built from an environment (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)):
 
-- `emptyProgram`: the starting program.
-- `parse(program, item)`: append one string token or one structured value.
-- `execute(program)`: evaluate the whole program, producing a data stack.
-- `initialStack()`: the stack a client persists before its first execution, containing one state value with no targets and empty focus.
+- `defaultEnv()`: an environment preloaded with the language's four operations (`.set`, `.rm`, `.@`, `.$`) and the seed stack. A client may register further symbols on `env.symbols` before building the interpreter.
+- `createInterpreter(env)`: bind an environment, producing an interpreter.
 
-Parse failures are values, not exceptions: a failed parse yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path, no `try`/`catch`, and no validation of its own. The same entry point validates any data the client holds, including manually supplied reset JSON.
+The interpreter exposes a **program** as an immutable ordered list of values:
+
+- `interp.emptyProgram`: the starting program.
+- `interp.append(program, item)`: append one string token or one structured value, validated against the environment.
+- `interp.execute(program)`: evaluate the whole program against a fresh empty stack, producing a data stack.
+- `interp.initialStack`: the stack a client persists before its first execution, containing one state value with no targets and empty focus.
+
+Parse failures are values, not exceptions: a failed `append` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path, no `try`/`catch`, and no validation of its own. The same entry point validates any data the client holds, including manually supplied reset JSON.
 
 ## Execution flow
 
-The client builds each program as `tokens.reduce(parse, parse(emptyProgram, lastStackValue))`, per [ADR 0003](adr/0003-clients-resume-from-last-stack-value.md), and treats persisted stack contents as opaque language data throughout.
+The client builds each program as `tokens.reduce(interp.append, interp.append(interp.emptyProgram, lastStackValue))`, per [ADR 0003](adr/0003-clients-resume-from-last-stack-value.md), and treats persisted stack contents as opaque language data throughout.
 
-1. Load the entire current persisted stack from localStorage. When the record is absent, take `initialStack()` as the current stack.
-2. Copy the final value of that stack, without modifying the persisted snapshot, and append it to `emptyProgram` as the program's first item. If the stack is empty, append no leading item and do not synthesize a state value. Earlier values in the stack are retained for debugging and possible future extensions, but never participate in the next execution.
+1. Load the entire current persisted stack from localStorage. When the record is absent, take `interp.initialStack` as the current stack.
+2. Copy the final value of that stack, without modifying the persisted snapshot, and append it to `interp.emptyProgram` as the program's first item. If the stack is empty, append no leading item and do not synthesize a state value. Earlier values in the stack are retained for debugging and possible future extensions, but never participate in the next execution.
 3. Split the user's input on whitespace and append each token. Search-bar users are not expected to type structured state, so input tokens are never treated as JSON.
 4. Execute, then pop the terminal `R` or `E`. Persist the entire remaining stack and update bounded history before navigating.
 5. For an `R` on initial URL-driven execution, navigate when exactly one target is selected with a nonnegative argument balance; otherwise show the fallback UI. There is no special case forcing a bare URL to the fallback UI. For an `E`, display its `type` and `description` without interpreting the type value.
@@ -104,7 +109,7 @@ While the target set is empty, the page shows setup instructions in place of the
 
 Provide a Settings control on the page, opening a modal containing stack history, manual state reset, and history-limit configuration. Do not reserve a settings URL or bypass normal execution with a parameter such as `view=settings`; users reach the page through a query with no matches or an ambiguous one, then open Settings.
 
-The reset editor accepts a JSON stack array directly, such as `[["S", {"targets": [], "focus": []}]]`, without an extra object wrapper. Validate each supplied value through `parse`: an invalid value yields `E` and the reset is refused without touching the stored record. A successful reset makes the supplied stack current and pushes the previous current stack into history under the same difference rule; it neither clears history nor executes the supplied stack. When the stored record is unreadable there is no previous current stack to retain, so reset simply writes the new record.
+The reset editor accepts a JSON stack array directly, such as `[["S", {"targets": [], "focus": []}]]`, without an extra object wrapper. Validate each supplied value through `interp.append`: an invalid value yields `E` and the reset is refused without touching the stored record. A successful reset makes the supplied stack current and pushes the previous current stack into history under the same difference rule; it neither clears history nor executes the supplied stack. When the stored record is unreadable there is no previous current stack to retain, so reset simply writes the new record.
 
 Navigation applies no client-side scheme allowlist and no scheme-based confirmation: for an otherwise eligible destination, attempt navigation and let the browser enforce its own restrictions. This is an explicit user-controlled policy — destinations such as `javascript:` can execute code in the page's context, potentially reading or modifying localStorage, and some schemes may simply be refused.
 
@@ -112,7 +117,7 @@ Navigation applies no client-side scheme allowlist and no scheme-based confirmat
 
 Retain the current persisted stack and at most **N previous persisted stacks**, with **N defaulting to 10**; the current stack is not counted against N. Snapshots hold the entire returned stack after its terminal `R` or `E` is popped, are never mutated by later executions, and change only by adding entries or evicting the oldest.
 
-On first initialization the current stack is `initialStack()`. It becomes a historical entry after the first execution that changes the stack, so the first mutation can be undone. History is a plain list of previous stacks, with no input, timestamp, or origin metadata.
+On first initialization the current stack is `interp.initialStack`. It becomes a historical entry after the first execution that changes the stack, so the first mutation can be undone. History is a plain list of previous stacks, with no input, timestamp, or origin metadata.
 
 Push the previous current stack into history only when the new current stack differs from it, comparing by structural JSON equality. Ordinary searches therefore add no entry. This deduplication applies to executions, resets, and restorations alike. Note that resuming from only the last value means a previous stack `[A, B]` becomes a shorter stack such as `[B']`, which differs structurally and so does add an entry.
 

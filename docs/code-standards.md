@@ -18,7 +18,9 @@ Imports flow one way: `client → dsl`, `client → lib`, `dsl → lib`. `lib` i
 
 Inside each area the **root files are the public surface**; `lib/` holds implementation and `tests/` holds tests. Import a module through its root files.
 
-`src/dsl` has exactly one entry point, `index.ts`, exporting exactly the four symbols `browser-client.md` specifies: `emptyProgram`, `parse`, `execute`, `initialStack`. That file *is* the core's documented interface, so adding an export to it is a specification change — amend `browser-client.md` in the same commit or don't add it. This is the only barrel in the repo; elsewhere, expose several small root files rather than re-exporting a subtree.
+`src/dsl` has exactly one entry point, `index.ts`, exporting the surface `browser-client.md` specifies: `createInterpreter` and `defaultEnv`, plus the types those need. Everything else — building a program, appending items, executing, the seed stack — hangs off the `Interpreter` those return. That file *is* the core's documented interface, so adding an export to it is a specification change — amend `browser-client.md` in the same commit or don't add it. This is the only barrel in the repo; elsewhere, expose several small root files rather than re-exporting a subtree. (The surface diverged from an earlier four-symbol shape when the operation set became a client-extensible environment — see [ADR 0005](adr/0005-extensible-interpreter-environment.md).)
+
+The whole language type algebra lives in one file, `src/dsl/types.ts`, so a developer reads the vocabulary in one place. `index.ts` re-exports from it; no other module redefines a core type.
 
 File names are kebab-case: `match-ordering.ts`, `destination-template.ts`.
 
@@ -28,9 +30,11 @@ Model data with `type` and `interface`. Behaviour lives in functions that take t
 
 Enums are fine, including `const enum`. The one form to avoid is the **ambient** `declare const enum`: `isolatedModules` rejects it, because a transpiler compiling one file at a time has no way to read its values. Note also that an exported `const enum` loses its inlining across a module seam for the same reason — esbuild emits an ordinary enum object — so reach for it for local clarity, not for speed.
 
-At every edge where untrusted input arrives, type the input `unknown` and narrow it. That is the whole contract of `parse`: it accepts any string or object and answers with a value. Reach for `@total-typescript/shoehorn` when a test needs partial data.
+Discriminate a tagged union on element 0 of a `["sigil", body]` tuple, the shape the wire envelopes (`S`, `R`, `E`) already take. Parsed program items reuse it, so every discriminated value in the core shares one style and reads like the persisted JSON. Do not introduce a `kind`/`type` discriminant field where a sigil tuple does the job; and keep the field name `type` for domain data only (an `E` payload's error category), never as a structural tag.
 
-Mark core data `readonly`, including `ReadonlyArray`, and return new values rather than editing arguments. Deep-freeze fixtures in tests so an accidental mutation fails loudly there instead of silently corrupting a persisted snapshot in the browser.
+At every edge where untrusted input arrives, type the input `unknown` and narrow it. That is the whole contract of `Interpreter.append`: it accepts any string or object and answers with a value. Reach for `@total-typescript/shoehorn` when a test needs partial data.
+
+Mark core data `readonly`, including `ReadonlyArray`, and return new values rather than editing arguments. The one carve-out is the evaluator's working `Stack`: a mutable array an `OperationFn` edits in place (and returns for convenience), because a stack machine is naturally imperative. Its safety rests on the *values* it holds — `S`, `R`, `E`, `L` — staying `readonly`, so nothing a client persists can be mutated through the stack. Deep-freeze fixtures in tests so an accidental mutation fails loudly there instead of silently corrupting a persisted snapshot in the browser.
 
 ## Failure
 
@@ -52,13 +56,17 @@ The worked programs of `dsl.md` §7 are golden end-to-end cases and must produce
 
 ## Comments and names
 
+Go easy on comments. Every comment is a second thing to keep in sync with the code, and it rots the moment they disagree. Prefer a self-describing type or a sharper name over a sentence explaining a vague one — the type algebra should for the most part read on its own.
+
 Head each `src/dsl` module with the spec section it implements:
 
 ```ts
 // dsl.md §4.4 — .$ search and boundary inference
 ```
 
-Comments carry the *why*: the reason for a choice, the trap avoided, the rule that looks wrong but is specified. The code states the *what*.
+Beyond that header, comment only the *why* the code cannot state: the trap avoided, the rule that looks wrong but is specified, the reason a choice was made over its obvious alternative. Never restate the *what* — if a comment paraphrases the code, delete one of them.
+
+Domain types are the exception that proves the rule: the dsl's type algebra lives in one file, `src/dsl/types.ts`, so a developer can read the whole vocabulary in one place. Keep its comments to the few distinctions the types genuinely cannot carry.
 
 Identifiers use `CONTEXT.md` vocabulary exactly — dimension, target, destination template, focus, match, argument balance, fallback page — and avoid the synonyms that glossary lists under `_Avoid_`. A concept missing from the glossary is a signal: either the name is invented, or the glossary has a gap worth filling.
 
