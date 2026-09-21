@@ -1,5 +1,9 @@
 # Thither
 
+## Writing code
+
+Layout, types, failure handling, test placement, and commit policy: `docs/code-standards.md`. Read it before adding or editing source.
+
 ## Agent skills
 
 ### Issue tracker

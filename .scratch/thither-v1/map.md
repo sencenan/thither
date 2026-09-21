@@ -31,7 +31,7 @@ Done when: the language core passes conformance tests traceable to every normati
 
 <!-- one line per resolved ticket: gist + link -->
 
-_None yet._
+- [Code principles and style rules](issues/01-code-principles-and-style-rules.md): Biome (2 spaces, width 100) for format and lint, strict tsc without `erasableSyntaxOnly` so enums stay, `type`/`interface` over classes, `src/dsl` + `src/lib` + `src/client` with a DOM-free tsconfig for the core and dependency-cruiser holding the import direction, values-not-exceptions in the core behind one `invariant()`, `readonly` plus test-only deep freeze, tests in `tests/` subfolders citing spec sections, `ticket/NN-slug` branches merged `--no-ff`. Written to [docs/code-standards.md](../../docs/code-standards.md).
 
 ## Not yet specified
 
