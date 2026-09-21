@@ -32,11 +32,25 @@ Model data with `type` and `interface`. Behaviour lives in functions that take t
 
 Enums are fine, including `const enum`. The one form to avoid is the **ambient** `declare const enum`: `isolatedModules` rejects it, because a transpiler compiling one file at a time has no way to read its values. Note also that an exported `const enum` loses its inlining across a module seam for the same reason — esbuild emits an ordinary enum object — so reach for it for local clarity, not for speed.
 
-Discriminate a tagged union on element 0 of a `["sigil", body]` tuple, the shape the wire envelopes (`S`, `R`, `E`) already take. Parsed program items reuse it, so every discriminated value in the core shares one style and reads like the persisted JSON. Do not introduce a `kind`/`type` discriminant field where a sigil tuple does the job; and keep the field name `type` for domain data only (an `E` payload's error category), never as a structural tag.
+Discriminate a tagged union on element 0 of a `["sigil", body]` tuple, the shape the wire values (`S`, `R`, `E`) already take. Parsed program items reuse it, so every discriminated value in the core shares one style and reads like the persisted JSON. Do not introduce a `kind`/`type` discriminant field where a sigil tuple does the job; and keep the field name `type` for domain data only (an `E` payload's error category), never as a structural tag.
 
 At every edge where untrusted input arrives, type the input `unknown` and narrow it. That is the whole contract of `Interpreter.append`: it accepts any string or object and answers with a value. Reach for `@total-typescript/shoehorn` when a test needs partial data.
 
 Mark core data `readonly`, including `ReadonlyArray`, and return new values rather than editing arguments. The one carve-out is the evaluator's working `Stack`: a mutable array an `OperationFn` edits in place (and returns for convenience), because a stack machine is naturally imperative. Its safety rests on the *values* it holds — `S`, `R`, `E`, `L` — staying `readonly`, so nothing a client persists can be mutated through the stack. Deep-freeze fixtures in tests so an accidental mutation fails loudly there instead of silently corrupting a persisted snapshot in the browser.
+
+## Interfaces
+
+Design an interface from the caller inward: state the signature a caller wants, then make the implementation meet it. The reverse — building the mechanism and exporting whatever it happened to need — is how leaked parameters and awkward return types get in, and no amount of explanatory prose repairs them afterwards.
+
+**Return the narrowest concrete type.** `validateState` returns `State | undefined`, never a union widened to cover a sibling's result. A function returning something broader than its name promises is a lie by widening, and every caller pays for it in narrowing.
+
+**An alias must be clearer than what it aliases.** `State | Result | ThitherError` reads better than a name like `Envelope`, so that alias is not worth its indirection. Name a union only when the name carries meaning its members do not.
+
+**Keep total transforms separate from partial validation.** A transform that cannot fail must not return `T | undefined` because a validity check was fused into it: that failure mode then propagates to every caller, including the ones that cannot fail. Split them — a predicate (`isValidDimension`) run at the edge where input is untrusted, and a total transform (`normalizeDimension`) everyone else uses freely. The parser validates then normalizes; the matcher only normalizes, and inherits no `undefined` to handle.
+
+**No leaked parameters.** If the callee only merges two parameters and never branches on the difference, the difference belongs to the caller. Detector: does the body *use* the distinction, or immediately erase it? The matcher took a `focus` argument used solely for `[...focus, ...explicit]`, importing a state concept into a matching primitive for no gain; callers now merge, and the matcher takes one flat list.
+
+**A name tracks its responsibility, and changes in the same commit the responsibility does.** `normalization.ts` became `dimension.ts` when it gained validation.
 
 ## Failure
 
@@ -58,7 +72,7 @@ The worked programs of `dsl.md` §7 are golden end-to-end cases and must produce
 
 ## Comments and names
 
-Go easy on comments. Every comment is a second thing to keep in sync with the code, and it rots the moment they disagree. Prefer a self-describing type or a sharper name over a sentence explaining a vague one — the type algebra should for the most part read on its own.
+Every comment is a second thing to keep in sync with the code, and it rots the moment they disagree. Before writing one, try to delete it by changing the code instead.
 
 Head each `src/dsl` module with the spec section it implements:
 
@@ -66,7 +80,16 @@ Head each `src/dsl` module with the spec section it implements:
 // dsl.md §4.4 — .$ search and boundary inference
 ```
 
-Beyond that header, comment only the *why* the code cannot state: the trap avoided, the rule that looks wrong but is specified, the reason a choice was made over its obvious alternative. Never restate the *what* — if a comment paraphrases the code, delete one of them.
+Beyond that header, a comment has to survive all four questions to earn its place:
+
+1. **Does the code already say this?** A paraphrase of the line below it (`// trim, then lowercase` over `raw.trim().toLowerCase()`) is duplication. Delete one of them.
+2. **Does the *type* already say this?** Totality, nullability, immutability, and what a function returns are the signature's job. If the type does not say it, fix the type rather than annotating around it.
+3. **Is this arguing *why this design over another*?** That belongs in the ticket answer or an ADR, which are durable and reviewable. Source states the design; it never defends it.
+4. **Is this the plan rather than the spec?** Ticket numbers and restated seam maps ("knows nothing of the stack") go stale and are recorded elsewhere already — the import list proves the second claim better than a sentence does. Cite `dsl.md §N`, never a ticket number.
+
+What survives is the *why* the code cannot state: the trap avoided, the rule that looks wrong but is specified, an ordering dependency, a policy choice the code under-determines.
+
+**Comment pressure is a design smell.** If a signature needs a paragraph to explain it, the signature is wrong — fix it instead, and the paragraph disappears with it. A module whose comments outweigh its code is under-designed or over-explained; treat that ratio as a review trigger, not a target to game.
 
 Domain types are the exception that proves the rule: the dsl's type algebra lives in one file, `src/dsl/types.ts`, so a developer can read the whole vocabulary in one place. Keep its comments to the few distinctions the types genuinely cannot carry.
 
