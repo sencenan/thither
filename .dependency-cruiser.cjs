@@ -5,9 +5,12 @@
  *   src/dsl has exactly one entry point, index.ts.
  *
  * dependency-cruiser cannot use typescript@7 yet (it accepts >=2 <7), so
- * @swc/core is installed purely as its TypeScript parser; type-only imports are
- * still detected. Its "missing-typescript-transpiler" warning on every run is
- * expected — drop @swc/core once dependency-cruiser supports typescript@7.
+ * @swc/core is its parser instead. swc keeps `import type` statements in the
+ * AST, so type-only edges are still cruised. The tsConfig and
+ * tsPreCompilationDeps options are deliberately absent: both are inert without
+ * a usable tsc, and setting them only triggers dependency-cruiser's
+ * missing-typescript-transpiler warning. Revisit when dependency-cruiser
+ * supports typescript@7, or if this repo grows tsconfig path aliases.
  */
 module.exports = {
   forbidden: [
@@ -60,8 +63,7 @@ module.exports = {
   options: {
     doNotFollow: { path: "node_modules" },
     includeOnly: "^src/",
-    tsConfig: { fileName: "tsconfig.json" },
-    tsPreCompilationDeps: true,
+    parser: "swc",
     enhancedResolveOptions: {
       extensions: [".ts", ".js"],
       exportsFields: ["exports"],

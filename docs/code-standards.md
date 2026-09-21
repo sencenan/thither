@@ -68,6 +68,8 @@ Work each ticket on `ticket/NN-slug`, branched from `main`. Merge with `--no-ff`
 
 A ticket's code, its `## Answer`, and the map's Decisions-so-far line land in the same commit: the tree and the map then agree at every commit.
 
+Merging publishes nothing. The deployed page is whatever the newest `v*` tag points at, per [ADR 0004](adr/0004-publish-by-tag.md); release with `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
 ## Tool-enforced
 
 | Rule | Tool | Setting |
