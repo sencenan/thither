@@ -4,7 +4,7 @@ Status: agreed scope and execution flow; integration details remain open. Langua
 
 ## Scope
 
-Axon is a static web application containing a JavaScript browser client and a JavaScript-compatible language core. The supported entry point is the browser address/search bar through a configured search shortcut.
+Thither is a static web application containing a JavaScript browser client and a JavaScript-compatible language core. The supported entry point is the browser address/search bar through a configured search shortcut.
 
 This browser client is one possible client, not the only intended client. Decisions here bind this client, while the language core stays client-agnostic.
 
@@ -68,7 +68,7 @@ The initial release is published on GitHub Pages. There is no server-side interp
 
 Selected tooling: vanilla TypeScript without a UI framework, Vite with `vite-plugin-singlefile`, a separate `tsc --noEmit` type-check step, and a GitHub Actions workflow that builds and deploys the resulting page.
 
-Use the browser-compatible npm `fzf` port (`ajitid/fzf-for-js`) for fuzzy matching and bundle it into the inline JavaScript. Its authors explicitly target browser use. Treat it as an ordinary dependency under the project's normal versioning policy, and test Axon's expected behavior rather than claiming score parity with current upstream fzf. Each target's sorted dimensions form one space-separated searchable string. Match each query dimension independently against that full string, require every dimension to match, and sum their scores, as specified in [dsl.md](dsl.md). Disable diacritic normalization, retain case-insensitive matching, and preserve target-set order when summed scores are equal. Remaining algorithm configuration is an implementation detail to settle with tests; see [the library research](research/fzf-libraries.md).
+Use the browser-compatible npm `fzf` port (`ajitid/fzf-for-js`) for fuzzy matching and bundle it into the inline JavaScript. Its authors explicitly target browser use. Treat it as an ordinary dependency under the project's normal versioning policy, and test Thither's expected behavior rather than claiming score parity with current upstream fzf. Each target's sorted dimensions form one space-separated searchable string. Match each query dimension independently against that full string, require every dimension to match, and sum their scores, as specified in [dsl.md](dsl.md). Disable diacritic normalization, retain case-insensitive matching, and preserve target-set order when summed scores are equal. Remaining algorithm configuration is an implementation detail to settle with tests; see [the library research](research/fzf-libraries.md).
 
 The build should verify that the deployable output contains only `index.html` and does not reference external application scripts or stylesheets. The single-file plugin does not automatically inline arbitrary files from Vite's `public` directory; avoid assuming that plugin installation alone guarantees a self-contained artifact.
 
@@ -93,7 +93,7 @@ Serialize the complete read → execute → save sequence across tabs using the 
 
 Persist two versioned localStorage records. Version suffixes exist so a later format can migrate rather than silently corrupt existing data.
 
-`axon.stacks.v1` is a flat array of stacks, oldest first, whose **last element is the current stack**:
+`thither.stacks.v1` is a flat array of stacks, oldest first, whose **last element is the current stack**:
 
 ```jsonc
 [ [/* oldest retained stack */], [/* ... */], [/* current stack */] ]
@@ -101,7 +101,7 @@ Persist two versioned localStorage records. Version suffixes exist so a later fo
 
 Eviction removes elements from the front. With history limit `N`, the array holds at most `N + 1` stacks. An empty array is not a valid record; absence of the key is how "no stored data" is represented.
 
-`axon.settings.v1` holds configuration only:
+`thither.settings.v1` holds configuration only:
 
 ```jsonc
 { "historyLimit": 10 }

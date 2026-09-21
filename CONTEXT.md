@@ -1,6 +1,6 @@
-# Axon
+# Thither
 
-Axon helps people navigate quickly to known web destinations using short dimensions and optional arguments, rather than searching history, bookmarks, or open tabs.
+Thither helps people navigate quickly to known web destinations using short dimensions and optional arguments, rather than searching history, bookmarks, or open tabs.
 
 Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 

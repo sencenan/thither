@@ -1,8 +1,8 @@
-# Axon DSL specification
+# Thither DSL specification
 
 Status: agreed core semantics; remaining precision questions are listed at the end.
 
-This document specifies Axon's stack-based language for maintaining targets, setting focus, and resolving navigation inputs. Domain terminology is defined in [CONTEXT.md](../CONTEXT.md).
+This document specifies Thither's stack-based language for maintaining targets, setting focus, and resolving navigation inputs. Domain terminology is defined in [CONTEXT.md](../CONTEXT.md).
 
 Browser integration, HTTP behavior, persistence, authentication, deployment, and the concrete host interpreter interface are outside this specification. Every evaluation starts with an empty data stack, and the interpreter executes the whole supplied program. Examples below supply state as the program's first item. See [browser-client.md](browser-client.md) for one host's contract.
 
@@ -43,7 +43,7 @@ Browser integration, HTTP behavior, persistence, authentication, deployment, and
 - Matching uses lowercase copies, prepends focus, and deduplicates. Stored dimensions are trimmed, lowercase, deduplicated, and sorted by JavaScript's default string order; join each target's dimensions with spaces into one searchable string. Fuzzy-match each query dimension independently against that entire string, require all query dimensions to match, and sum their scores. Preserve target-set order on equal scores. Disable diacritic normalization and fzf query operators.
 - Produce one match per selected target, including incomplete ones. Fill original `{}` placeholders left-to-right with literal, case-preserved arguments; do not URL-encode. Ignore extras; leave missing placeholders intact. `hint.argDelta = supplied arguments − placeholders`; each `m` stores only applied arguments. Keep fuzzy rank order in `R`; `R.inputs` excludes focus and arguments.
 - **Error unwinding:** Pop until the nearest `S` is on top, retaining everything below it, then push `E` and stop. If no `S` exists, end with `[E]`. Earlier successful changes survive; a failing operation must preserve its own input state. An error carries a machine-readable `type` and a human-readable `description`.
-- **Destination validation:** render every `{}` with the probe token `axon`, then validate the result with the WHATWG `URL` parser; store the original template text. Placeholders are allowed in any position.
+- **Destination validation:** render every `{}` with the probe token `thither`, then validate the result with the WHATWG `URL` parser; store the original template text. Placeholders are allowed in any position.
 
 The numbered sections below expand these rules and define result presentation and remaining precision questions.
 
@@ -154,9 +154,9 @@ Scheme-less destinations such as `example.com/path`, `/path/{}`, and `//example.
 
 Validation must account for `{}` rather than reject a template solely because it contains placeholders. Keep the original template text for literal substitution; validation must not silently encode or rewrite its placeholders.
 
-Validate by rendering, not by parsing the raw template: replace every `{}` with the probe token `axon`, then validate that rendered string with the standard WHATWG `URL` parser. Accept the destination when the rendered form parses and has an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of the probe. A template that renders invalid is rejected at validation time.
+Validate by rendering, not by parsing the raw template: replace every `{}` with the probe token `thither`, then validate that rendered string with the standard WHATWG `URL` parser. Accept the destination when the rendered form parses and has an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of the probe. A template that renders invalid is rejected at validation time.
 
-Placeholders may appear in any position, including the scheme: `{}://example.com` renders as `axon://example.com` and is accepted. Substituting actual arguments can still produce a different, possibly invalid, URL at navigation time; template acceptance is not a promise about every rendered result.
+Placeholders may appear in any position, including the scheme: `{}://example.com` renders as `thither://example.com` and is accepted. Substituting actual arguments can still produce a different, possibly invalid, URL at navigation time; template acceptance is not a promise about every rendered result.
 
 This validation rule applies wherever a destination is accepted, including `.set` operands and destinations inside supplied state.
 
@@ -167,7 +167,7 @@ https://exa mple.com/{}
 example.com/{}
 ```
 
-`{}://example.com` is accepted: it renders as `axon://example.com`, which parses.
+`{}://example.com` is accepted: it renders as `thither://example.com`, which parses.
 
 This is a language-level acceptance rule, not permission for a browser or other host to execute every accepted scheme. Host security policy remains outside this specification.
 
@@ -405,14 +405,14 @@ With no supplied literals, search using focus alone; with empty focus, select al
 Example, with a target whose dimensions are `[company, git]`:
 
 ```text
-company           -> matches
-company git       -> matches
-company git axon  -> no matches
+company              -> matches
+company git          -> matches
+company git thither  -> no matches
 ```
 
-The selected matching prefix is `company git`; `axon` is the argument.
+The selected matching prefix is `company git`; `thither` is the argument.
 
-If instead `company git axon` itself matches a target, the longest-prefix rule consumes `axon` as matching input. Use `?` when an explicit argument boundary is needed.
+If instead `company git thither` itself matches a target, the longest-prefix rule consumes `thither` as matching input. Use `?` when an explicit argument boundary is needed.
 
 #### Results
 
@@ -461,8 +461,8 @@ Examples:
 | Template | Supplied arguments | Rendered destination | `argDelta` | Applied arguments |
 | --- | --- | --- | --- | --- |
 | `https://example.com/{}` | `MyRepo` | `https://example.com/MyRepo` | `0` | `[MyRepo]` |
-| `https://example.com/{}` | `axon extra` | `https://example.com/axon` | `1` | `[axon]` |
-| `https://example.com/{}/tree/{}` | `axon` | `https://example.com/axon/tree/{}` | `-1` | `[axon]` |
+| `https://example.com/{}` | `thither extra` | `https://example.com/thither` | `1` | `[thither]` |
+| `https://example.com/{}/tree/{}` | `thither` | `https://example.com/thither/tree/{}` | `-1` | `[thither]` |
 | `https://example.com/{}` | none | `https://example.com/{}` | `-1` | `[]` |
 | `https://example.com/` | `ignored` | `https://example.com/` | `1` | `[]` |
 
@@ -574,14 +574,14 @@ Result:
   ],
   "focus": []
 }]
-git ? axon .$
+git ? thither .$
 ```
 
 Both targets appear in `R.matches`:
 
 ```text
-https://github.com/company/axon         argDelta:  0
-https://github.com/personal/axon/tree/{} argDelta: -1
+https://github.com/company/thither          argDelta:  0
+https://github.com/personal/thither/tree/{} argDelta: -1
 ```
 
 The result is ambiguous even though only one URL is complete. Their actual match-array ordering follows fuzzy ranking, not the order used to display this example.

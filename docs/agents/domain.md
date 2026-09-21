@@ -6,7 +6,7 @@ This repo is **single-context**: one `CONTEXT.md` and one `docs/adr/` at the roo
 
 ## Before exploring, read these
 
-- **`CONTEXT.md`** at the repo root: the Axon domain glossary (dimensions, targets, destination templates, focus, and so on).
+- **`CONTEXT.md`** at the repo root: the Thither domain glossary (dimensions, targets, destination templates, focus, and so on).
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.

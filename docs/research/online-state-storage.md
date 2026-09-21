@@ -1,14 +1,14 @@
-# Free online storage for Axon state
+# Free online storage for Thither state
 
 > **Outcome:** deferred. The first client keeps all state in browser localStorage, with no remote storage or synchronization; see [ADR 0001](../adr/0001-localstorage-only-browser-client.md). This note remains as background for any future shared-state work.
 
 ## Scope and recommendation
 
-Question: can Axon's static browser client and CLI keep `S` online without operating a custom backend?
+Question: can Thither's static browser client and CLI keep `S` online without operating a custom backend?
 
 Yes, by using an existing authenticated storage API. This preserves static application hosting; it does not eliminate the remote service dependency. The following are candidates, not adopted architecture decisions.
 
-**Recommendation for a personal, developer-oriented first version:** investigate one `state.json` file in a private GitHub repository, with explicit pull/push initially. It offers private storage, version history, and a browser-accessible API. For a general-user product, compare Google Drive app data against an Axon-managed Supabase project before choosing an authentication flow.
+**Recommendation for a personal, developer-oriented first version:** investigate one `state.json` file in a private GitHub repository, with explicit pull/push initially. It offers private storage, version history, and a browser-accessible API. For a general-user product, compare Google Drive app data against a Thither-managed Supabase project before choosing an authentication flow.
 
 ## Candidates
 
@@ -16,8 +16,8 @@ Yes, by using an existing authenticated storage API. This preserves static appli
 
 - GitHub Free includes unlimited private repositories with a limited feature set. [1]
 - The Contents API reads files and creates or updates file content. Updates require the SHA of the file being replaced; the endpoint documents conflict responses and requires Contents write permission for fine-grained tokens. This provides a basis for detecting stale writes, not automatic merging. [2]
-- GitHub's REST API explicitly supports CORS requests from any origin, so browser requests need not inherently pass through an Axon proxy. Authentication still needs a separate design. [3]
-- Proposed representation: a single `state.json`. Only actual state changes should produce writes; searching alone should not create commits. This is an Axon design recommendation, not a provider requirement.
+- GitHub's REST API explicitly supports CORS requests from any origin, so browser requests need not inherently pass through a Thither proxy. Authentication still needs a separate design. [3]
+- Proposed representation: a single `state.json`. Only actual state changes should produce writes; searching alone should not create commits. This is a Thither design recommendation, not a provider requirement.
 - For a personal experiment, a user-supplied, repository-scoped token is possible. Do not embed a shared write credential in the public JavaScript bundle. A polished browser/CLI authorization flow remains untested and undecided.
 
 ### GitHub Gist
@@ -38,11 +38,11 @@ Yes, by using an existing authenticated storage API. This preserves static appli
 - The inspected pricing page lists a $0 plan with a 500 MB database, 50,000 monthly active users, and 5 GB egress. Free projects pause after one week of inactivity; two active projects are allowed. [9]
 - Supabase documents browser-to-database access using Auth plus row-level security (RLS). Exposed tables require appropriate grants and policies. Administrative secret/service-role keys must not be exposed in the browser. [10]
 - Proposed representation: one row per user containing state JSON and a revision. Authenticated ownership policies restrict reads and writes; a conditional revision update would prevent silent stale overwrites. This schema and concurrency policy are suggestions, not built-in behavior obtained merely by choosing Supabase.
-- Assessment: more natural for an Axon-operated, multi-user service. No custom application server is necessary for basic state CRUD, but Axon still owns a backend project, its policies, and its quota exposure.
+- Assessment: more natural for a Thither-operated, multi-user service. No custom application server is necessary for basic state CRUD, but Thither still owns a backend project, its policies, and its quota exposure.
 
 ## Design consequences independent of provider
 
-These are recommendations and questions arising from Axon's existing model, not provider promises:
+These are recommendations and questions arising from Thither's existing model, not provider promises:
 
 1. **Storage is not synchronization.** If browser and CLI both load version A and independently overwrite it, one can erase the other's changes. Choose conditional writes and a conflict workflow before claiming safe synchronization.
 2. **Retain a local copy.** localStorage and the CLI file can continue to support local execution. Explicit pull/push is a smaller initial design than background offline synchronization.
