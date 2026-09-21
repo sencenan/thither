@@ -71,17 +71,13 @@ export type Result = readonly [
   { readonly matches: MatchSet; readonly inputs: readonly Dim[] },
 ];
 
-// The closed vocabulary of generated-error types (dsl.md §6). Adding one is a
-// specification change. `ThitherError.type` below stays `string`, not this union,
-// because a supplied `E` may carry any type the core displays without
-// interpreting; only errors the core *generates* draw from this set.
-export type ErrorType =
-  | "parse_error"
-  | "invalid_value"
-  | "invalid_destination"
-  | "missing_dimensions"
-  | "ambiguous_set"
-  | "invalid_stack";
+// The closed vocabulary of generated-error types (dsl.md §6), discriminated by
+// phase: every failure raised while *parsing* one item is `parse_error` whatever
+// its cause, and the rest name failures raised while *evaluating* an operation.
+// Adding one is a specification change. `ThitherError.type` below stays `string`,
+// not this union, because a supplied `E` may carry any type the core displays
+// without interpreting; only errors the core *generates* draw from this set.
+export type ErrorType = "parse_error" | "invalid_destination" | "missing_operand" | "ambiguous_set";
 
 // Error `E` = ["E", { type, description, ...diagnostics }]. Named `ThitherError`
 // to stay clear of the platform `Error`; the core answers with these values
