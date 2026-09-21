@@ -84,3 +84,10 @@ Merging publishes nothing. The deployed page is whatever the newest `v*` tag poi
 | Import direction | dependency-cruiser | `client → dsl`, `client → lib`, `dsl → lib`; root files only; no cycles |
 
 Two rules have no tool behind them, so they hold by review: **no classes**, and **no `as` assertions** outside `as const` and shoehorn's own use.
+
+### How the boundaries are enforced
+
+Two mechanisms above have non-obvious wiring worth knowing before you touch the config:
+
+- **DOM-free core = a second tsconfig, not a flag.** `typecheck` runs `tsc` twice: `tsconfig.json` checks the whole repo with the `DOM` lib present, and `tsconfig.dsl.json` re-checks `src/dsl` alone with a `lib` that omits `DOM`. A `document`/`window`/`localStorage` reference in the core passes the first pass and fails the second with `TS2584`. Any `lib` utility the core imports is pulled into the DOM-free program too, so a DOM-using helper cannot leak in through `src/lib`.
+- **dependency-cruiser parses with `@swc/core`, not `tsc`.** dependency-cruiser accepts TypeScript `>=2 <7`, so it cannot use this repo's TypeScript 7; `@swc/core` is its parser instead. swc keeps `import type` in the AST, so type-only edges are still cruised. The `tsConfig` and `tsPreCompilationDeps` options are deliberately left unset (inert without a usable `tsc`, and setting them only triggers a missing-transpiler warning). Revisit when dependency-cruiser supports TypeScript 7, or if the repo grows tsconfig path aliases.
