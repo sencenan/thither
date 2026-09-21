@@ -16,6 +16,8 @@ Types to pin down: `u` URL, `p` destination template, `d` dimension, `L` accumul
 - How unknown object fields are preserved (`dsl.md` §2) without acquiring semantics.
 - Readonly/immutability representation, per the stance taken in ticket 01.
 
+The layout is already fixed by [docs/code-standards.md](../../../docs/code-standards.md) — `src/dsl/index.ts` is the single entry point exporting the four specified symbols, `lib/` is implementation, `tests/` holds tests, and the DOM is unavailable in this area. This ticket decides which modules exist behind that entry point, not where the directories go.
+
 Module seams to draw, with the public surface being exactly `emptyProgram`, `parse`, `execute`, `initialStack`: token parsing, structured-value validation and normalization, destination validation, the fzf adapter, query construction and matching, the evaluator loop, the operations, template rendering, match ordering, error construction and unwinding. For each, name its responsibility and what it does **not** know. Consult `codebase-design`; aim for deep modules with narrow interfaces, and note explicitly which seams let tickets 05–13 proceed in parallel sessions without colliding.
 
 **Done when** the types are committed as real TypeScript (not prose), the module map is recorded on this ticket, and the ownership of each `dsl.md` rule area is unambiguous.
