@@ -128,10 +128,4 @@ Selected tooling: vanilla TypeScript without a UI framework, Vite with `vite-plu
 
 Use the browser-compatible npm `fzf` port (`ajitid/fzf-for-js`) for fuzzy matching and bundle it into the inline JavaScript. Treat it as an ordinary dependency under the project's normal versioning policy, configured to satisfy the matching rules in [dsl.md](dsl.md), and test Thither's expected behavior rather than claiming score parity with current upstream fzf. Remaining algorithm configuration is an implementation detail to settle with tests; see [the library research](research/fzf-libraries.md).
 
-Build order:
-
-1. Scaffold: Vite, Vitest, `tsc --noEmit`, and the GitHub Pages workflow.
-2. Core tests, written first from [dsl.md](dsl.md).
-3. Core implementation.
-4. Single-file bundling.
-5. UI and localStorage persistence, which only run in a browser.
+Implementation staging is not part of this specification; it lives in [the v1 implementation map](../.scratch/thither-v1/map.md).

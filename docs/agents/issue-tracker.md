@@ -1,6 +1,6 @@
 # Issue tracker: Local Markdown
 
-Issues and specs for this repo live as markdown files in `.scratch/`. This repo has no git remote, so there is no GitHub/GitLab issue tracker to call.
+Issues and specs for this repo live as markdown files in `.scratch/`, committed alongside the code. The repo has a GitHub remote, but its issue tracker is deliberately unused: the plan stays in-repo and diffable against the specs it derives from.
 
 ## Conventions
 
