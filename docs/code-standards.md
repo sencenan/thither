@@ -73,10 +73,11 @@ A ticket's code, its `## Answer`, and the map's Decisions-so-far line land in th
 | Rule | Tool | Setting |
 | --- | --- | --- |
 | Formatting | Biome | `indentWidth: 2`, `lineWidth: 100` |
-| Linting | Biome | `recommended: true`, plus `noExplicitAny`, `noNonNullAssertion`, `noDefaultExport` as errors |
+| Linting | Biome | `preset: "recommended"` (the 2.5 spelling of `recommended: true`), plus `noExplicitAny`, `noNonNullAssertion`, `noDefaultExport` as errors |
 | Import order | Biome | organize-imports on, run by `biome check` |
 | Enforcement points | Husky + lint-staged, CI | `biome check` at commit and in CI |
 | Type strictness | tsc | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`, `isolatedModules`, `module: "preserve"`, `target: "ES2022"` |
+| Import paths | tsc | `allowImportingTsExtensions`: relative imports carry their `.ts` extension |
 | DOM-free core | tsc | `src/dsl` tsconfig omits the `DOM` lib |
 | Import direction | dependency-cruiser | `client → dsl`, `client → lib`, `dsl → lib`; root files only; no cycles |
 

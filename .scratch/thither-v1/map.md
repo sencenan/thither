@@ -32,6 +32,7 @@ Done when: the language core passes conformance tests traceable to every normati
 <!-- one line per resolved ticket: gist + link -->
 
 - [Code principles and style rules](issues/01-code-principles-and-style-rules.md): Biome (2 spaces, width 100) for format and lint, strict tsc without `erasableSyntaxOnly` so enums stay, `type`/`interface` over classes, `src/dsl` + `src/lib` + `src/client` with a DOM-free tsconfig for the core and dependency-cruiser holding the import direction, values-not-exceptions in the core behind one `invariant()`, `readonly` plus test-only deep freeze, tests in `tests/` subfolders citing spec sections, `ticket/NN-slug` branches merged `--no-ff`. Written to [docs/code-standards.md](../../docs/code-standards.md).
+- [Scaffold the toolchain](issues/02-toolchain-scaffold.md): pnpm project on exactly-pinned Vite 8 / Vitest 5 / TypeScript 7 / Biome 2.5 / dependency-cruiser 18 / `fzf@0.5.2`, `src/{dsl,lib,client}` with the four-symbol `src/dsl/index.ts` and the `invariant()` helper, two tsconfigs (the dsl one DOM-free), Husky + lint-staged and a CI workflow running `check → typecheck → lint:boundaries → test → build`, plus a Pages deploy workflow authored but not enabled. `@swc/core` was added as dependency-cruiser's TypeScript parser, since under TypeScript 7 it cruised zero modules and passed vacuously. DOM-free core, both boundary rules (runtime *and* type-only imports), and a deliberate type error were each observed failing and then passing.
 
 ## Not yet specified
 

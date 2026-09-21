@@ -1,0 +1,9 @@
+{
+  // The whole repo, with the DOM available. src/dsl is additionally checked by
+  // tsconfig.dsl.json, whose lib omits DOM — see docs/code-standards.md.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src", "vite.config.ts", "vitest.config.ts"]
+}
