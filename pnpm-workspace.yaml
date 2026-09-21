@@ -1,0 +1,4 @@
+allowBuilds:
+  '@swc/core': true
+minimumReleaseAgeExclude:
+  - dependency-cruiser@18.4.0

@@ -1,7 +1,7 @@
 # Scaffold the toolchain
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 01
 
 ## Question
@@ -26,3 +26,25 @@ Scope:
 - Any tooling enforcement decided in 01 (pre-commit hooks, CI checks).
 
 **Done when** the umbrella script runs clean from a fresh install, both the DOM-free tsconfig and the boundary rules have been observed failing on a deliberate violation and passing after reverting it, and the workflow file is committed.
+
+## Answer
+
+The scaffold is in place and proven. `pnpm run verify` (`check` → `typecheck` → `lint:boundaries` → `test` → `build`) runs clean after `rm -rf node_modules && pnpm install --frozen-lockfile`.
+
+**Dependencies, all pinned exactly** (no ranges): runtime `fzf@0.5.2` (the `ajitid/fzf-for-js` port — recorded here because the research note calls out port-vs-upstream drift); dev `vite@8.3.0`, `vite-plugin-singlefile@2.3.3`, `vitest@5.0.1`, `typescript@7.0.2`, `@biomejs/biome@2.5.14`, `dependency-cruiser@18.4.0`, `@total-typescript/shoehorn@0.1.2`, `husky@9.1.7`, `lint-staged@17.5.1`, `@swc/core@1.16.2`.
+
+**`@swc/core` is an unplanned dependency, and it earns its place.** `dependency-cruiser@18.4.0` accepts `typescript >=2 <7` and simply cannot parse `.ts` under `typescript@7`: before swc it cruised **0 modules** and reported "no violations" — a green light that checked nothing, the worst possible failure mode for a boundary tool. swc is its TypeScript parser only; type-only imports are still detected (proven below). The alternative was downgrading the product's compiler to satisfy a lint tool, which is the wrong way round. Its `missing-typescript-transpiler` warning prints on every run and is expected; the config comment says to drop swc when dependency-cruiser supports TypeScript 7.
+
+**Layout.** `src/dsl/index.ts` exports exactly `emptyProgram`, `parse`, `execute`, `initialStack`, with `Program` and `Stack` as deliberately opaque `readonly unknown[]` placeholders until ticket 04 designs the value model; the three functions call `invariant(false, …)` naming the ticket that implements them, so an accidental early caller fails loudly rather than getting a plausible empty value. `src/lib/invariant.ts` is the single sanctioned throw site — a plain `Error` with an `INVARIANT_PREFIX`, not an `Error` subclass, because the standards rule out classes. `src/client/main.ts` is a placeholder page body. `src/lib/tests/invariant.test.ts` is the trivial passing suite (3 cases, including one that exercises the `asserts` narrowing).
+
+**Two tsconfigs.** `tsconfig.base.json` holds the strictness table; `tsconfig.json` adds `DOM` and covers the repo; `tsconfig.dsl.json` includes only `src/dsl` with `lib: ["ES2022"]`, and the files it imports from `src/lib` are pulled into that program, so a DOM-using utility cannot leak into the core either. `typecheck` runs both. One addition to the standards table was needed and is recorded there: `allowImportingTsExtensions`, since `module: "preserve"` alone still rejects the `.ts` import specifiers this repo writes.
+
+**Enforcement.** Husky `pre-commit` runs lint-staged (`biome check --write` on staged files), then `typecheck`, `lint:boundaries`, and `test`. `.github/workflows/ci.yml` runs the same five steps on push and PR; `.github/workflows/deploy.yml` calls it, then builds and deploys to Pages with `pages`/`id-token` permissions and a non-cancelling `pages` concurrency group. Pages is **not** enabled in repo settings — that stays ticket 22.
+
+**Proofs run (each failed on the violation, passed after reverting):**
+
+- **DOM-free core.** Adding `localStorage.getItem(…)` to `src/dsl/index.ts`: the repo-wide pass accepted it, the dsl pass gave `error TS2304: Cannot find name 'localStorage'`.
+- **Boundaries.** A `src/client/main.ts → src/dsl/lib/probe.ts` import tripped both `dsl-entry-point-only` and `area-internals-are-private`; re-running it as `import type` tripped both again, confirming swc does not silently drop type-only edges; a `src/dsl → src/client` import tripped `core-imports-no-client`.
+- **Type error.** A `const count: number = "not a number"` file gave `error TS2322` and failed `typecheck`.
+
+**Deferred deliberately:** the single-file output check (ticket 21 — the plugin is wired and `dist/` is one `index.html` today, but nothing yet asserts it), Vitest DOM environment (no client tests exist yet; `environment: "node"` until ticket 17 needs otherwise), and the `.vscode/` folder, excluded from Biome rather than reformatted since it is editor-local.
