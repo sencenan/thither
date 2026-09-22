@@ -1,3 +1,4 @@
+import { invariant } from '../lib/invariant';
 import { parse } from './parser';
 import type { Interpreter, InterpreterEnv, Op, Program, Stack, Token } from './types';
 
@@ -7,7 +8,7 @@ const TERM_TOKEN: Token = ['o', '.$'];
 export const createInterpreter = (env: InterpreterEnv): Interpreter => {
   const interpreter = {
     pushToken: (program: Program, raw: unknown): Program => {
-      program.push(parse(raw));
+      program.push(parse(env, raw));
       return program;
     },
 
@@ -16,7 +17,7 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
         program = interpreter.pushToken(program, TERM);
       }
 
-      let stack = [...env.initialStack];
+      let stack: Stack = [];
       let token = program.shift();
       while (token) {
         const [sigil, body] = token;
@@ -35,20 +36,9 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
           }
 
           case 'o': {
-            const fn = env.symbols.get(body); // assu,e all symbols are operations
-
-            if (!fn) {
-              stack.push([
-                'E',
-                {
-                  type: 'missing_operation',
-                  description: `operation ${body} not found`,
-                },
-              ]);
-            } else {
-              stack = fn(stack);
-            }
-
+            const fn = env.symbols.get(body);
+            invariant(fn, `operation ${body} not found`);
+            stack = fn(stack);
             break;
           }
 

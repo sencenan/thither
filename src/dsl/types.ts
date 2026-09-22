@@ -73,7 +73,6 @@ export type OpFn = (stack: Stack) => Stack;
 
 export interface InterpreterEnv {
   readonly symbols: Map<Op, OpFn>;
-  readonly initialStack: Stack;
 }
 
 export interface Interpreter {

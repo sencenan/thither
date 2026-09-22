@@ -3,6 +3,7 @@ import {
   type ErrorType,
   ErrorTypes,
   type Hint,
+  type InterpreterEnv,
   type Literal,
   type Match,
   type Op,
@@ -14,7 +15,7 @@ import {
   type Token,
 } from './types';
 
-export const parse = (raw: unknown): Token => {
+export const parse = (env: InterpreterEnv, raw: unknown): Token => {
   if (typeof raw === 'string') {
     const token = raw.trim();
 
@@ -23,7 +24,17 @@ export const parse = (raw: unknown): Token => {
     }
 
     if (isOp(token)) {
-      return ['o', token];
+      if (env.symbols.has(token)) {
+        return ['o', token];
+      }
+
+      return [
+        'E',
+        {
+          type: 'missing_operation',
+          description: `operation ${token} not found`,
+        },
+      ];
     }
 
     return ['l', token as Dim]; // not escaping .. here, not normalizing
