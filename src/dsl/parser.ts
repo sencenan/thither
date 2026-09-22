@@ -8,6 +8,8 @@ import {
   type Match,
   type Op,
   type Result,
+  SEP,
+  SEP_ESCAPE,
   type Separator,
   type Target,
   type Template,
@@ -161,7 +163,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 const isSeparator = (value: string): value is Separator => {
-  return value === '.';
+  return value === SEP;
 };
 
 const isDim = (value: string): value is Dim => {
@@ -174,7 +176,7 @@ const isDimList = (value: unknown): value is Literal[] => {
 };
 
 const isOp = (value: string): value is Op => {
-  return value.startsWith('.') && !value.startsWith('..') && !isSeparator(value);
+  return value.startsWith(SEP) && !value.startsWith(SEP_ESCAPE) && !isSeparator(value);
 };
 
 const isTemplate = (value: string): value is Template => {

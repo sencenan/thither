@@ -1,8 +1,13 @@
 import { invariant } from '../lib/invariant';
 import { parse } from './parser';
-import type { Interpreter, InterpreterEnv, Op, Program, Stack, StackValue } from './types';
-
-const TERM: Op = '.$';
+import {
+  type Interpreter,
+  type InterpreterEnv,
+  type Program,
+  type Stack,
+  type StackValue,
+  TERM_OP,
+} from './types';
 
 const push = (stack: Stack, value: StackValue): Stack => {
   const top = stack[stack.length - 1];
@@ -42,7 +47,7 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
 
     execute: (program: Program): Stack => {
       if (!hasTerminalOp(program)) {
-        program = interpreter.pushToken(program, TERM);
+        program = interpreter.pushToken(program, TERM_OP);
       }
 
       let stack: Stack = [];
@@ -78,5 +83,5 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
 
 const hasTerminalOp = (program: Program): boolean => {
   const last = program[program.length - 1];
-  return !!(last && last[0] === 'o' && last[1] === TERM);
+  return !!(last && last[0] === 'o' && last[1] === TERM_OP);
 };

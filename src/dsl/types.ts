@@ -2,8 +2,13 @@
 
 export type Dim = string;
 export type Template = string;
+
+export const SEP = '.' as const;
+export const SEP_ESCAPE = '..';
+export type Separator = typeof SEP;
+
 export type Op = string;
-export type Separator = '.';
+export const TERM_OP: Op = '.$';
 
 // composite values
 
