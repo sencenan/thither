@@ -112,16 +112,16 @@ Ordinary literals retain their spelling and order. URL literals and templates ac
 
 A leading dot is the language's only control syntax: `.set`, `.rm`, `.@`, and `.$` are operations, and a **standalone `.`** is the argument separator. Every other token is data. Only the standalone token is a separator; a dot inside a literal or URL, as in `node.js` or `example.com`, is ordinary content.
 
-A leading double dot escapes a dot-prefixed token by removing one leading dot and treating the result as an ordinary literal:
+A leading double dot escapes a dot-prefixed token: parsing keeps the token verbatim as an ordinary literal, `..` and all. One leading dot is removed whenever the literal is later *used* — both when it is matched and when it is substituted into a destination — while the accumulated form retains the `..`. So `..git` matches as `.git` and renders as `.git`.
 
 ```text
-..rm   -> literal .rm
-..set  -> literal .set
-..$    -> literal .$
-..     -> literal .
+..rm   -> literal ..rm   (resolves to .rm)
+..set  -> literal ..set  (resolves to .set)
+..$    -> literal ..$    (resolves to .$)
+..     -> literal ..     (resolves to .)
 ```
 
-Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to `E`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
+Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
 The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them; only `.$` uses the suffix.
 
@@ -154,7 +154,7 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 ### Supplied structured values
 
-Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics.
+Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
 
 Normalize each supplied `S`'s target dimensions and focus by the rules of section 3. Reject dimension strings containing internal whitespace after trimming. Normalization does not change target order, destination text, argument spelling, or `R.inputs`.
 
@@ -335,14 +335,16 @@ A direct-navigation candidate requires exactly one selected target and a nonnega
 
 An operation with no matching stack rule, a failed operand validation, or an ambiguous `.set` emits an evaluation error. An explicit `E` value is not such a failure: push it and stop without unwinding, so `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
 
-Every error carries a machine-readable `type` from this closed vocabulary, plus a human-readable `description`. The vocabulary is discriminated by **phase**: every failure raised while parsing one item is `parse_error`, whatever its cause, and the remaining types name failures raised while evaluating an operation.
+Every error carries a machine-readable `type` from this closed vocabulary, plus a human-readable `description`. The vocabulary is discriminated by **phase**: failures raised while parsing one item are `parse_error` or `missing_operation`, and the remaining types name failures raised while evaluating an operation.
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, invalid operation syntax, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets or an `E` whose `type` is outside this vocabulary. |
+| `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
 | `missing_operand` | Evaluation | An operation lacks a required operand: no explicit dimension, no destination literal, or no state to operate on. |
 | `ambiguous_set` | Evaluation | `.set` matches more than one target. |
+| `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand.
 
@@ -355,7 +357,7 @@ S company git .set                  # no destination literal
 git https://example.com/{} .set     # no state anywhere on the stack
 ```
 
-Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail. A supplied `E` is held to a weaker rule: it need only carry a string `type` and a string `description`, and its `type` is not checked against this vocabulary, so an error produced by another version round-trips unchanged.
+Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail. A supplied `E` must carry a `type` drawn from this vocabulary and a string `description`; unlike a generated error it may also carry extra diagnostic fields, which are preserved. An `E` whose `type` falls outside the vocabulary fails validation and parses to `parse_error`, so an error produced by another version does not round-trip unchanged.
 
 ### Unwinding
 

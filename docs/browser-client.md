@@ -46,7 +46,7 @@ The core exposes an **interpreter**, built from an environment (see [ADR 0005](a
 - `defaultEnv()`: an environment preloaded with the language's four operations (`.set`, `.rm`, `.@`, `.$`) and the seed stack. A client may register further symbols on `env.symbols` before building the interpreter.
 - `createInterpreter(env)`: bind an environment, producing an interpreter.
 
-The interpreter exposes a **program** as an immutable ordered list of values:
+The interpreter exposes a **program** as an ordered list of values:
 
 - `interp.emptyProgram`: the starting program.
 - `interp.append(program, item)`: append one string token or one structured value, validated against the environment.

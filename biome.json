@@ -19,6 +19,7 @@
     "rules": {
       "preset": "recommended",
       "style": {
+        "useConst": "error",
         "noDefaultExport": "error",
         "noNonNullAssertion": "error"
       },
@@ -37,7 +38,7 @@
   },
   "javascript": {
     "formatter": {
-      "quoteStyle": "double",
+      "quoteStyle": "single",
       "semicolons": "always",
       "trailingCommas": "all"
     }
