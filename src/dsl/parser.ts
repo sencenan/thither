@@ -12,11 +12,10 @@ import {
   SEP_ESCAPE,
   type Separator,
   type Target,
-  type Template,
   type ThitherError,
   type Token,
 } from './types';
-import { thitherError } from './utils';
+import { isTemplate, normalizeDimensions, thitherError } from './utils';
 
 export const parse = (env: InterpreterEnv, raw: unknown): Token => {
   if (typeof raw === 'string') {
@@ -179,15 +178,6 @@ const isOp = (value: string): value is Op => {
   return value.startsWith(SEP) && !value.startsWith(SEP_ESCAPE) && !isSeparator(value);
 };
 
-const isTemplate = (value: string): value is Template => {
-  try {
-    const parsed = URL.parse(value.split('{}').join('thither'));
-    return parsed !== null;
-  } catch (_ex) {
-    return false;
-  }
-};
-
 const isErrorType = (value: unknown): value is ErrorType => {
   return ErrorTypes.some((it) => it === value);
 };
@@ -197,8 +187,4 @@ const isErrorType = (value: unknown): value is ErrorType => {
 const normalizeTarget = (target: Target): Target => {
   const [dims, dest] = target;
   return [normalizeDimensions(dims), dest];
-};
-
-const normalizeDimensions = (dims: readonly Dim[]): Dim[] => {
-  return [...new Set(dims.map((it) => it.trim().toLowerCase()))].sort();
 };

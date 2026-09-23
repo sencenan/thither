@@ -1,42 +1,7 @@
 import { invariant } from '../lib/invariant';
 import { parse } from './parser';
-import {
-  type Interpreter,
-  type InterpreterEnv,
-  type Program,
-  type Stack,
-  type StackValue,
-  TERM_OP,
-} from './types';
-
-const push = (stack: Stack, value: StackValue): Stack => {
-  const top = stack[stack.length - 1];
-
-  if (!top) {
-    // empty stack
-    stack.push(value);
-    return stack;
-  }
-
-  const [topSigil, topToken] = top;
-  const [sigil, token] = value;
-
-  switch (topSigil) {
-    case 'R':
-    case 'E':
-      // ignore future values if top is already R, E
-      return stack;
-
-    default:
-      if (topSigil === 'L' && sigil === topSigil) {
-        stack[stack.length - 1] = ['L', [...topToken, ...token]];
-      } else {
-        stack.push(value);
-      }
-
-      return stack;
-  }
-};
+import { type Interpreter, type InterpreterEnv, type Program, type Stack, TERM_OP } from './types';
+import { push } from './utils';
 
 export const createInterpreter = (env: InterpreterEnv): Interpreter => {
   const interpreter = {

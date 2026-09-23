@@ -16,9 +16,11 @@ Imports flow one way: `client → dsl`, `client → lib`, `dsl → lib`. `lib` i
 
 **`src/dsl` compiles without the DOM.** Its `tsconfig` omits the `DOM` lib, so `localStorage`, `document`, and `window` are type errors there. This is ADR-0001's client-agnostic core, held by the compiler instead of by memory.
 
-The core may use *universal* platform globals — ones present in every JavaScript runtime (browser, Node, workers), such as the WHATWG `URL` — because they do not tie the core to a client. Omitting the `DOM` lib drops their types along with the client-only ones, so re-supply just the needed surface with a **module-scoped** `declare const` in the module that uses it, never by widening the core's `lib` (which would re-admit `localStorage`/`document`/`window`). Being module-local, the declaration shadows nothing and does not collide with the repo-wide DOM pass. `src/dsl/lib/destination.ts`'s `declare const URL` is the reference example.
+The core may use *universal* platform globals — ones present in every JavaScript runtime (browser, Node, workers), such as the WHATWG `URL` — because they do not tie the core to a client. Omitting the `DOM` lib drops their types along with the client-only ones, so re-supply just the needed surface with a **module-scoped** `declare const` in the module that uses it, never by widening the core's `lib` (which would re-admit `localStorage`/`document`/`window`). Being module-local, the declaration shadows nothing and does not collide with the repo-wide DOM pass. `src/dsl/utils.ts`'s `declare const URL` is the reference example.
 
 Inside each area the **root files are the public surface**; `lib/` holds implementation and `tests/` holds tests. Import a module through its root files.
+
+The core has one more internal folder, `src/dsl/operations/`: one file per language operation (`set.ts`, `rm.ts`, and so on), each exporting a single `OpFn` under the operation's name, with its own `tests/` beside it. Operations are wired into the environment by the core's root files and are as private to `src/dsl` as `lib/` is: nothing outside the core imports them.
 
 `src/dsl` has exactly one entry point, `index.ts`, exporting the surface `browser-client.md` specifies: `createInterpreter` and `defaultEnv`, plus the types those need. Everything else — building a program, appending items, executing, the seed stack — hangs off the `Interpreter` those return. That file *is* the core's documented interface, so adding an export to it is a specification change — amend `browser-client.md` in the same commit or don't add it. This is the only barrel in the repo; elsewhere, expose several small root files rather than re-exporting a subtree. (The surface diverged from an earlier four-symbol shape when the operation set became a client-extensible environment — see [ADR 0005](adr/0005-extensible-interpreter-environment.md).)
 
@@ -74,13 +76,7 @@ The worked programs of `dsl.md` §7 are golden end-to-end cases and must produce
 
 Every comment is a second thing to keep in sync with the code, and it rots the moment they disagree. Before writing one, try to delete it by changing the code instead.
 
-Head each `src/dsl` module with the spec section it implements:
-
-```ts
-// dsl.md §4.4 — .$ search and boundary inference
-```
-
-Beyond that header, a comment has to survive all four questions to earn its place:
+A comment has to survive all four questions to earn its place:
 
 1. **Does the code already say this?** A paraphrase of the line below it (`// trim, then lowercase` over `raw.trim().toLowerCase()`) is duplication. Delete one of them.
 2. **Does the *type* already say this?** Totality, nullability, immutability, and what a function returns are the signature's job. If the type does not say it, fix the type rather than annotating around it.
@@ -114,7 +110,7 @@ Merging publishes nothing. The deployed page is whatever the newest `v*` tag poi
 | Type strictness | tsc | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`, `verbatimModuleSyntax`, `isolatedModules`, `module: "preserve"`, `target: "ES2022"` |
 | Import paths | tsc | `allowImportingTsExtensions`: relative imports carry their `.ts` extension |
 | DOM-free core | tsc | `src/dsl` tsconfig omits the `DOM` lib |
-| Import direction | dependency-cruiser | `client → dsl`, `client → lib`, `dsl → lib`; root files only; no cycles |
+| Import direction | dependency-cruiser | `client → dsl`, `client → lib`, `dsl → lib`; root files only (`lib/`, `tests/`, `operations/` fenced); no cycles |
 
 Two rules have no tool behind them, so they hold by review: **no classes**, and **no `as` assertions** outside `as const` and shoehorn's own use.
 
@@ -122,5 +118,5 @@ Two rules have no tool behind them, so they hold by review: **no classes**, and 
 
 Two mechanisms above have non-obvious wiring worth knowing before you touch the config:
 
-- **DOM-free core = a second tsconfig, not a flag.** `typecheck` runs `tsc` twice: `tsconfig.json` checks the whole repo with the `DOM` lib present, and `tsconfig.dsl.json` re-checks `src/dsl` alone with a `lib` that omits `DOM`. A `document`/`window`/`localStorage` reference in the core passes the first pass and fails the second with `TS2584`. Any `lib` utility the core imports is pulled into the DOM-free program too, so a DOM-using helper cannot leak in through `src/lib`.
+- **DOM-free core = a second tsconfig, not a flag.** `typecheck` runs `tsc` twice: `tsconfig.json` checks the whole repo with the `DOM` lib present, and `tsconfig.dsl.json` re-checks `src/dsl` alone with a `lib` that omits `DOM`. A `document`/`window`/`localStorage` reference in the core passes the first pass and fails the second with `TS2304` (cannot find name). Any `lib` utility the core imports is pulled into the DOM-free program too, so a DOM-using helper cannot leak in through `src/lib`.
 - **dependency-cruiser parses with `@swc/core`, not `tsc`.** dependency-cruiser accepts TypeScript `>=2 <7`, so it cannot use this repo's TypeScript 7; `@swc/core` is its parser instead. swc keeps `import type` in the AST, so type-only edges are still cruised. The `tsConfig` and `tsPreCompilationDeps` options are deliberately left unset (inert without a usable `tsc`, and setting them only triggers a missing-transpiler warning). Revisit when dependency-cruiser supports TypeScript 7, or if the repo grows tsconfig path aliases.

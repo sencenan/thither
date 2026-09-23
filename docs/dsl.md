@@ -179,11 +179,11 @@ To construct a matching query:
 3. Prepend the current focus.
 4. Remove duplicate dimensions.
 
-Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. Fuzzy-match each query dimension independently against that entire string. Select a target only when every query dimension matches, and sum their scores for ranking. A fuzzy token may span dimension boundaries.
+Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. The query is normalized the same way (this section's rules, so it is sorted and deduplicated) and joined with spaces into **one fuzzy pattern**, which is matched against that searchable string in a single pass. A target is selected when the pattern matches; its score is the matcher's score for that pass. Because both sides are sorted before joining, a fuzzy token may span dimension boundaries, but the pattern as a whole follows sorted order.
 
-Query-dimension order does not affect selection or score: both `git company` and `company git` match the searchable string `company git`. Do not pass the whole space-joined query as a single ordered fuzzy pattern. Only `.$`'s prefix inference cares about the user's original token order.
+Query-dimension order does not affect selection or score: both `git company` and `company git` normalize to the pattern `company git`. Only `.$`'s prefix inference cares about the user's original token order.
 
-Do not import fzf's special query operators, such as negation, anchors, or exact-match syntax; they have no meaning here. Matching is case-insensitive, but diacritic normalization is disabled: `cafe` does not match `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
+Do not import fzf's special query operators, such as negation, anchors, or exact-match syntax; they have no meaning here. Matching is case-insensitive (the query is lowercase by construction) and diacritic-insensitive, following the matcher's defaults: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
 
 Operations differ only in how they choose query inputs:
 
@@ -205,7 +205,7 @@ Each operation reads the matching portion defined in section 2, normalizes dimen
 
 Interpret `L` in this order:
 
-1. Require its last literal to be a valid URL or destination template, and remove it as the destination. Do not search backward for a URL. A plain URL is a valid destination with zero placeholders.
+1. Remove its last literal as the destination and require it to be a valid URL or destination template; a last literal that fails validation is `invalid_destination`, whatever it looks like. Do not search backward for a URL. A plain URL is a valid destination with zero placeholders.
 2. From the remaining literals, keep the matching portion.
 3. Require **at least one explicit dimension** there. Focus cannot satisfy this requirement.
 4. Combine those dimensions with focus and match the complete combined query.
@@ -313,12 +313,12 @@ Substitution is literal, not percent-encoding, and fills the original template; 
 
 Each match reports why it matched, so a presentation layer can highlight without re-running the matcher:
 
-- `hint.positions`: the ascending, deduplicated character indices matched within that target's searchable string. Matching runs one fuzzy query per query dimension, so these are the **union** of those results: a character matched by two dimensions appears once, and the list does not record which dimension matched it. Because a fuzzy token may span dimension boundaries, these are string indices, not dimension indices.
-- `hint.score`: the match's ranking score, the sum of its per-query-dimension scores. The breakdown is not reported; an implementation may add it as an extra debugging field.
+- `hint.positions`: the ascending, deduplicated character indices matched within that target's searchable string. These are the matcher's positions for the single query pattern. Because a fuzzy token may span dimension boundaries, these are string indices, not dimension indices.
+- `hint.score`: the match's ranking score, the matcher's score for the query pattern.
 
 These fields are evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
-A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because a sum over no dimensions is zero. Every target then ties on score, so ordering falls to argument balance and target-set order.
+A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because an empty pattern matches every target with no evidence. Every target then ties on score, so ordering falls to argument balance and target-set order.
 
 ### Match ordering
 
@@ -342,19 +342,19 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 | `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no explicit dimension, no destination literal, or no state to operate on. |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, or no state to operate on. |
 | `ambiguous_set` | Evaluation | `.set` matches more than one target. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
-The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand.
+The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the last literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`git` is an unusable destination), not `missing_operand`.
 
 `missing_operand` covers every required-operand failure of one operation, whichever operand is absent:
 
 ```text
-S .set                              # no explicit dimension
-S . ignored .set                    # no explicit dimension; the suffix is ignored
-S company git .set                  # no destination literal
-git https://example.com/{} .set     # no state anywhere on the stack
+S .set                                          # no literal array
+S https://github.com/company/{} .set            # no explicit dimension
+S . ignored https://github.com/company/{} .set  # no explicit dimension; the suffix is ignored
+git https://example.com/{} .set                 # no state anywhere on the stack
 ```
 
 Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail. A supplied `E` must carry a `type` drawn from this vocabulary and a string `description`; unlike a generated error it may also carry extra diagnostic fields, which are preserved. An `E` whose `type` falls outside the vocabulary fails validation and parses to `parse_error`, so an error produced by another version does not round-trip unchanged.
