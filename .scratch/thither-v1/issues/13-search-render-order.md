@@ -1,7 +1,7 @@
 # Implement .$: search, rendering, and match ordering
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 11, 12
 
 ## Question
@@ -17,3 +17,21 @@ Implement `.$` — search with boundary inference (§4.4), argument rendering (�
 **Ordering (§5).** Emit `R.matches` in one total order so the client renders top-to-bottom without sorting: (1) nonnegative `argDelta` first, (2) `|argDelta|` ascending, (3) `hint.score` descending, (4) target-set order. So a weakly-scored `+1` precedes a strongly-scored `+2`. Ordering never manufactures uniqueness.
 
 **Done when** fixtures cover the `company` / `company git` / `company git thither` prefix ladder (including the longer-prefix-still-matches case), no-prefix-match, focus-only, select-all, and `R.inputs` spelling; every row of the §5 rendering table (including `a/b` producing a path segment and the zero-placeholder template ignoring its argument); each ordering key isolated including the weak-`+1`-beats-strong-`+2` case; and the order proven total.
+
+## Answer
+
+Implemented on branch `ticket/13-search-render-order` (commit `b984275`) as `src/dsl/operations/search.ts`, with fixtures in `src/dsl/operations/tests/search.test.ts`. 22 `.$` fixtures; 116 tests green across the core.
+
+**The operation.** `.$` peeks its state and pops only the literal array, pushing `R` through the seal-aware `push`, so it inherits the peek-not-pop contract of ticket 12. `[K, S] .$` searches on focus alone; `[K, S, L] .$` resolves `L` into matching inputs and arguments. Any other top-of-stack shape (`R`, `E`, no state, or an `L` with no state beneath it) is restored untouched and fails with `missing_operand`; on a sealed stack that error is absorbed, as ticket 11 specified.
+
+**Boundary inference (§4.4).** With a separator, the matching portion is matched in full and the suffix is taken verbatim as arguments (`S lookup . https://example.com .$` renders the URL unescaped). Without one, prefixes of `L` are probed longest-first for the first that yields ≥1 match combined with focus; the remainder is arguments. No matching prefix → empty matches, but `R.inputs` still reports every literal supplied (the attempt), with no arguments. `R.inputs` is always the matching literals in original spelling — case and escape marks preserved — excluding focus, separator, and arguments; a focus-only search has empty `inputs`.
+
+**Rendering (§5).** `{}` is filled left-to-right by string slicing, never `String.replace`, so `$` in an argument cannot be re-read as a replacement pattern. `argDelta = A − P`; applied args are the first `min(A, P)`; extras ignored; missing placeholders left in place. Arguments are substituted **verbatim** (no `resolveEscape`) — §5 says "preserving its original spelling and case" and no fixture covers a `..`-prefixed argument; revisit if that ever matters.
+
+**Ordering (§5).** One comparator: nonnegative `argDelta` first, `|argDelta|` ascending, `score` descending. The fourth key, target-set order, is not tracked explicitly: `searchTargets` runs fzf with **`sort: false`** so selections arrive in target-set order, and ES2019's stable `Array.prototype.sort` preserves that order on ties. The order is total by construction. This deliberately supersedes ticket 12's "fzf defaults" for the `sort` option only; a probe confirmed `sort` affects result order alone (selection, scores, positions unchanged).
+
+**The matcher's final shape.** `src/dsl/selector.ts` exports a single `searchTargets(targets, query): Selection[]`, where `Selection = { target, score, positions }` (positions ascending, deduped, string indices into the space-joined searchable string). `.set` and `.rm` project to targets at the call site (`.map((s) => s.target)`) rather than through a second slot-only function, so "no evidence needed here" is visible in the caller. An earlier `IndexedMatch` carrier (match + target index for the tiebreak) was designed out once `sort: false` made the index redundant.
+
+**Fixture coverage.** The `company` / `company git` / `company git thither` ladder including longer-prefix-still-matches; no-prefix-match; focus-only; select-all (the §7 example, with empty evidence); `R.inputs` case preservation (the §7 `Company Git MyRepo` example); all six §5 rendering-table rows including `a/b` and the zero-placeholder template; the separator/URL-argument case and the empty-matching-portion case; each ordering key isolated — nonnegative-first, `|argDelta|` ascending, weak-`+1`-beats-strong-`+2` against set order, score-descending against set order, and tied-score/argDelta falling to set order not dimension order; `missing_operand` with no state; sealed-stack absorption. Scores are never pinned; positions are asserted from real fzf output.
+
+Unblocks 14 (public surface, `defaultEnv`, §7 goldens).

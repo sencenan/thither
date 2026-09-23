@@ -1,6 +1,6 @@
 // dsl.md §4.1 — .set: insert or update a target
 
-import { selectTargets } from '../selector';
+import { searchTargets } from '../selector';
 import type { OpFn, State } from '../types';
 import {
   isTemplate,
@@ -43,7 +43,7 @@ export const set: OpFn = (stack) => {
 
   const { targets, focus } = state[1];
   const query = normalizeDimensions([...focus, ...explicit]);
-  const matched = selectTargets(targets, query);
+  const matched = searchTargets(targets, query).map((selection) => selection.target);
 
   if (matched.length > 1) {
     return push(

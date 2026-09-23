@@ -1,6 +1,6 @@
 // dsl.md §4.2 — .rm: remove matching targets
 
-import { selectTargets } from '../selector';
+import { searchTargets } from '../selector';
 import type { OpFn, State } from '../types';
 import { normalizeDimensions, push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
 
@@ -32,7 +32,7 @@ export const rm: OpFn = (stack) => {
 
   const { targets, focus } = state[1];
   const query = normalizeDimensions([...focus, ...explicit]);
-  const matched = selectTargets(targets, query);
+  const matched = searchTargets(targets, query).map((selection) => selection.target);
 
   const nextState: State = [
     'S',
