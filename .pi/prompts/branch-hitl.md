@@ -4,8 +4,21 @@ argument-hint: "[branch-name]"
 ---
 Work in **human-in-the-loop, stay-on-branch mode** for the rest of this session.
 
-Branch: use `${1:-the current branch}`. If it does not exist yet, create it from
-the current `HEAD`; otherwise switch to it. Do the rest of the work there.
+Branch selection:
+
+- If `$1` is given, use it verbatim as the branch name.
+- If `$1` is empty, **derive a fresh, descriptive branch name from the current
+  context** — the ticket being worked, the conversation so far, and any
+  wayfinder/issue-tracker state. Follow the repo convention `ticket/NN-slug`
+  (see `docs/code-standards.md`); if there is no ticket number, use a short
+  `slug` that summarizes the work. Do **not** silently reuse the current branch,
+  and do not invent a generic placeholder name — the slug must reflect this
+  session's actual work.
+- State the chosen name and why before proceeding. If the context is too thin to
+  name the branch, ask me for one instead of guessing.
+
+If the chosen branch does not exist yet, create it from the current `HEAD`;
+otherwise switch to it. Do the rest of the work there.
 
 Rules for this mode:
 
