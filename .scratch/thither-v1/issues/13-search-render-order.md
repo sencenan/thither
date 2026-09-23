@@ -1,7 +1,7 @@
 # Implement .$: search, rendering, and match ordering
 
 Type: task
-Status: open
+Status: claimed
 Blocked by: 11, 12
 
 ## Question
