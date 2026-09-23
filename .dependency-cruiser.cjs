@@ -1,7 +1,8 @@
 /**
  * Import direction, per docs/code-standards.md "Layout":
  *   client -> dsl, client -> lib, dsl -> lib; lib imports neither.
- *   Root files are an area's public surface; lib/ and tests/ are internal.
+ *   Root files are an area's public surface; lib/, tests/, and the core's
+ *   operations/ are internal.
  *   src/dsl has exactly one entry point, index.ts.
  *
  * dependency-cruiser cannot use typescript@7 yet (it accepts >=2 <7), so
@@ -45,9 +46,10 @@ module.exports = {
     {
       name: 'area-internals-are-private',
       severity: 'error',
-      comment: "An area's lib/ and tests/ folders are not importable from another area.",
+      comment:
+        "An area's lib/, tests/, and operations/ folders are not importable from another area.",
       from: { path: '^src/([^/]+)/' },
-      to: { path: '^src/[^/]+/(lib|tests)/', pathNot: '^src/$1/' },
+      to: { path: '^src/[^/]+/(lib|tests|operations)/', pathNot: '^src/$1/' },
     },
     {
       name: 'no-orphans',
