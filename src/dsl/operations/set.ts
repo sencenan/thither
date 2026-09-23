@@ -4,10 +4,10 @@ import { selectTargets } from '../selector';
 import type { OpFn, State } from '../types';
 import {
   isTemplate,
-  matchingPortion,
   normalizeDimensions,
   push,
   resolveEscape,
+  splitAtSeparator,
   thitherError,
 } from '../utils';
 
@@ -35,7 +35,8 @@ export const set: OpFn = (stack) => {
     return push(stack, thitherError('invalid_destination', `${dest} is not a valid URL`));
   }
 
-  const explicit = matchingPortion(dims).map(resolveEscape);
+  const [matching] = splitAtSeparator(dims);
+  const explicit = matching.map(resolveEscape);
   if (explicit.length === 0) {
     return push(stack, thitherError('missing_operand', 'no explicit dimension'));
   }

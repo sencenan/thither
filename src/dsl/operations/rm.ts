@@ -2,7 +2,7 @@
 
 import { selectTargets } from '../selector';
 import type { OpFn, State } from '../types';
-import { matchingPortion, normalizeDimensions, push, resolveEscape, thitherError } from '../utils';
+import { normalizeDimensions, push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
 
 const unexpectedStackError = thitherError('missing_operand', '.rm expects [.., S, L] or [.., S]');
 
@@ -24,7 +24,8 @@ export const rm: OpFn = (stack) => {
     return push(stack, unexpectedStackError);
   }
 
-  const explicit = matchingPortion(ls[1]).map(resolveEscape);
+  const [matching] = splitAtSeparator(ls[1]);
+  const explicit = matching.map(resolveEscape);
   if (explicit.length === 0) {
     return stack;
   }

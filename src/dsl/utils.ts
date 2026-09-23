@@ -64,9 +64,13 @@ export const normalizeDimensions = (dims: readonly Dim[]): Dim[] => {
 };
 
 // dsl.md §2 — the first standalone separator divides the matching portion from the suffix
-export const matchingPortion = (literals: readonly Literal[]): Literal[] => {
+export const splitAtSeparator = (
+  literals: readonly Literal[],
+): [matching: Literal[], suffix: Literal[]] => {
   const separator = literals.indexOf(SEP);
-  return separator === -1 ? [...literals] : literals.slice(0, separator);
+  return separator === -1
+    ? [[...literals], []]
+    : [literals.slice(0, separator), literals.slice(separator + 1)];
 };
 
 // dsl.md §2 — one leading dot is removed when an escaped literal is used
