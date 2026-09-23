@@ -1,8 +1,15 @@
 // dsl.md §4.1 — .set: insert or update a target
 
 import { selectTargets } from '../selector';
-import { type Dim, type Literal, type OpFn, SEP, SEP_ESCAPE, type State } from '../types';
-import { isTemplate, normalizeDimensions, push, thitherError } from '../utils';
+import type { OpFn, State } from '../types';
+import {
+  isTemplate,
+  matchingPortion,
+  normalizeDimensions,
+  push,
+  resolveEscape,
+  thitherError,
+} from '../utils';
 
 const unexpectedStackError = thitherError('missing_operand', '.set expects [.., S, L]');
 
@@ -58,12 +65,3 @@ export const set: OpFn = (stack) => {
   stack.pop();
   return push(stack, nextState);
 };
-
-const matchingPortion = (literals: readonly Literal[]): Literal[] => {
-  const separator = literals.indexOf(SEP);
-  return separator === -1 ? [...literals] : literals.slice(0, separator);
-};
-
-// dsl.md §2 — one leading dot is removed when an escaped literal is used
-const resolveEscape = (literal: Literal): Dim =>
-  literal.startsWith(SEP_ESCAPE) ? literal.slice(1) : literal;

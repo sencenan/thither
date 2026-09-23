@@ -1,4 +1,14 @@
-import type { Dim, ErrorType, Stack, StackValue, Template, ThitherError } from './types';
+import {
+  type Dim,
+  type ErrorType,
+  type Literal,
+  SEP,
+  SEP_ESCAPE,
+  type Stack,
+  type StackValue,
+  type Template,
+  type ThitherError,
+} from './types';
 
 export const thitherError = (
   type: ErrorType,
@@ -52,3 +62,13 @@ export const isTemplate = (value: string): value is Template => {
 export const normalizeDimensions = (dims: readonly Dim[]): Dim[] => {
   return [...new Set(dims.map((it) => it.trim().toLowerCase()))].sort();
 };
+
+// dsl.md §2 — the first standalone separator divides the matching portion from the suffix
+export const matchingPortion = (literals: readonly Literal[]): Literal[] => {
+  const separator = literals.indexOf(SEP);
+  return separator === -1 ? [...literals] : literals.slice(0, separator);
+};
+
+// dsl.md §2 — one leading dot is removed when an escaped literal is used
+export const resolveEscape = (literal: Literal): Dim =>
+  literal.startsWith(SEP_ESCAPE) ? literal.slice(1) : literal;

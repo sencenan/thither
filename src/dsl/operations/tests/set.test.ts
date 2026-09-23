@@ -1,42 +1,22 @@
 // dsl.md §4.1 — .set: insert or update a target
 
 import { describe, expect, it } from 'vitest';
-import { createInterpreter } from '../../interpreter.ts';
-import type { InterpreterEnv, OpFn, Program, Stack, State, Target } from '../../types.ts';
+import type { Stack, Target } from '../../types.ts';
 import { set } from '../set.ts';
+import {
+  type Case,
+  companyDocs,
+  companyGit,
+  error,
+  explicitError,
+  personalGit,
+  runWith,
+  state,
+  three,
+} from './harness.ts';
 
-const identity: OpFn = (stack) => stack;
-const env: InterpreterEnv = {
-  symbols: new Map<string, OpFn>([
-    ['.set', set],
-    ['.$', identity],
-  ]),
-};
-
-const run = (items: readonly unknown[]): Stack => {
-  const interp = createInterpreter(env);
-  const program: Program = [];
-  for (const item of items) {
-    interp.pushToken(program, item);
-  }
-  return interp.execute(program);
-};
-
-const state = (targets: readonly Target[], focus: readonly string[] = []): State => [
-  'S',
-  { targets: [...targets], focus },
-];
-
-const error = (type: string) => ['E', expect.objectContaining({ type })];
-
-const companyGit: Target = [['company', 'git'], 'https://github.com/company/{}'];
-const companyDocs: Target = [['company', 'docs'], 'https://docs.company.com/{}'];
-const personalGit: Target = [['git', 'personal'], 'https://github.com/me/{}'];
-const three = [companyGit, companyDocs, personalGit];
+const run = runWith({ '.set': set });
 const companyGitLab: Target = [['company', 'git'], 'https://gitlab.com/company/{}'];
-const explicitError = ['E', { type: 'unknown_error', description: 'boom' }];
-
-type Case = readonly [name: string, program: readonly unknown[], stack: readonly unknown[]];
 
 const cases: readonly Case[] = [
   // operand extraction
