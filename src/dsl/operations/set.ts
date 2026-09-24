@@ -1,7 +1,7 @@
 // dsl.md §4.1 — .set: insert or update a target
 
-import { searchTargets } from '../selector';
-import type { OpFn, State } from '../types';
+import { searchTargets } from '../selector.ts';
+import type { OpFn, State } from '../types.ts';
 import {
   isOperatorTerm,
   isTemplate,
@@ -10,7 +10,7 @@ import {
   resolveEscape,
   splitAtSeparator,
   thitherError,
-} from '../utils';
+} from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.set expects [.., S, L]');
 

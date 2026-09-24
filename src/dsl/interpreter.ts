@@ -1,7 +1,13 @@
-import { invariant } from '../lib/invariant';
-import { parse } from './parser';
-import { type Interpreter, type InterpreterEnv, type Program, type Stack, TERM_OP } from './types';
-import { push } from './utils';
+import { invariant } from '../lib/invariant.ts';
+import { parse } from './parser.ts';
+import {
+  type Interpreter,
+  type InterpreterEnv,
+  type Program,
+  type Stack,
+  TERM_OP,
+} from './types.ts';
+import { push } from './utils.ts';
 
 export const createInterpreter = (env: InterpreterEnv): Interpreter => {
   const interpreter = {

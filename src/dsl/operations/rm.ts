@@ -1,8 +1,8 @@
 // dsl.md §4.2 — .rm: remove matching targets
 
-import { searchTargets } from '../selector';
-import type { OpFn, State } from '../types';
-import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
+import { searchTargets } from '../selector.ts';
+import type { OpFn, State } from '../types.ts';
+import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.rm expects [.., S, L] or [.., S]');
 

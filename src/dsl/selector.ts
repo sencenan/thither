@@ -1,5 +1,5 @@
 import { extendedMatch, Fzf } from 'fzf';
-import type { Dim, Target } from './types';
+import type { Dim, Target } from './types.ts';
 
 // dsl.md §5 — the matcher's evidence for one selected target: its score and the
 // ascending, deduplicated character indices matched within its searchable string.

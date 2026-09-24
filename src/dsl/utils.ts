@@ -9,7 +9,7 @@ import {
   type State,
   type Template,
   type ThitherError,
-} from './types';
+} from './types.ts';
 
 export const emptyState = (): State => ['S', { targets: [], focus: [] }];
 

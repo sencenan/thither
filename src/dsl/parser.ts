@@ -14,14 +14,14 @@ import {
   type Target,
   type ThitherError,
   type Token,
-} from './types';
+} from './types.ts';
 import {
   isOperatorOnly,
   isOperatorTerm,
   isTemplate,
   normalizeDimensions,
   thitherError,
-} from './utils';
+} from './utils.ts';
 
 export const parse = (env: InterpreterEnv, raw: unknown): Token => {
   if (typeof raw === 'string') {

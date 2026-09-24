@@ -10,7 +10,10 @@ Config files are the source of truth for anything a tool checks; this document h
 src/dsl/      the language core — implements docs/dsl.md
 src/lib/      utilities with no client knowledge
 src/client/   the browser client — implements docs/browser-client.md
+scripts/      developer tools run directly by Node (`pnpm repl`); never bundled
 ```
+
+`scripts/` is outside `src`, so the import-direction rules do not apply to it; it may import the core through `src/dsl/index.ts` and use Node APIs. It has its own `scripts/tsconfig.json` (`types: ["node"]`, no DOM), placed inside the folder because editors resolve the nearest `tsconfig.json` per file, and `typecheck` runs it as a third pass. Relative imports carry their `.ts` extension everywhere: Node's ESM loader does no extension guessing, so this is what lets `node scripts/repl.ts` load the real core with no build step.
 
 Imports flow one way: `client → dsl`, `client → lib`, `dsl → lib`. `lib` imports neither.
 

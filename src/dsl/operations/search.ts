@@ -1,6 +1,6 @@
 // dsl.md §4.4, §5 — .$: search with boundary inference, render arguments, order matches
 
-import { type Selection, searchTargets } from '../selector';
+import { type Selection, searchTargets } from '../selector.ts';
 import {
   type Dim,
   type Hint,
@@ -11,8 +11,8 @@ import {
   SEP,
   type State,
   type Target,
-} from '../types';
-import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
+} from '../types.ts';
+import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts';
 
 const missingOperand = thitherError('missing_operand', '.$ expects [.., S, L] or [.., S]');
 

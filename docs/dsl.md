@@ -198,7 +198,7 @@ Each target's canonically sorted dimensions are joined with spaces into **one se
 
 Term order does not affect selection or score except around `|`, which binds the terms on either side of it: with focus `[company]`, the query `git | docs` is `company AND (git OR docs)`. Only `.$`'s prefix inference otherwise cares about the user's original token order.
 
-Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Stored dimensions are lowercase, so an uppercase term matches no stored dimension: `Git` finds nothing where `git` finds every git target. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
+Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Stored dimensions are lowercase, so an uppercase term matches no stored dimension: `Git` finds nothing where `git` finds every git target. An uppercase letter is read as a deliberate request for case-sensitive matching, and the language does not second-guess it — so under `.$`'s prefix inference (section 4.4), `company Git MyRepo` stops matching at `company` and takes `Git` as the first argument. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
 
 Operations differ only in how they choose query inputs:
 

@@ -1,0 +1,12 @@
+{
+  // Developer scripts run directly under Node (`node scripts/<name>.ts`), so they see
+  // Node's globals and `node:` modules and no DOM. They import the core through
+  // src/dsl/index.ts, which is pulled into this program too. Lives inside scripts/
+  // because editors resolve the nearest tsconfig.json per file.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["node"]
+  },
+  "include": ["."]
+}
