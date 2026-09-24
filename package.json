@@ -37,6 +37,7 @@
     "@total-typescript/shoehorn": "0.1.2",
     "@types/node": "24.13.6",
     "dependency-cruiser": "18.4.0",
+    "happy-dom": "^20.14.5",
     "husky": "9.1.7",
     "lint-staged": "17.5.1",
     "typescript": "7.0.2",
