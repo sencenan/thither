@@ -82,5 +82,5 @@ export interface InterpreterEnv {
 
 export interface Interpreter {
   pushToken(program: Program, token: unknown): Program;
-  execute(program: Program): Stack;
+  execute(program: Program, stack?: Stack): Stack;
 }
