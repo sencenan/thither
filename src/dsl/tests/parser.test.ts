@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { parse } from '../parser.ts';
 import type { InterpreterEnv, OpFn } from '../types.ts';
 
-const noop: OpFn = (stack) => stack;
+const noop: OpFn = (_interp, stack) => stack;
 const env: InterpreterEnv = {
   symbols: new Map<string, OpFn>([
     ['.set', noop],

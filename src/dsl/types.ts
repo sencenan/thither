@@ -74,7 +74,11 @@ export type Stack = StackValue[];
 
 // evaluation types
 
-export type OpFn = (stack: Stack) => Stack;
+// The evaluator hands an operation the interpreter it is bound to (first argument), so a host
+// operation can reuse the core's own parsing/evaluation (e.g. `.load` validating persisted
+// values through pushToken) without the circular wiring of being handed the interpreter before
+// it exists (ADR 0005). Core operations ignore it.
+export type OpFn = (interp: Interpreter, stack: Stack) => Stack;
 
 export interface InterpreterEnv {
   readonly symbols: Map<Op, OpFn>;

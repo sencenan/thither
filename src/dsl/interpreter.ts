@@ -26,7 +26,9 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
           case 'o': {
             const fn = env.symbols.get(body);
             invariant(fn, `operation ${body} not found`);
-            stack = fn(stack);
+            // Hand the operation the interpreter it belongs to, so a host operation can reuse
+            // pushToken/execute without being wired the interpreter before it exists (ADR 0005).
+            stack = fn(interpreter, stack);
             break;
           }
 

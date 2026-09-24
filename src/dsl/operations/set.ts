@@ -14,7 +14,7 @@ import {
 
 const unexpectedStackError = thitherError('missing_operand', '.set expects [.., S, L]');
 
-export const set: OpFn = (stack) => {
+export const set: OpFn = (_interp, stack) => {
   const ls = stack.pop();
 
   if (!ls) {

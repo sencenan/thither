@@ -12,7 +12,7 @@ import {
 
 const unexpectedStackError = thitherError('missing_operand', '.@ expects [.., S, L] or [.., S]');
 
-export const at: OpFn = (stack) => {
+export const at: OpFn = (_interp, stack) => {
   const ls = stack.pop();
 
   if (!ls) {

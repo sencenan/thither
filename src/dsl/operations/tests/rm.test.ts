@@ -12,6 +12,7 @@ import {
   personalGit,
   runWith,
   state,
+  testInterp,
   three,
 } from './harness.ts';
 
@@ -120,6 +121,6 @@ describe('.rm — operand contract', () => {
       ['L', ['stray']],
       ['L', ['git']],
     ];
-    expect(rm(stack)).toEqual([['L', ['stray']], error('missing_operand')]);
+    expect(rm(testInterp, stack)).toEqual([['L', ['stray']], error('missing_operand')]);
   });
 });
