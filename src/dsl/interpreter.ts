@@ -1,12 +1,6 @@
 import { invariant } from '../lib/invariant.ts';
 import { parse } from './parser.ts';
-import {
-  type Interpreter,
-  type InterpreterEnv,
-  type Program,
-  type Stack,
-  TERM_OP,
-} from './types.ts';
+import type { Interpreter, InterpreterEnv, Program, Stack } from './types.ts';
 import { push } from './utils.ts';
 
 export const createInterpreter = (env: InterpreterEnv): Interpreter => {
@@ -17,14 +11,11 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
     },
 
     execute: (program: Program, initial: Stack = []): Stack => {
-      // Both arguments are the caller's: copy before the terminal .$ lands or the stack grows.
-      const items: Program = hasTerminalOp(program)
-        ? [...program]
-        : interpreter.pushToken([...program], TERM_OP);
-
+      // The stack is the caller's: copy it so evaluation never mutates it (ADR 0006).
+      // The program is evaluated exactly as given — the interpreter appends nothing (ADR 0007).
       let stack: Stack = [...initial];
 
-      for (const token of items) {
+      for (const token of program) {
         const [sigil, body] = token;
 
         switch (sigil) {
@@ -51,9 +42,4 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
   };
 
   return interpreter;
-};
-
-const hasTerminalOp = (program: Program): boolean => {
-  const last = program[program.length - 1];
-  return !!(last && last[0] === 'o' && last[1] === TERM_OP);
 };

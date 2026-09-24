@@ -2,15 +2,13 @@ import { expect } from 'vitest';
 import { createInterpreter } from '../../interpreter.ts';
 import type { OpFn, Program, Stack, State, Target } from '../../types.ts';
 
-const identity: OpFn = (stack) => stack;
-
-// Runs a program with the operations under test bound, plus a no-op terminal `.$`
-// so the final stack shows exactly what the operations left behind.
+// Runs a program with the operations under test bound. The interpreter appends
+// nothing (ADR 0007), so the final stack shows exactly what the operations left behind.
 export const runWith =
   (ops: Readonly<Record<string, OpFn>>) =>
   (items: readonly unknown[]): Stack => {
     const interp = createInterpreter({
-      symbols: new Map<string, OpFn>([...Object.entries(ops), ['.$', identity]]),
+      symbols: new Map<string, OpFn>(Object.entries(ops)),
     });
     const program: Program = [];
     for (const item of items) {

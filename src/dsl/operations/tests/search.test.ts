@@ -6,11 +6,12 @@ import type { OpFn, Program, Stack, Target } from '../../types.ts';
 import { search } from '../search.ts';
 import { companyDocs, companyGit, personalGit, state } from './harness.ts';
 
-// Binds the real `.$`; the interpreter appends it when a program does not end in one.
+// Binds the real `.$` and closes each program with it, as a host does (ADR 0007):
+// the interpreter appends nothing, so the terminal search must be explicit.
 const run = (items: readonly unknown[]): Stack => {
   const interp = createInterpreter({ symbols: new Map<string, OpFn>([['.$', search]]) });
   const program: Program = [];
-  for (const item of items) {
+  for (const item of [...items, '.$']) {
     interp.pushToken(program, item);
   }
   return interp.execute(program);

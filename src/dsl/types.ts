@@ -8,7 +8,6 @@ export const SEP_ESCAPE = '..';
 export type Separator = typeof SEP;
 
 export type Op = string;
-export const TERM_OP: Op = '.$';
 
 // composite values
 

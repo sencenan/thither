@@ -11,7 +11,6 @@ const envWith = (ops: Record<string, OpFn>): InterpreterEnv => ({
 
 describe('execute — literal accumulation (dsl.md §1)', () => {
   it('§1 accumulates literals without lowercasing, sorting, or deduping', () => {
-    // A no-op `.$` isolates accumulation: the raw literal array survives to the top.
     const interp = createInterpreter(envWith({ '.$': identity }));
     const program: Program = [];
     interp.pushToken(program, 'Company');
@@ -32,17 +31,17 @@ describe('execute — literal accumulation (dsl.md §1)', () => {
   });
 });
 
-describe('execute — terminal .$ appending (dsl.md §1)', () => {
-  it('§1 appends a terminal .$ when the program does not already end with the .$ operation', () => {
+describe('execute — evaluates exactly the program given (ADR 0007, dsl.md §1)', () => {
+  it('§1 a program with no .$ ends with the literal array on top — no search is appended', () => {
     const dollar = vi.fn(identity);
     const interp = createInterpreter(envWith({ '.$': dollar }));
     const program: Program = [];
     interp.pushToken(program, 'git');
-    interp.execute(program);
-    expect(dollar).toHaveBeenCalledTimes(1);
+    expect(interp.execute(program)).toEqual([['L', ['git']]]);
+    expect(dollar).not.toHaveBeenCalled();
   });
 
-  it('§1 does not append a second .$ when the program already ends with the .$ operation', () => {
+  it('§1 an explicit trailing .$ runs exactly once', () => {
     const dollar = vi.fn(identity);
     const interp = createInterpreter(envWith({ '.$': dollar }));
     const program: Program = [];
@@ -52,7 +51,7 @@ describe('execute — terminal .$ appending (dsl.md §1)', () => {
     expect(dollar).toHaveBeenCalledTimes(1);
   });
 
-  it('§1 appending the terminal .$ never mutates the caller’s program', () => {
+  it('§1 execute never mutates the caller’s program', () => {
     const interp = createInterpreter(envWith({ '.$': identity }));
     const program: Program = [];
     interp.pushToken(program, 'git');
@@ -60,13 +59,14 @@ describe('execute — terminal .$ appending (dsl.md §1)', () => {
     expect(program).toEqual([['l', 'git']]);
   });
 
-  it('§1 an escaped literal ..$ does not count as a terminal .$', () => {
+  it('§1 an escaped literal ..$ is a literal, never the .$ operation', () => {
     const dollar = vi.fn(identity);
     const interp = createInterpreter(envWith({ '.$': dollar }));
     const program: Program = [];
     interp.pushToken(program, '..$');
-    interp.execute(program);
-    expect(dollar).toHaveBeenCalledTimes(1);
+    // Accumulated verbatim (the escape resolves to `.$` only when the literal is used).
+    expect(interp.execute(program)).toEqual([['L', ['..$']]]);
+    expect(dollar).not.toHaveBeenCalled();
   });
 });
 
@@ -79,7 +79,7 @@ describe('execute — operation dispatch (ADR 0005)', () => {
       }
       return stack;
     };
-    const interp = createInterpreter(envWith({ '.dup': dup, '.$': identity }));
+    const interp = createInterpreter(envWith({ '.dup': dup }));
     const program: Program = [];
     interp.pushToken(program, 'x');
     interp.pushToken(program, '.dup');
@@ -130,7 +130,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
   });
 
   it('§6 an explicit E is pushed as-is, not unwound: [S, L] then E becomes [S, L, E]', () => {
-    const interp = createInterpreter(envWith({ '.$': identity }));
+    const interp = createInterpreter(envWith({}));
     const program: Program = [];
     interp.pushToken(program, state());
     interp.pushToken(program, 'git');
@@ -144,7 +144,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
   });
 
   it('§6 an E on top seals the stack against trailing literals', () => {
-    const interp = createInterpreter(envWith({ '.$': identity }));
+    const interp = createInterpreter(envWith({}));
     const program: Program = [];
     interp.pushToken(program, state());
     interp.pushToken(program, 'git');
@@ -159,7 +159,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
   });
 
   it('§1 a program whose first item is an unparsable E evaluates to [E]', () => {
-    const interp = createInterpreter(envWith({ '.$': identity }));
+    const interp = createInterpreter(envWith({}));
     const program: Program = [];
     interp.pushToken(program, ['bogus']);
     interp.pushToken(program, 'ignored');

@@ -4,6 +4,10 @@ Rules for writing code in this repo. Read before adding or editing source.
 
 Config files are the source of truth for anything a tool checks; this document holds the conventions and reasons a tool cannot state. The settings themselves are listed once under [Tool-enforced](#tool-enforced) so the scaffold can wire them up.
 
+## Working mode
+
+Unless the human explicitly says otherwise, do all coding work in the **human-in-the-loop, stay-on-branch mode** defined by [`.pi/prompts/branch-hitl.md`](../.pi/prompts/branch-hitl.md): work on a `ticket/NN-slug` branch, one unit at a time, run `pnpm run verify` before committing, and **stop before each commit to let the human review the diff**. Never merge, rebase, push, or reset a shared branch without an explicit instruction. Only depart from this mode when the human names a different mode for the session.
+
 ## Layout
 
 ```

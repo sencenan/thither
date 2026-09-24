@@ -13,9 +13,9 @@ const run = (items: readonly unknown[], stack?: Stack) => {
 };
 
 describe('execute resumes from a caller-supplied stack', () => {
-  it('§7 create and implicitly search, seeded through the stack instead of the program', () => {
+  it('§7 create and search, seeded through the stack instead of the program', () => {
     const persisted: Stack = [emptyState()];
-    const stack = run(['company', 'git', 'https://github.com/company/{}', '.set'], persisted);
+    const stack = run(['company', 'git', 'https://github.com/company/{}', '.set', '.$'], persisted);
 
     expect(stack[0]).toEqual([
       'S',
@@ -40,44 +40,29 @@ describe('the public surface holds the browser-client.md contract', () => {
     expect(stack).toEqual([state, ['E', expect.objectContaining({ type: 'parse_error' })]]);
   });
 
-  it('execute leaves the program reusable: two runs give equal stacks, and tokens appended after a run still execute', () => {
+  it('execute does not mutate the program, and two runs give equal stacks', () => {
     const interp = createInterpreter(defaultEnv());
     const program: Program = [];
     interp.pushToken(program, state);
     interp.pushToken(program, 'company');
+    interp.pushToken(program, '.$');
 
     const first = interp.execute(program);
     const second = interp.execute(program);
     expect(second).toEqual(first);
-    expect(program).toHaveLength(2);
-
-    // Had the terminal .$ landed in `program`, this literal would sit past a result and never run.
-    interp.pushToken(program, 'MyRepo');
-    const third = interp.execute(program);
-    expect(third[1]).toEqual([
-      'R',
-      expect.objectContaining({
-        matches: [
-          [
-            'https://github.com/company/MyRepo',
-            ['company', 'git'],
-            ['MyRepo'],
-            expect.objectContaining({ argDelta: 0 }),
-          ],
-        ],
-      }),
-    ]);
+    expect(program).toHaveLength(3);
   });
 });
 
 describe('dsl.md §7 worked programs', () => {
-  it('§7 create and implicitly search', () => {
+  it('§7 create and search', () => {
     const stack = run([
       ['S', { targets: [], focus: [] }],
       'company',
       'git',
       'https://github.com/company/{}',
       '.set',
+      '.$',
     ]);
 
     expect(stack).toEqual([
@@ -104,7 +89,7 @@ describe('dsl.md §7 worked programs', () => {
       'S',
       { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
     ];
-    const stack = run([state, 'company', 'git', 'MyRepo']);
+    const stack = run([state, 'company', 'git', 'MyRepo', '.$']);
 
     expect(stack).toEqual([
       state,
@@ -174,7 +159,7 @@ describe('dsl.md §7 worked programs', () => {
         focus: [],
       },
     ];
-    const stack = run([state]);
+    const stack = run([state, '.$']);
 
     expect(stack).toEqual([
       state,

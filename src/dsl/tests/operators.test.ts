@@ -56,7 +56,7 @@ describe('search operators apply in .$ (dsl.md §3, §4.4)', () => {
   it.each(cases)(
     '%s: %j selects the expected targets and reports the terms verbatim',
     (_op, terms, selects) => {
-      const stack = run([state(all), ...terms, '.']);
+      const stack = run([state(all), ...terms, '.', '.$']);
       same(
         selectedDims(stack).map((dims) => [dims, ''] as const),
         selects,
@@ -132,7 +132,7 @@ describe('a bare $ is plain text, not an operator (dsl.md §2)', () => {
   });
 
   it('$ .$ fuzzy-matches the stored $ dimension', () => {
-    const stack = run([state([[['$'], 'https://x/'], docs]), '$', '.']);
+    const stack = run([state([[['$'], 'https://x/'], docs]), '$', '.', '.$']);
     expect(selectedDims(stack)).toEqual([['$']]);
   });
 });
