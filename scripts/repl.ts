@@ -93,10 +93,10 @@ const showMatch = (match: Match, i: number, unique: boolean): string => {
   ].join('\n');
 };
 
-const showTop = (top: StackValue | undefined, implicitTerminal = false): void => {
+const showTop = (top: StackValue | undefined): void => {
   if (top?.[0] === 'R') {
     const { matches, inputs } = top[1];
-    console.log(dim(`inputs ${JSON.stringify(inputs)}${implicitTerminal ? ' ⤷ .$' : ''}`));
+    console.log(dim(`inputs ${JSON.stringify(inputs)}`));
     if (matches.length === 0) {
       console.log(yellow('  no matches'));
     }
@@ -113,9 +113,13 @@ const showTop = (top: StackValue | undefined, implicitTerminal = false): void =>
   }
 };
 
-// browser-client.md "Execution flow" steps 2–3, in memory.
+// The REPL is a host (ADR 0007): it composes the terminal `.$` onto every line itself, since
+// the core evaluates exactly the program it is given. An empty line composes just `['.$']`,
+// which searches on focus alone. The composed program is echoed dim so the epilogue is visible.
 const execute = (tokens: readonly string[]): void => {
-  const program = tokens.reduce(interp.pushToken, []);
+  const composed = [...tokens, '.$'];
+  console.log(dim(`> ${composed.join(' ')}`));
+  const program = composed.reduce(interp.pushToken, []);
   const result = interp.execute(program, stack);
   const top = result[result.length - 1];
   const remaining = top && (top[0] === 'R' || top[0] === 'E') ? result.slice(0, -1) : result;
@@ -127,16 +131,7 @@ const execute = (tokens: readonly string[]): void => {
     console.log(dim('state changed'));
   }
 
-  // dsl.md §1 lifecycle step 2: `execute` takes a complete program and appends `.$` when the
-  // last item is not that operation. A REPL line is often a fragment, so make the seam
-  // visible: echo the appended `.$` as a dim continuation of the input.
-  const last = program[program.length - 1];
-  const explicitTerminal = last?.[0] === 'o' && last[1] === '.$';
-  if (top?.[0] === 'R' && !explicitTerminal) {
-    console.log(dim('  ⤷ .$'));
-  }
-
-  showTop(top, top?.[0] === 'R' && !explicitTerminal);
+  showTop(top);
 };
 
 const load = (json: string): void => {
@@ -234,7 +229,7 @@ rl.prompt();
 rl.on('line', (raw) => {
   const line = raw.trim();
   if (line.length === 0) {
-    // empty input: the client's step 2 gives an empty program, and the appended .$ searches on focus
+    // empty line: the composed program is just `['.$']`, which searches on focus alone
     execute([]);
   } else if (line.startsWith(':')) {
     if (!command(line)) {
