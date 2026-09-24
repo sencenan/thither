@@ -79,7 +79,7 @@ Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or dedu
 ### Lifecycle
 
 1. Build the program by appending parsed items in order. An unparsable item becomes an `E` value at that position; earlier items remain executable.
-2. Append `.$` unless the program's last item is already the **operation** `.$`. An escaped literal `..$` does not count.
+2. The interpreter appends nothing. A host that wants a search to close every program appends the **operation** `.$` itself, along with any host operations of its own (see [ADR 0007](adr/0007-hosts-compose-the-program.md)). An escaped literal `..$` is not an operation.
 3. Start with an empty data stack and evaluate left to right.
 4. Stop when an `R` or explicit `E` reaches the top, discarding the rest of the program. Pushing an explicit `E` does not unwind the stack.
 5. Stop on a generated evaluation error after applying the unwinding of section 6.
@@ -265,7 +265,7 @@ S . ignored .rm
 
 Otherwise combine the explicit dimensions with focus, match that complete dimension list, and remove every matching target. Zero matches is a successful no-op and multiple matches are allowed; never shorten the query to obtain a match. So `S company nonexistent .rm` removes nothing and does not retry `company`.
 
-The interpreter still appends `.$`, so these programs go on to search the unchanged state.
+A host that appends `.$` makes these programs go on to search the unchanged state.
 
 ### 4.3 `.@`
 
@@ -405,14 +405,16 @@ A parse failure behaves like any other `E` in the stream: items before it have a
 
 These examples use `S`, `S0`, and `S1` as explanatory names for actual state JSON values; they are not source-level variable bindings.
 
-### Create and implicitly search
+The worked programs end in an explicit `.$`. The interpreter appends nothing; a host such as the browser client or the REPL appends `.$` (and its own host operations) to the user's tokens before executing.
+
+### Create and search
 
 ```text
 ["S", {"targets": [], "focus": []}]
-company git https://github.com/company/{} .set
+company git https://github.com/company/{} .set .$
 ```
 
-The interpreter appends `.$`. `.set` appends `[company, git]`, and the appended search selects all targets because focus and explicit input are empty. The final shape is `[S', R]`, whose single match keeps its `{}` intact with `argDelta: -1`.
+`.set` appends `[company, git]`, and the search selects all targets because focus and explicit input are empty. The final shape is `[S', R]`, whose single match keeps its `{}` intact with `argDelta: -1`.
 
 ### Navigate with inferred arguments
 
@@ -421,10 +423,10 @@ The interpreter appends `.$`. `.set` appends `[company, git]`, and the appended 
   "targets": [[["company", "git"], "https://github.com/company/{}"]],
   "focus": []
 }]
-company git MyRepo
+company git MyRepo .$
 ```
 
-The implicit `.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and stored dimensions are lowercase.)
+`.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and stored dimensions are lowercase.)
 
 ```json
 ["R", {
@@ -465,9 +467,10 @@ https://github.com/personal/thither/tree/{} argDelta: -1
   ],
   "focus": []
 }]
+.$
 ```
 
-The appended `.$` selects everything, and each match carries empty evidence:
+`.$` selects everything, and each match carries empty evidence:
 
 ```json
 ["R", {
