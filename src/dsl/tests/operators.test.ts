@@ -79,15 +79,15 @@ const operatorTokens = ['|', '!personal', "'ompany", '^git', 'git$', '^docs$'];
 
 describe('search operators are refused where a dimension is stored (dsl.md §4.1, §4.3, §6)', () => {
   it.each(operatorTokens)(
-    '.set: %s https://x/ .set is invalid_dimension and stores nothing',
+    '.set: https://x/ %s .set is invalid_dimension and stores nothing',
     (token) => {
-      const stack = run([state(all), token, 'https://x/', '.set']);
+      const stack = run([state(all), 'https://x/', token, '.set']);
       expect(stack).toEqual([state(all), error('invalid_dimension')]);
     },
   );
 
   it.each(operatorTokens)('.set: a plain dimension next to %s still fails as a whole', (token) => {
-    const stack = run([state(all), 'home', token, 'https://x/', '.set']);
+    const stack = run([state(all), 'https://x/', 'home', token, '.set']);
     expect(stack).toEqual([state(all), error('invalid_dimension')]);
   });
 
@@ -126,7 +126,7 @@ describe('operator-only tokens are parse errors everywhere (dsl.md §2)', () => 
 
 describe('a bare $ is plain text, not an operator (dsl.md §2)', () => {
   it('$ can be stored as a dimension by .set and .@', () => {
-    expect(run([state([]), '$', 'https://x/', '.set', '$', '.@', '.$'])[0]).toEqual(
+    expect(run([state([]), 'https://x/', '$', '.set', '$', '.@', '.$'])[0]).toEqual(
       state([[['$'], 'https://x/']], ['$']),
     );
   });

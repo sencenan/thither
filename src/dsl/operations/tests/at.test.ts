@@ -75,7 +75,7 @@ const cases: readonly Case[] = [
   ],
   [
     '§6 earlier operations are not rolled back: the error stack retains the cleared focus',
-    [state(three, ['personal']), 'company', '.@', '.@', 'git', 'https://example.com/{}', '.set'],
+    [state(three, ['personal']), 'company', '.@', '.@', 'https://example.com/{}', 'git', '.set'],
     [state(three), error('ambiguous_set')],
   ],
   [
