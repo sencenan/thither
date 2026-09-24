@@ -15,7 +15,7 @@ const run = (items: readonly unknown[], stack?: Stack) => {
 describe('execute resumes from a caller-supplied stack', () => {
   it('§7 create and search, seeded through the stack instead of the program', () => {
     const persisted: Stack = [emptyState()];
-    const stack = run(['company', 'git', 'https://github.com/company/{}', '.set', '.$'], persisted);
+    const stack = run(['https://github.com/company/{}', 'company', 'git', '.set', '.$'], persisted);
 
     expect(stack[0]).toEqual([
       'S',
@@ -58,9 +58,9 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 create and search', () => {
     const stack = run([
       ['S', { targets: [], focus: [] }],
+      'https://github.com/company/{}',
       'company',
       'git',
-      'https://github.com/company/{}',
       '.set',
       '.$',
     ]);

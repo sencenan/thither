@@ -4,7 +4,7 @@
 // tokens, execute on the current stack, pop the terminal R/E, keep the rest.
 //
 //   pnpm repl
-//   > company git https://github.com/company/{} .set
+//   > https://github.com/company/{} company git .set
 //   > comp git thither
 //   > :help
 

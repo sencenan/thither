@@ -30,7 +30,7 @@ export const set: OpFn = (stack) => {
     return push(stack, unexpectedStackError);
   }
 
-  const dest = ls[1].pop();
+  const dest = ls[1].shift();
   const dims = ls[1];
   if (!dest || !isTemplate(dest)) {
     return push(stack, thitherError('invalid_destination', `${dest} is not a valid URL`));

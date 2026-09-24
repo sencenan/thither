@@ -221,7 +221,7 @@ Each operation reads the matching portion defined in section 2, normalizes dimen
 
 Interpret `L` in this order:
 
-1. Remove its last literal as the destination and require it to be a valid URL or destination template; a last literal that fails validation is `invalid_destination`, whatever it looks like. Do not search backward for a URL. A plain URL is a valid destination with zero placeholders.
+1. Remove its first literal as the destination and require it to be a valid URL or destination template; a first literal that fails validation is `invalid_destination`, whatever it looks like. Do not search forward for a URL. A plain URL is a valid destination with zero placeholders.
 2. From the remaining literals, keep the matching portion.
 3. Require **at least one explicit dimension** there. Focus cannot satisfy this requirement.
 4. Combine those dimensions with focus and match the complete combined query.
@@ -237,16 +237,16 @@ Fuzzy updating does not rename dimensions: if `comp git` uniquely matches `[comp
 `.set` matches on the **normalized** combined dimensions, the exact set it would store, rather than on the raw typed query: under smart-case a raw `Git` would be case-sensitive, miss the stored `git`, and insert a duplicate dimension set. Matching lowercase against lowercase guarantees an identical existing target is always found. For the same reason an explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` matches on is what it stores, and a stored dimension is plain text.
 
 ```text
-S company git . ignored https://github.com/company/{} .set
+S https://github.com/company/{} company git . ignored .set
 ```
 
-The URL is extracted first, so the explicit dimensions are `company git` and `. ignored` plays no part.
+The URL leads and is extracted first, so the explicit dimensions are `company git` and `. ignored` plays no part.
 
 These are errors, even when focus is nonempty, because no explicit dimension remains:
 
 ```text
 S https://github.com/company/{} .set
-S . ignored https://github.com/company/{} .set
+S https://github.com/company/{} . ignored .set
 ```
 
 ### 4.2 `.rm`
@@ -367,15 +367,15 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 | `ambiguous_set` | Evaluation | `.set` matches more than one target. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
-The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the last literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`git` is an unusable destination), not `missing_operand`.
+The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.
 
 `missing_operand` covers every required-operand failure of one operation, whichever operand is absent:
 
 ```text
 S .set                                          # no literal array
 S https://github.com/company/{} .set            # no explicit dimension
-S . ignored https://github.com/company/{} .set  # no explicit dimension; the suffix is ignored
-git https://example.com/{} .set                 # no state anywhere on the stack
+S https://github.com/company/{} . ignored .set  # no explicit dimension; the suffix is ignored
+https://example.com/{} git .set                 # no state anywhere on the stack
 ```
 
 Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail. A supplied `E` must carry a `type` drawn from this vocabulary and a string `description`; unlike a generated error it may also carry extra diagnostic fields, which are preserved. An `E` whose `type` falls outside the vocabulary fails validation and parses to `parse_error`, so an error produced by another version does not round-trip unchanged.
@@ -394,7 +394,7 @@ Operations must preserve their input state until they have succeeded: an ambiguo
 Earlier successful operations are **not rolled back**. The retained state is the nearest working state at the point of failure, not the initial state. Suppose the original focus is `[personal]` and `git` matches more than one target when focus is empty:
 
 ```text
-S company .@ .@ git https://example.com/{} .set
+S company .@ .@ https://example.com/{} git .set
 ```
 
 The first `.@` sets focus, the second clears it, and `.set` then fails as ambiguous. The error stack retains the state with cleared focus.
@@ -411,7 +411,7 @@ The worked programs end in an explicit `.$`. The interpreter appends nothing; a 
 
 ```text
 ["S", {"targets": [], "focus": []}]
-company git https://github.com/company/{} .set .$
+https://github.com/company/{} company git .set .$
 ```
 
 `.set` appends `[company, git]`, and the search selects all targets because focus and explicit input are empty. The final shape is `[S', R]`, whose single match keeps its `{}` intact with `argDelta: -1`.
