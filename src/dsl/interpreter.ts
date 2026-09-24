@@ -10,12 +10,12 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
       return program;
     },
 
-    execute: (program: Program): Stack => {
+    execute: (program: Program, initial: Stack = []): Stack => {
       if (!hasTerminalOp(program)) {
         program = interpreter.pushToken(program, TERM_OP);
       }
 
-      let stack: Stack = [];
+      let stack: Stack = [...initial];
 
       for (const token of program) {
         const [sigil, body] = token;

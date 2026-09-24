@@ -88,7 +88,7 @@ Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or dedu
 
 ## 2. Source syntax and parsing
 
-A program is built one item at a time: `append(program, tokenOrValue) -> program'`. The core parses a **single** item per call and never tokenizes a multi-item string. Hosts split user input on JavaScript whitespace (`\s`) and append the resulting tokens in order.
+A program is built one item at a time: `pushToken(program, tokenOrValue) -> program`. The core parses a **single** item per call and never tokenizes a multi-item string. Hosts split user input on JavaScript whitespace (`\s`) and append the resulting tokens in order.
 
 Each appended item is either:
 

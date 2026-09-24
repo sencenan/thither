@@ -20,7 +20,8 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 │   ├── adr/
 │   │   ├── 0001-localstorage-only-browser-client.md
 │   │   ├── 0002-single-file-static-page-on-github-pages.md
-│   │   └── 0003-clients-resume-from-last-stack-value.md
+│   │   ├── 0003-clients-resume-from-last-stack-value.md
+│   │   └── ...
 │   ├── dsl.md
 │   └── research/
 └── ...
