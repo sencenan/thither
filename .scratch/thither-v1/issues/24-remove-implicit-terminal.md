@@ -1,7 +1,7 @@
 # Remove the implicit terminal from the core
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: —
 
 ## Question
@@ -24,3 +24,13 @@ The public signature does not change — `execute(program, stack?)` stays, `inde
 Not in scope: `scripts/repl.ts` (ticket 25), the browser client, any change to the four language operations.
 
 **Done when** `pnpm verify` is green, the §7 goldens match the amended `dsl.md` exactly, `grep -rn TERM_OP src/dsl/interpreter.ts src/dsl/types.ts` finds nothing, and the REPL is *known broken* until ticket 25 (its programs no longer search) — say so in the commit message rather than patching it here.
+
+## Answer
+
+Done on branch `ticket/24-remove-implicit-terminal` (`3083fa3`); `pnpm verify` green, 217 tests.
+
+**Core.** `src/dsl/interpreter.ts` now iterates `program` directly — the `hasTerminalOp` check, the `TERM_OP` append, and the program copy that only received it are gone; the stack copy stays (ADR 0006 non-mutation). `src/dsl/types.ts` dropped `export const TERM_OP`, so it holds only the type algebra; `src/dsl/env.ts` binds `search` under the inline literal `'.$'` instead. `grep -rn TERM_OP src/dsl/interpreter.ts src/dsl/types.ts` finds nothing (the symbol is gone from `src/` entirely).
+
+**Tests, all through the existing harnesses.** `interpreter.test.ts`: the `terminal .$ appending` block became `evaluates exactly the program given` — a no-`.$` program ends `[S, L]` and the search stub is never called; an explicit trailing `.$` runs once; `execute` doesn't mutate the program; `..$` stays a literal. One assertion corrected against the current core: escapes are stored **verbatim**, so `..$` accumulates as `['L', ['..$']]` (resolving to `.$` only on use), not `['L', ['.$']]`. `golden.test.ts`: every §7 program ends in an explicit `.$` matching the amended `dsl.md` §7 (`… .set .$`, empty query `S .$`); the reuse test now asserts non-mutation + equal-across-two-runs and drops the append-a-literal-after-a-run step that tested the append itself. `operators.test.ts`: the two `.$`-searching cases gained an explicit `.$` (the `.set`/`.rm`/`.@` cases already assert the post-operation state, so were untouched). `operations/tests/harness.ts`: dropped the no-op identity `.$`. `operations/tests/search.test.ts`: its `run` helper now closes each program with `.$` itself, as a host does.
+
+**REPL left known-broken** (`scripts/repl.ts` still composes programs without `.$`) — recorded in the commit message, fixed in ticket 25 per the core → REPL → client sequencing.
