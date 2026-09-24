@@ -31,6 +31,7 @@ export type Match = readonly [
 export const ErrorTypes = [
   'parse_error',
   'invalid_destination',
+  'invalid_dimension',
   'missing_operand',
   'missing_operation',
   'ambiguous_set',

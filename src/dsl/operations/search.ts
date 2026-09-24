@@ -12,7 +12,7 @@ import {
   type State,
   type Target,
 } from '../types';
-import { normalizeDimensions, push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
+import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
 
 const missingOperand = thitherError('missing_operand', '.$ expects [.., S, L] or [.., S]');
 
@@ -49,7 +49,8 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
   const { targets, focus } = state[1];
   const { matching, args } = inferBoundary(literals, targets, focus);
 
-  const query = normalizeDimensions([...focus, ...matching.map(resolveEscape)]);
+  // §3 — focus then the explicit terms, in typed order: the query is fzf's, operators and all.
+  const query = [...focus, ...matching.map(resolveEscape)];
   const matches = orderMatches(
     searchTargets(targets, query).map((selection) => toMatch(selection, args)),
   );
@@ -60,7 +61,7 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
 interface Boundary {
   // Verbatim matching literals; original spelling doubles as R.inputs.
   readonly matching: readonly Literal[];
-  // Verbatim arguments, spelling and case preserved for rendering.
+  // Arguments in accumulated form; escapes are resolved at rendering, spelling and case kept.
   readonly args: readonly Literal[];
 }
 
@@ -79,7 +80,7 @@ const inferBoundary = (
   // Without a separator: the longest nonempty prefix yielding at least one match wins.
   for (let length = literals.length; length > 0; length--) {
     const prefix = literals.slice(0, length);
-    const query = normalizeDimensions([...focus, ...prefix.map(resolveEscape)]);
+    const query = [...focus, ...prefix.map(resolveEscape)];
     if (searchTargets(targets, query).length > 0) {
       return { matching: prefix, args: literals.slice(length) };
     }
@@ -90,10 +91,12 @@ const inferBoundary = (
 };
 
 // dsl.md §5 — render the template and record the argument balance for one selected target.
+// §2 — an escaped argument is *used* here, so one leading dot is removed before substitution;
+// `m.args` reports the same resolved spelling, while `R.inputs` keeps the accumulated form.
 const toMatch = (selection: Selection, args: readonly Literal[]): Match => {
   const [dims, template] = selection.target;
   const placeholders = template.split('{}').length - 1;
-  const applied = args.slice(0, Math.min(args.length, placeholders));
+  const applied = args.slice(0, Math.min(args.length, placeholders)).map(resolveEscape);
 
   const hint: Hint = {
     argDelta: args.length - placeholders,

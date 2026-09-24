@@ -30,7 +30,7 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | --- | --- | --- |
 | `u` | URL | A valid URL with an explicit scheme and without template placeholders. Any scheme is supported. |
 | `p` | Destination template | A URL with an explicit scheme and additional anonymous `{}` placeholders. A plain `u` is accepted wherever a destination template is required. |
-| `d` | Dimension literal | A space-free literal. Preserve source spelling during evaluation; normalize when used as a stored dimension. |
+| `d` | Dimension literal | A space-free literal. Preserve source spelling during evaluation; normalize when used as a stored dimension. In a search query a literal may also carry a **search operator** (section 3); a stored dimension never does. |
 | `L` | Literal array | An ordered array of ordinary literals: dimensions, URLs, or templates. Created by accumulation during evaluation. |
 | `t` | Target | `[[d], p]`, also permitting a plain URL in the destination slot. |
 | `T` | Target set | `[t]`. |
@@ -106,7 +106,7 @@ Supported operations are:
 .$      search and produce a result
 ```
 
-Ordinary literals retain their spelling and order. URL literals and templates accumulate exactly like dimensions, so a URL-valued argument needs no escaping.
+Ordinary literals retain their spelling and order. URL literals and templates accumulate exactly like dimensions, so a URL-valued argument needs no escaping. A string token is trimmed; one that is empty after trimming, or still contains whitespace, is not a single literal and parses to `parse_error`. The core never splits it.
 
 ### Separator and escaping
 
@@ -124,6 +124,22 @@ A leading double dot escapes a dot-prefixed token: parsing keeps the token verba
 Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
 The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them; only `.$` uses the suffix.
+
+### Search operators
+
+The matching portion is handed to the matcher as an fzf **extended-search** query, so fzf's operators are part of the language. They are recognised only at the edges of a term:
+
+```text
+git docs      both terms must match                (AND, the default)
+git | docs    either term may match                (OR; `|` is its own token)
+!personal     the term must not match              (NOT, exact substring)
+'ompany       exact substring, not fuzzy
+^git          the searchable string starts with git
+git$          the searchable string ends with git
+^git$         the searchable string is exactly git
+```
+
+A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in stored dimensions alike. Operator-carrying terms are legal in the matching portion of `.$` and `.rm` only; sections 4.1 and 4.3 say what `.set` and `.@` do with them.
 
 ### URL and template validation
 
@@ -172,24 +188,24 @@ This gives equivalent dimension sets a consistent searchable representation. Foc
 
 **Target-set order** is the order targets occupy in the state. A supplied `S` keeps the order it was given; `.set` appends a newly inserted target to the end; updating an existing target leaves it in place; `.rm` removes targets without reordering the rest. That order is the final tiebreak wherever matches are ranked.
 
-To construct a matching query:
+To construct a matching query for `.$` and `.rm`:
 
-1. Select the operation's explicit matching literals.
-2. Use lowercase copies for matching; retain original literals for arguments and result inputs.
-3. Prepend the current focus.
-4. Remove duplicate dimensions.
+1. Select the operation's explicit matching literals, resolving escapes (section 2).
+2. Prepend the current focus.
+3. Keep the result as given: typed order, original case, no deduplication. It is an fzf query, and fzf owns its interpretation.
 
-Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. The query is normalized the same way (this section's rules, so it is sorted and deduplicated) and joined with spaces into **one fuzzy pattern**, which is matched against that searchable string in a single pass. A target is selected when the pattern matches; its score is the matcher's score for that pass. Because both sides are sorted before joining, a fuzzy token may span dimension boundaries, but the pattern as a whole follows sorted order.
+Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. The query terms are joined with spaces into **one fzf extended-search query** and matched against that searchable string: every term must match (an OR group counts as one term), and a target is selected when they all do. Its score is the sum of the per-term scores; a NOT term contributes nothing. A single term is fuzzy-matched against the whole searchable string, so it may span dimension boundaries: `am` selects `[apple, mango]`. Terms are independent of one another, so `m ppl` and `pple m` both select `[apple, mango]` too.
 
-Query-dimension order does not affect selection or score: both `git company` and `company git` normalize to the pattern `company git`. Only `.$`'s prefix inference cares about the user's original token order.
+Term order does not affect selection or score except around `|`, which binds the terms on either side of it: with focus `[company]`, the query `git | docs` is `company AND (git OR docs)`. Only `.$`'s prefix inference otherwise cares about the user's original token order.
 
-Do not import fzf's special query operators, such as negation, anchors, or exact-match syntax; they have no meaning here. Matching is case-insensitive (the query is lowercase by construction) and diacritic-insensitive, following the matcher's defaults: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
+Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Stored dimensions are lowercase, so an uppercase term matches no stored dimension: `Git` finds nothing where `git` finds every git target. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
 
 Operations differ only in how they choose query inputs:
 
-- `.set` and `.rm` match the **entire explicit matching portion**, combined with focus. They never retry shorter prefixes.
-- `.$` infers the boundary between matching literals and arguments by finding the longest matching prefix.
-- `.@` sets focus directly; it does not search for targets.
+- `.rm` matches the **entire explicit matching portion**, combined with focus, operators included. It never retries shorter prefixes.
+- `.set` also matches the entire explicit matching portion combined with focus, but on the **normalized** dimensions it would store (section 4.1), and it refuses operator terms.
+- `.$` infers the boundary between matching literals and arguments by finding the longest matching prefix; operator terms take part in that inference like any other term.
+- `.@` sets focus directly; it does not search for targets, and it refuses operator terms.
 
 An empty explicit query searches on focus alone; empty focus with no explicit input selects all targets.
 
@@ -217,6 +233,8 @@ Interpret `L` in this order:
 | More than one | Emit an error; leave the operation's input state unchanged. |
 
 Fuzzy updating does not rename dimensions: if `comp git` uniquely matches `[company, git]`, `.set` updates the URL and retains `[company, git]`.
+
+`.set` matches on the **normalized** combined dimensions, the exact set it would store, rather than on the raw typed query: under smart-case a raw `Git` would be case-sensitive, miss the stored `git`, and insert a duplicate dimension set. Matching lowercase against lowercase guarantees an identical existing target is always found. For the same reason an explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` matches on is what it stores, and a stored dimension is plain text.
 
 ```text
 S company git . ignored https://github.com/company/{} .set
@@ -258,6 +276,8 @@ The interpreter still appends `.$`, so these programs go on to search the unchan
 
 Normalize the matching portion and replace focus with it, without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
 
+Focus is a stored dimension list, so a matching portion containing a search operator (section 2) is `invalid_dimension` and leaves focus unchanged. `!personal .@` is refused; type `!personal` in the search itself.
+
 ### 4.4 `.$`
 
 ```text
@@ -296,7 +316,7 @@ hint.argDelta = A - P
 appliedArgs   = first min(A, P) supplied arguments
 ```
 
-Extra arguments are ignored during substitution; missing ones leave their placeholders intact. The `[args]` field in `m` contains the **applied** arguments only, but `argDelta` counts every supplied argument.
+Extra arguments are ignored during substitution; missing ones leave their placeholders intact. The `[args]` field in `m` contains the **applied** arguments only, but `argDelta` counts every supplied argument. An escaped argument is resolved on use (section 2): `..git` substitutes as `.git`, and `[args]` reports that resolved spelling, while `R.inputs` keeps the accumulated `..git`.
 
 Substitution is literal, not percent-encoding, and fills the original template; replacement text is argument content, not a new round of template syntax.
 
@@ -313,8 +333,8 @@ Substitution is literal, not percent-encoding, and fills the original template; 
 
 Each match reports why it matched, so a presentation layer can highlight without re-running the matcher:
 
-- `hint.positions`: the ascending, deduplicated character indices matched within that target's searchable string. These are the matcher's positions for the single query pattern. Because a fuzzy token may span dimension boundaries, these are string indices, not dimension indices.
-- `hint.score`: the match's ranking score, the matcher's score for the query pattern.
+- `hint.positions`: the ascending, deduplicated character indices matched within that target's searchable string, the union over every term of the query; NOT terms contribute none, and the joining spaces are never among them. Because a term may span dimension boundaries, these are string indices, not dimension indices.
+- `hint.score`: the match's ranking score, the sum of the matcher's score for each term.
 
 These fields are evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
@@ -339,9 +359,10 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets or an `E` whose `type` is outside this vocabulary. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets, a stored dimension carrying operator syntax, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
+| `invalid_dimension` | Evaluation | A dimension about to be stored by `.set` or `.@` carries search-operator syntax (section 2). |
 | `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, or no state to operate on. |
 | `ambiguous_set` | Evaluation | `.set` matches more than one target. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
@@ -400,17 +421,17 @@ The interpreter appends `.$`. `.set` appends `[company, git]`, and the appended 
   "targets": [[["company", "git"], "https://github.com/company/{}"]],
   "focus": []
 }]
-Company Git MyRepo
+company git MyRepo
 ```
 
-The implicit `.$` matches `Company Git` case-insensitively and treats `MyRepo` as the argument:
+The implicit `.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and stored dimensions are lowercase.)
 
 ```json
 ["R", {
   "matches": [
     ["https://github.com/company/MyRepo", ["company", "git"], ["MyRepo"], {"argDelta": 0}]
   ],
-  "inputs": ["Company", "Git"]
+  "inputs": ["company", "git"]
 }]
 ```
 

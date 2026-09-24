@@ -77,5 +77,29 @@ export const splitAtSeparator = (
 };
 
 // dsl.md §2 — one leading dot is removed when an escaped literal is used
+// dsl.md §3 — fzf's extended-search operators, mirrored from the library's `parseTerms`: a
+// standalone `|` is OR; a leading `!`, `'` or `^` and a trailing `$` (on anything but a bare `$`)
+// decorate a term. Stripping them the way fzf does leaves the text the term matches on.
+const OR_TERM = '|';
+
+const stripOperators = (term: string): string => {
+  let text = term.startsWith('!') ? term.slice(1) : term;
+  if (text !== '$' && text.endsWith('$')) {
+    text = text.slice(0, -1);
+  }
+  if (text.startsWith("'") || text.startsWith('^')) {
+    text = text.slice(1);
+  }
+  return text;
+};
+
+// A term fzf would read as an operator or an operator-decorated term, rather than plain text.
+export const isOperatorTerm = (term: string): boolean =>
+  term === OR_TERM || stripOperators(term) !== term;
+
+// A token that is nothing but operator syntax: fzf drops it silently, so §2 rejects it at parse.
+export const isOperatorOnly = (term: string): boolean =>
+  term !== OR_TERM && stripOperators(term).length === 0;
+
 export const resolveEscape = (literal: Literal): Dim =>
   literal.startsWith(SEP_ESCAPE) ? literal.slice(1) : literal;

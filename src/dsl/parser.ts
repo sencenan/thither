@@ -15,7 +15,13 @@ import {
   type ThitherError,
   type Token,
 } from './types';
-import { isTemplate, normalizeDimensions, thitherError } from './utils';
+import {
+  isOperatorOnly,
+  isOperatorTerm,
+  isTemplate,
+  normalizeDimensions,
+  thitherError,
+} from './utils';
 
 export const parse = (env: InterpreterEnv, raw: unknown): Token => {
   if (typeof raw === 'string') {
@@ -39,7 +45,18 @@ export const parse = (env: InterpreterEnv, raw: unknown): Token => {
       ];
     }
 
-    return ['l', token as Dim]; // not escaping .. here, not normalizing
+    // dsl.md §2 — one token is one literal: empty or whitespace-bearing text is not a value.
+    if (!isDim(token)) {
+      return createParseError(`'${raw}' is not a single literal`);
+    }
+
+    // dsl.md §2/§3 — a token that is only fzf operator syntax (`!`, `'`, `^`, `^$`) would be
+    // dropped silently by the matcher, turning `! .rm` into "remove everything". Reject it.
+    if (isOperatorOnly(token)) {
+      return createParseError(`'${raw}' is search syntax with no text to match`);
+    }
+
+    return ['l', token]; // not escaping .. here, not normalizing
   }
 
   if (Array.isArray(raw)) {
@@ -62,7 +79,7 @@ const parseState = (raw: unknown): Token => {
   if (isRecord(raw)) {
     const { targets, focus } = raw;
 
-    if (Array.isArray(targets) && isDimList(focus) && targets.every(isTarget)) {
+    if (Array.isArray(targets) && isStoredDimList(focus) && targets.every(isTarget)) {
       const normalized = targets.map(normalizeTarget);
 
       const dimSet = new Set<string>();
@@ -146,11 +163,16 @@ const isTarget = (value: readonly unknown[]): value is Target => {
 
   return (
     rest.length === 0 &&
-    isStringArray(dims) &&
-    isDimList(dims) &&
+    isStoredDimList(dims) &&
     typeof dest === 'string' &&
     isTemplate(dest.trim())
   );
+};
+
+// dsl.md §3 — a stored dimension (target or focus) is plain text: fzf operator syntax is
+// query-only, so a supplied S carrying `!git` or `|` as a dimension is malformed.
+const isStoredDimList = (value: unknown): value is Dim[] => {
+  return isDimList(value) && !value.some(isOperatorTerm);
 };
 
 const isStringArray = (value: unknown): value is string[] => {

@@ -6,7 +6,7 @@ Status: agreed. Language semantics are defined in [dsl.md](dsl.md), and domain t
 
 Thither is a static web application containing a JavaScript browser client and a JavaScript-compatible language core. The supported entry point is the browser address or search bar through a configured search shortcut.
 
-This browser client is one possible client, not the only intended one. Decisions here bind this client; the language core stays client-agnostic and performs no persistence, rendering, or navigation. Browser targeting is capability-based: any browser supporting shortcut-based search is a valid target, with no brand allowlist.
+This browser client is one possible client, not the only intended one. Decisions here bind this client; the language core stays client-agnostic and performs no persistence, rendering, or navigation. Browser targeting is capability-based: any browser supporting shortcut-based search is a valid target, with no brand allowlist. The platform floor is **Baseline 2024**: the core validates destinations with the static `URL.parse()` (Chrome 126, Firefox 126, Safari 18) and the client serializes on the Web Locks API, and neither is polyfilled.
 
 localStorage is the sole source of persisted state, per [ADR 0001](adr/0001-localstorage-only-browser-client.md). This version has no command-line application, local-file adapter, remote state storage, authentication, sharing, or synchronization, and no server-side interpreter.
 
@@ -50,7 +50,7 @@ The core exposes an **interpreter**, built from an environment (see [ADR 0005](a
 The interpreter exposes a **program** as an ordered, mutable list of values; the empty program is `[]`:
 
 - `interp.pushToken(program, item)`: append one string token or one structured value, validated against the environment, mutating and returning `program`.
-- `interp.execute(program, stack?)`: evaluate the whole program on a copy of `stack` (empty when omitted), producing a data stack. The supplied stack is never mutated.
+- `interp.execute(program, stack?)`: evaluate the whole program on a copy of `stack` (empty when omitted), producing a data stack. Neither argument is mutated: the terminal `.$` the interpreter appends lands on an internal copy of `program`.
 
 Parse failures are values, not exceptions: a failed `pushToken` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path, no `try`/`catch`, and no validation of its own. The same entry point validates any data the client holds, including manually supplied reset JSON.
 

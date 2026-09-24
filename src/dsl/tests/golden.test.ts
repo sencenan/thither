@@ -26,6 +26,50 @@ describe('execute resumes from a caller-supplied stack', () => {
   });
 });
 
+describe('the public surface holds the browser-client.md contract', () => {
+  const state = [
+    'S',
+    { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
+  ];
+
+  it('§2 a whitespace-bearing token is an E in the stream: earlier items execute, then it stops', () => {
+    // The client splits on whitespace, so it can never send this; a host extension could.
+    // No try/catch: the failure is a value, and the state before it is preserved.
+    const stack = run([state, 'company git', 'MyRepo']);
+
+    expect(stack).toEqual([state, ['E', expect.objectContaining({ type: 'parse_error' })]]);
+  });
+
+  it('execute leaves the program reusable: two runs give equal stacks, and tokens appended after a run still execute', () => {
+    const interp = createInterpreter(defaultEnv());
+    const program: Program = [];
+    interp.pushToken(program, state);
+    interp.pushToken(program, 'company');
+
+    const first = interp.execute(program);
+    const second = interp.execute(program);
+    expect(second).toEqual(first);
+    expect(program).toHaveLength(2);
+
+    // Had the terminal .$ landed in `program`, this literal would sit past a result and never run.
+    interp.pushToken(program, 'MyRepo');
+    const third = interp.execute(program);
+    expect(third[1]).toEqual([
+      'R',
+      expect.objectContaining({
+        matches: [
+          [
+            'https://github.com/company/MyRepo',
+            ['company', 'git'],
+            ['MyRepo'],
+            expect.objectContaining({ argDelta: 0 }),
+          ],
+        ],
+      }),
+    ]);
+  });
+});
+
 describe('dsl.md §7 worked programs', () => {
   it('§7 create and implicitly search', () => {
     const stack = run([
@@ -60,7 +104,7 @@ describe('dsl.md §7 worked programs', () => {
       'S',
       { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
     ];
-    const stack = run([state, 'Company', 'Git', 'MyRepo']);
+    const stack = run([state, 'company', 'git', 'MyRepo']);
 
     expect(stack).toEqual([
       state,
@@ -75,7 +119,7 @@ describe('dsl.md §7 worked programs', () => {
               expect.objectContaining({ argDelta: 0 }),
             ],
           ],
-          inputs: ['Company', 'Git'],
+          inputs: ['company', 'git'],
         },
       ],
     ]);

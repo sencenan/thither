@@ -11,13 +11,14 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
     },
 
     execute: (program: Program, initial: Stack = []): Stack => {
-      if (!hasTerminalOp(program)) {
-        program = interpreter.pushToken(program, TERM_OP);
-      }
+      // Both arguments are the caller's: copy before the terminal .$ lands or the stack grows.
+      const items: Program = hasTerminalOp(program)
+        ? [...program]
+        : interpreter.pushToken([...program], TERM_OP);
 
       let stack: Stack = [...initial];
 
-      for (const token of program) {
+      for (const token of items) {
         const [sigil, body] = token;
 
         switch (sigil) {

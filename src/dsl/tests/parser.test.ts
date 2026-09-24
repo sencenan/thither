@@ -50,6 +50,39 @@ describe('parse — string tokens (dsl.md §2)', () => {
     expect(parse(env, 'https://example.com/{}')).toEqual(['l', 'https://example.com/{}']);
   });
 
+  it('§2 a string token that is empty after trimming is parse_error, not an empty literal', () => {
+    for (const raw of ['', '   ', '\t\n']) {
+      const token = parse(env, raw);
+      expect(token[0]).toBe('E');
+      expect(token[1]).toMatchObject({ type: 'parse_error' });
+    }
+  });
+
+  it('§2 a string token with internal whitespace is parse_error: the core never splits it', () => {
+    const token = parse(env, 'company git');
+    expect(token[0]).toBe('E');
+    expect(token[1]).toMatchObject({ type: 'parse_error' });
+  });
+
+  it('§2/§3 a token that is only fzf operator syntax is parse_error: the matcher would drop it silently', () => {
+    for (const raw of ['!', "'", '^', '^$', "'$", "!'"]) {
+      const token = parse(env, raw);
+      expect(token[0]).toBe('E');
+      expect(token[1]).toMatchObject({ type: 'parse_error' });
+    }
+  });
+
+  it('§3 operator-decorated terms and the OR token parse as ordinary literals', () => {
+    expect(parse(env, '!git')).toEqual(['l', '!git']);
+    expect(parse(env, '^git$')).toEqual(['l', '^git$']);
+    expect(parse(env, '|')).toEqual(['l', '|']);
+    expect(parse(env, '$')).toEqual(['l', '$']);
+  });
+
+  it('§2 surrounding whitespace on a string token is trimmed, not rejected', () => {
+    expect(parse(env, '  Company  ')).toEqual(['l', 'Company']);
+  });
+
   it('§2 a double-dot token escapes to a literal, never an operation', () => {
     // The `..` prefix is retained and stripped only when the literal is rendered,
     // so parse yields a literal that still carries both dots.
@@ -132,6 +165,18 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
     );
     expect(token[0]).toBe('E');
     expect(token[1]).toMatchObject({ type: 'parse_error' });
+  });
+
+  it('§3 a stored dimension carrying fzf operator syntax makes the state invalid', () => {
+    for (const dim of ['!git', "'git", '^git', 'git$', '|']) {
+      const targets = parse(env, ['S', { targets: [[[dim], 'https://x/']], focus: [] }]);
+      expect(targets[0]).toBe('E');
+      expect(targets[1]).toMatchObject({ type: 'parse_error' });
+
+      const focus = parse(env, ['S', { targets: [], focus: [dim] }]);
+      expect(focus[0]).toBe('E');
+      expect(focus[1]).toMatchObject({ type: 'parse_error' });
+    }
   });
 
   it('§2 a dimension with internal whitespace is invalid, not split into two', () => {

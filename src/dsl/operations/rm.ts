@@ -2,7 +2,7 @@
 
 import { searchTargets } from '../selector';
 import type { OpFn, State } from '../types';
-import { normalizeDimensions, push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
+import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils';
 
 const unexpectedStackError = thitherError('missing_operand', '.rm expects [.., S, L] or [.., S]');
 
@@ -31,7 +31,8 @@ export const rm: OpFn = (stack) => {
   }
 
   const { targets, focus } = state[1];
-  const query = normalizeDimensions([...focus, ...explicit]);
+  // §3 — the query is fzf's: typed order, operators live (`!git .rm` removes the non-git targets).
+  const query = [...focus, ...explicit];
   const matched = searchTargets(targets, query).map((selection) => selection.target);
 
   const nextState: State = [

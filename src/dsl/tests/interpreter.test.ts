@@ -52,6 +52,14 @@ describe('execute — terminal .$ appending (dsl.md §1)', () => {
     expect(dollar).toHaveBeenCalledTimes(1);
   });
 
+  it('§1 appending the terminal .$ never mutates the caller’s program', () => {
+    const interp = createInterpreter(envWith({ '.$': identity }));
+    const program: Program = [];
+    interp.pushToken(program, 'git');
+    interp.execute(program);
+    expect(program).toEqual([['l', 'git']]);
+  });
+
   it('§1 an escaped literal ..$ does not count as a terminal .$', () => {
     const dollar = vi.fn(identity);
     const interp = createInterpreter(envWith({ '.$': dollar }));

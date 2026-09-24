@@ -21,6 +21,21 @@ const cases: readonly Case[] = [
     [state(three, ['git'])],
   ],
   [
+    '§4.3 focus is stored dimensions, not search syntax: !personal .@ is invalid_dimension and leaves focus unchanged',
+    [state(three, ['company']), '!personal', '.@'],
+    [state(three, ['company']), error('invalid_dimension')],
+  ],
+  [
+    '§4.3 the OR operator cannot enter focus: git | docs .@ is invalid_dimension',
+    [state(three), 'git', '|', 'docs', '.@'],
+    [state(three), error('invalid_dimension')],
+  ],
+  [
+    '§4.3 a bare $ is plain text to fzf, so it is a valid focus dimension',
+    [state(three), '$', '.@'],
+    [state(three, ['$'])],
+  ],
+  [
     '§4.3 S company . git .@ sets focus to [company], not [company, git]',
     [state(three), 'company', '.', 'git', '.@'],
     [state(three, ['company'])],

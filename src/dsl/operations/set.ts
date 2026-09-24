@@ -3,6 +3,7 @@
 import { searchTargets } from '../selector';
 import type { OpFn, State } from '../types';
 import {
+  isOperatorTerm,
   isTemplate,
   normalizeDimensions,
   push,
@@ -41,6 +42,18 @@ export const set: OpFn = (stack) => {
     return push(stack, thitherError('missing_operand', 'no explicit dimension'));
   }
 
+  // §4.1 — what .set matches on is what it stores, so fzf operator syntax cannot be a dimension.
+  const operator = explicit.find(isOperatorTerm);
+  if (operator !== undefined) {
+    return push(
+      stack,
+      thitherError('invalid_dimension', `${operator} is search syntax, not a dimension`),
+    );
+  }
+
+  // .set matches on the *normalized* combined dimensions, exactly the set it would store: under
+  // fzf's smart-case a raw `Git` would be case-sensitive, miss the stored `git`, and insert a
+  // duplicate dimension set. Lowercase-on-lowercase always finds an identical existing target.
   const { targets, focus } = state[1];
   const query = normalizeDimensions([...focus, ...explicit]);
   const matched = searchTargets(targets, query).map((selection) => selection.target);

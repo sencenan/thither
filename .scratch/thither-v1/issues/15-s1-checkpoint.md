@@ -1,7 +1,7 @@
 # S1 checkpoint: the core is correct
 
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 14
 
 ## Question

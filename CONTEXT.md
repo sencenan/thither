@@ -9,8 +9,12 @@ Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 ### Targets and matching
 
 **Dimension (dim)**:
-A short label used to recall and select a target, such as `company`, `personal`, or `git`. Dimensions are stored lowercase, trimmed, and without whitespace.
+A short label used to recall and select a target, such as `company`, `personal`, or `git`. Dimensions are stored lowercase, trimmed, without whitespace, and free of search-operator syntax.
 _Avoid_: Tag keyword
+
+**Search operator**:
+fzf's extended-search syntax, available on the terms of a search or removal query: `|` between terms for either-or, a leading `!` for must-not-match, a leading `'` for exact substring, a leading `^` and a trailing `$` as anchors. A term carrying an operator is search syntax, never a dimension, so it cannot be stored in a target or in focus.
+_Avoid_: Filter, modifier
 
 **Target**:
 An association between a set of dimensions and a single destination template. Targets are selected and ranked through fuzzy matching; ranking first does not itself permit direct navigation.
@@ -32,7 +36,7 @@ A standalone `.` token separating the dimension-matching portion of an input fro
 A search-selected target represented with its fully or partially rendered destination, dimensions, applied arguments, and hints. Missing arguments leave their `{}` placeholders intact and prevent direct navigation; the argument balance is recorded in the hints.
 
 **Searchable string**:
-A target's dimensions joined into the single piece of text that matching runs against, rather than matched one dimension at a time. A supplied dimension may therefore match across the boundary between two of a target's dimensions.
+A target's dimensions joined into the single piece of text that matching runs against. Each query term is matched against the whole string independently, and a target is selected when every term matches; a single term may therefore match across the boundary between two of a target's dimensions.
 
 **Matching evidence**:
 The record of why a target matched, carried by every match: which characters of its searchable string matched, and how strongly the target matched overall. It exists so a result can be explained without matching again, and it is not an instruction about how to display anything.
@@ -53,7 +57,7 @@ The matches produced by a search together with the user-supplied dimensions used
 The collection of available targets together with the current focus.
 
 **Focus**:
-Stored dimensions implicitly combined with the supplied dimensions of target-setting, removal, and search operations. Focus supplies matching context, not an exact namespace or access-control boundary.
+Stored dimensions implicitly combined with the supplied dimensions of target-setting, removal, and search operations. Focus supplies matching context, not an exact namespace or access-control boundary, and being stored dimensions it carries no search operators.
 
 ### Navigation
 

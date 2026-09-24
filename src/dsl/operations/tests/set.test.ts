@@ -63,6 +63,20 @@ const cases: readonly Case[] = [
     [state(three), error('ambiguous_set')],
   ],
 
+  // §4.1 fuzzy selection has no exact-match preference: a query that is a subset of an
+  // existing target's dimensions selects that target, so the subset can never be inserted
+  // beside it. Pinned here so the consequence is visible; changing it is a §4.1 amendment.
+  [
+    '§4.1 a subset query updates its superset target: company alone rewrites [company, git], no [company] target is inserted',
+    [state([companyGit]), 'company', 'https://company.com/', '.set'],
+    [state([[['company', 'git'], 'https://company.com/']])],
+  ],
+  [
+    '§4.1 a subset query with two superset targets is ambiguous_set: [company] cannot be created beside [company, git] and [company, docs]',
+    [state([companyGit, companyDocs]), 'company', 'https://company.com/', '.set'],
+    [state([companyGit, companyDocs]), error('ambiguous_set')],
+  ],
+
   // focus joins the query
   [
     '§3 focus is prepended to the explicit dimensions when matching',
@@ -115,6 +129,38 @@ const cases: readonly Case[] = [
     '§6 with no state anywhere on the stack the literal array is consumed and E is pushed',
     ['git', 'https://example.com/{}', '.set'],
     [error('missing_operand')],
+  ],
+
+  // invalid_dimension — what .set stores must be plain dimensions, never fzf operator syntax
+  [
+    '§4.1 an explicit NOT term is invalid_dimension: !personal https://x/ .set stores nothing',
+    [state(three), '!personal', 'https://x/', '.set'],
+    [state(three), error('invalid_dimension')],
+  ],
+  [
+    '§4.1 an anchored term is invalid_dimension: ^git https://x/ .set',
+    [state([]), '^git', 'https://x/', '.set'],
+    [state([]), error('invalid_dimension')],
+  ],
+  [
+    '§4.1 a trailing-$ term is invalid_dimension: git$ https://x/ .set',
+    [state([]), 'git$', 'https://x/', '.set'],
+    [state([]), error('invalid_dimension')],
+  ],
+  [
+    '§4.1 the OR token is invalid_dimension: git | docs https://x/ .set',
+    [state([]), 'git', '|', 'docs', 'https://x/', '.set'],
+    [state([]), error('invalid_dimension')],
+  ],
+  [
+    '§4.1 the destination is extracted before the check, so an operator after the separator is ignored',
+    [state([]), 'home', '.', '!ignored', 'https://example.com/', '.set'],
+    [state([[['home'], 'https://example.com/']])],
+  ],
+  [
+    '§4.1 .set matches on the normalized query, so Git https://x/ .set updates the stored git target rather than duplicating it',
+    [state([[['git'], 'https://a/']]), 'Git', 'https://b/', '.set'],
+    [state([[['git'], 'https://b/']])],
   ],
 
   // invalid_destination

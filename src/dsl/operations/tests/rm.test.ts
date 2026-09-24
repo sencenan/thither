@@ -65,9 +65,19 @@ const cases: readonly Case[] = [
     [state([companyDocs, personalGit])],
   ],
   [
-    '§3 matching is case-insensitive: GIT removes the git targets',
+    '§3 smart-case: an uppercase term is case-sensitive, so GIT matches no lowercase dimension and removes nothing',
     [state(three), 'GIT', '.rm'],
-    [state([companyDocs])],
+    [state(three)],
+  ],
+  [
+    '§3 the NOT operator is live in .rm: !git removes every target without git',
+    [state(three), '!git', '.rm'],
+    [state([companyGit, personalGit])],
+  ],
+  [
+    '§3 the OR operator is live in .rm: docs | personal removes both',
+    [state(three), 'docs', '|', 'personal', '.rm'],
+    [state([companyGit])],
   ],
   [
     '§2 an escaped literal is resolved when matched: ..git matches the dimension .git',

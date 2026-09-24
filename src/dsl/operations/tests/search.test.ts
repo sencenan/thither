@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createInterpreter } from '../../interpreter.ts';
 import type { OpFn, Program, Stack, Target } from '../../types.ts';
 import { search } from '../search.ts';
-import { companyGit, state } from './harness.ts';
+import { companyDocs, companyGit, personalGit, state } from './harness.ts';
 
 // Binds the real `.$`; the interpreter appends it when a program does not end in one.
 const run = (items: readonly unknown[]): Stack => {
@@ -45,6 +45,9 @@ const oA: Target = [['alpha', 'shared'], 'https://a/{}']; // P1
 const oB: Target = [['beta', 'shared'], 'https://b/{}/{}']; // P2
 const oC: Target = [['gamma', 'shared'], 'https://c/']; // P0
 
+// per-dimension matching target
+const apple: Target = [['apple', 'mango'], 'https://fruit.example/{}'];
+
 type Case = readonly [name: string, program: readonly unknown[], stack: readonly unknown[]];
 
 const cases: readonly Case[] = [
@@ -72,7 +75,7 @@ const cases: readonly Case[] = [
             ['company', 'git'],
             [],
             -1,
-            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            [0, 1, 2, 3, 4, 5, 6, 8, 9, 10], // the joining space (7) is never evidence
           ),
         ],
         ['company', 'git'],
@@ -122,13 +125,147 @@ const cases: readonly Case[] = [
 
   // §4.4 R.inputs records original spelling of the matching literals
   [
-    '§7 inputs keep original case while matching lowercased; the trailing literal renders',
-    [state([companyGit]), 'Company', 'Git', 'MyRepo'],
+    '§7 inputs keep original spelling; the trailing literal renders with its case intact',
+    [state([companyGit]), 'company', 'git', 'MyRepo'],
     [
       state([companyGit]),
       result(
         [m('https://github.com/company/MyRepo', ['company', 'git'], ['MyRepo'], 0)],
-        ['Company', 'Git'],
+        ['company', 'git'],
+      ),
+    ],
+  ],
+  [
+    '§3 smart-case: an uppercase term is case-sensitive and matches no lowercase dimension, so it is taken as an argument',
+    [state([companyGit]), 'company', 'Git'],
+    [
+      state([companyGit]),
+      result([m('https://github.com/company/Git', ['company', 'git'], ['Git'], 0)], ['company']),
+    ],
+  ],
+
+  // §3 fzf operators are live in .$ queries
+  [
+    '§3 OR: git | docs selects targets matching either; ties fall to target-set order',
+    [state([companyGit, companyDocs, personalGit]), 'git', '|', 'docs', '.'],
+    [
+      state([companyGit, companyDocs, personalGit]),
+      result(
+        [
+          m('https://docs.company.com/{}', ['company', 'docs'], [], -1), // docs outscores git (4 chars vs 3)
+          m('https://github.com/company/{}', ['company', 'git'], [], -1),
+          m('https://github.com/me/{}', ['git', 'personal'], [], -1),
+        ],
+        ['git', '|', 'docs'],
+      ),
+    ],
+  ],
+  [
+    '§3 NOT: git !personal selects the git targets without personal; the NOT term adds no evidence',
+    [state([companyGit, companyDocs, personalGit]), 'git', '!personal', '.'],
+    [
+      state([companyGit, companyDocs, personalGit]),
+      result(
+        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [8, 9, 10])],
+        ['git', '!personal'],
+      ),
+    ],
+  ],
+  [
+    "§3 exact: 'ompany matches the substring, cmpny does not",
+    [state([companyGit]), "'ompany", '.'],
+    [
+      state([companyGit]),
+      result(
+        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [1, 2, 3, 4, 5, 6])],
+        ["'ompany"],
+      ),
+    ],
+  ],
+  [
+    '§3 prefix anchor: ^git selects only the target whose searchable string starts with git',
+    [state([companyGit, personalGit]), '^git', '.'],
+    [
+      state([companyGit, personalGit]),
+      result([m('https://github.com/me/{}', ['git', 'personal'], [], -1, [0, 1, 2])], ['^git']),
+    ],
+  ],
+  [
+    '§3 suffix anchor: git$ selects only the target whose searchable string ends with git',
+    [state([companyGit, personalGit]), 'git$', '.'],
+    [
+      state([companyGit, personalGit]),
+      result(
+        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [8, 9, 10])],
+        ['git$'],
+      ),
+    ],
+  ],
+  [
+    '§3 operators take part in prefix inference: git !personal MyRepo consumes the NOT term, MyRepo is the argument',
+    [state([companyGit, personalGit]), 'git', '!personal', 'MyRepo'],
+    [
+      state([companyGit, personalGit]),
+      result(
+        [m('https://github.com/company/MyRepo', ['company', 'git'], ['MyRepo'], 0)],
+        ['git', '!personal'],
+      ),
+    ],
+  ],
+  [
+    '§3 focus joins the query as leading terms: focus [company] with git | docs is company AND (git OR docs)',
+    [state([companyGit, companyDocs, personalGit], ['company']), 'git', '|', 'docs', '.'],
+    [
+      state([companyGit, companyDocs, personalGit], ['company']),
+      result(
+        [
+          m('https://docs.company.com/{}', ['company', 'docs'], [], -1),
+          m('https://github.com/company/{}', ['company', 'git'], [], -1),
+        ],
+        ['git', '|', 'docs'],
+      ),
+    ],
+  ],
+
+  // §3 each query dimension is matched independently (fzf extended search): every dimension must
+  // match, in any order, so how an abbreviation sorts never affects selection.
+  [
+    '§3 each query dimension matches independently: m ppl selects [apple, mango] with no argument',
+    [state([apple]), 'm', 'ppl'],
+    [
+      state([apple]),
+      result(
+        [m('https://fruit.example/{}', ['apple', 'mango'], [], -1, [1, 2, 3, 6])],
+        ['m', 'ppl'],
+      ),
+    ],
+  ],
+
+  // §2 escaping — the accumulated form keeps `..`; one dot is removed wherever the literal is used
+  [
+    '§2 an escaped argument renders resolved: ..git substitutes as .git, and args holds .git',
+    [state([companyGit]), 'company', 'git', '..git'],
+    [
+      state([companyGit]),
+      result(
+        [m('https://github.com/company/.git', ['company', 'git'], ['.git'], 0)],
+        ['company', 'git'],
+      ),
+    ],
+  ],
+  [
+    '§2 an escaped separator argument renders as a single dot',
+    [state([one]), 'x', '.', '..'],
+    [state([one]), result([m('https://example.com/.', ['x'], ['.'], 0)], ['x'])],
+  ],
+  [
+    '§2 an escaped matching literal is resolved when matched but kept verbatim in inputs',
+    [state([[['.git', 'hooks'], 'https://hooks.example/{}']]), '..git', 'pre-commit'],
+    [
+      state([[['.git', 'hooks'], 'https://hooks.example/{}']]),
+      result(
+        [m('https://hooks.example/pre-commit', ['.git', 'hooks'], ['pre-commit'], 0)],
+        ['..git'],
       ),
     ],
   ],
