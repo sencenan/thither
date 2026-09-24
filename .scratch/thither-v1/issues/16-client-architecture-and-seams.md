@@ -75,6 +75,6 @@ Every run — initial, live, reset, restore — is this shape (reset/restore sub
 
 ### Tickets touched
 
-- New: [Remove the implicit terminal from the core](24-remove-implicit-terminal.md), unblocked; blocks 18.
-- Rewritten: [Register the host operations](18-naive-persistence.md) (was "Persist the stack, naively"; now `Blocked by: 16, 24`), [Wire the skeleton](19-skeleton-execute-and-navigate.md). Both had gone stale on ADR-0003 vocabulary (`initialStack`, `emptyProgram`, `parse`).
+- New: [Remove the implicit terminal from the core](24-remove-implicit-terminal.md) (core code + tests, unblocked) and [The REPL composes its own program](25-repl-epilogue.md) (blocked by 24). **Order is core → REPL → client**: both 17 and 18 are `Blocked by: 16, 25`, so no browser-client work starts until the core's new contract is proven and the one existing host has adopted it.
+- Rewritten: [Register the host operations](18-naive-persistence.md) (was "Persist the stack, naively"), [Wire the skeleton](19-skeleton-execute-and-navigate.md). Both had gone stale on ADR-0003 vocabulary (`initialStack`, `emptyProgram`, `parse`).
 - Reworded: [S2 checkpoint](20-s2-checkpoint.md) to check the register/host-op shape instead of a storage interface.
