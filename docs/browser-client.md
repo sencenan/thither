@@ -50,24 +50,42 @@ The core exposes an **interpreter**, built from an environment (see [ADR 0005](a
 The interpreter exposes a **program** as an ordered, mutable list of values; the empty program is `[]`:
 
 - `interp.pushToken(program, item)`: append one string token or one structured value, validated against the environment, mutating and returning `program`.
-- `interp.execute(program, stack?)`: evaluate the whole program on a copy of `stack` (empty when omitted), producing a data stack. Neither argument is mutated: the terminal `.$` the interpreter appends lands on an internal copy of `program`.
+- `interp.execute(program, stack?)`: evaluate exactly the program given, on a copy of `stack` (empty when omitted), producing a data stack. The interpreter appends nothing — not even `.$` — so a host closes its programs itself ([ADR 0007](adr/0007-hosts-compose-the-program.md)). Neither argument is mutated.
 
-Parse failures are values, not exceptions: a failed `pushToken` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path, no `try`/`catch`, and no validation of its own. The same entry point validates any data the client holds, including manually supplied reset JSON.
+Parse failures are values, not exceptions: a failed `pushToken` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path and no validation of its own. The same entry point validates any data the client holds: the persisted stack on load, and manually supplied reset JSON.
+
+### Host operations
+
+The client registers three **host operations** on `defaultEnv()` before building the interpreter, and they are the whole of its persistence. They write to an **output register**, a client-held slot cleared at the start of each run, which is the only thing the client reads after execution.
+
+- `.load`: clears the register; reads `thither.stacks.v1`; when the record is absent, pushes `[emptyState()]`; otherwise validates every value of the current stack through `interp.pushToken` and pushes the stack. A record that is not a non-empty array of arrays, or whose current stack holds a value that parses to `E`, makes `.load` push that `parse_error` and set `loaded: false` in the register. When `localStorage` itself is unavailable, `.load` throws.
+- `.out`: if the top of the stack is an `R` or `E`, pops it into the register as the run's terminal; otherwise does nothing. It extracts output for the client's next step and is not a general-purpose pop.
+- `.save`: persists the stack as it stands — never an empty one — under the bounded-history rules below, and records `changed` (structural difference from the previous current stack) in the register. If saving fails even after evicting history, `.save` pushes `E(unknown_error)` and records that `E` in the register as well.
+
+Host operations are ordinary environment symbols, so a user can type them mid-program. The epilogue always runs last, so a stray `.load`, `.out`, or `.save` cannot corrupt the final write; this is documented behaviour, not a defended-against attack.
 
 ## Execution flow
 
-The client builds each program as `tokens.reduce(interp.pushToken, [])` and executes it on the current persisted stack, per [ADR 0006](adr/0006-clients-resume-by-executing-on-the-persisted-stack.md), treating persisted stack contents as opaque language data throughout.
+Every run is one program, **prologue + user tokens + epilogue**:
 
-1. Load the entire current persisted stack from localStorage. When the record is absent, take `[emptyState()]` as the current stack.
-2. Split the user's input on whitespace and append each token to an empty program. Search-bar users are not expected to type structured state, so input tokens are never treated as JSON.
-3. Execute the program with the current stack as its second argument, then pop the terminal `R` or `E`. Persist the entire remaining stack and update bounded history before navigating.
-4. For an `R` on initial URL-driven execution, navigate when exactly one target is selected with a nonnegative argument balance; otherwise show the fallback UI. There is no special case forcing a bare URL to the fallback UI. For an `E`, display its `type` and `description` without interpreting the type value.
+```text
+.load  <tokens…>  .$  .out  .save
+```
 
-The client does not inspect the persisted values' language types, extract `S`, or serialize anything into DSL source: operations act on the top of the stack, so values beneath it ride along unchanged, and an unusable top value is the interpreter's concern and surfaces as `E`, with no client-side repair. An unparsable token is likewise just an `E` in the program stream, so tokens before it still execute. Every outcome follows the same pop, save, display loop, and the client never reconstructs an error stack from the previous snapshot.
+1. Split the user's input on whitespace. Search-bar users are not expected to type structured state, so input tokens are never treated as JSON.
+2. Build the program: `['.load', ...tokens, '.$', '.out', '.save'].reduce(interp.pushToken, [])`.
+3. Execute it inside the Web Lock (below). `.load` supplies the world, `.$` searches, `.out` captures the terminal, `.save` persists — so the save necessarily precedes anything the client does next.
+4. Read the register. For an `R` on initial URL-driven execution, navigate when exactly one target is selected with a nonnegative argument balance **and the persisted stack did not change**; otherwise show the fallback UI. There is no special case forcing a bare URL to the fallback UI. For an `E`, display its `type` and `description` without interpreting the type value; when `loaded` is `false`, add that recovery happens through the Settings reset.
+
+The persisted stack never changes on a plain search, so the `changed` guard only bites after a mutation: `home https://example.com/ .set` sets and then shows the fallback UI rather than setting and navigating in one keystroke. Automatic navigation uses `location.replace`, so the Thither page does not remain in history as a redirect loop behind the destination; links in the fallback UI are ordinary anchors.
+
+The client does not inspect the persisted values' language types, extract `S`, or serialize anything into DSL source: operations act on the top of the stack, so values beneath it ride along unchanged, and an unusable top value is the interpreter's concern and surfaces as `E`, with no client-side repair. An unparsable token is likewise just an `E` in the program stream, so tokens before it still execute. Every outcome follows the same execute-then-read-the-register loop, and the client never reconstructs an error stack from the previous snapshot.
+
+Recoverable failures are `E` values in the language's existing vocabulary; unrecoverable ones (`localStorage` unavailable) are exceptions, caught once in the client's composition root and rendered as a bare error page with no execution and no navigation.
 
 Execute the supplied program as-is. Do not add confirmation gates for `.set`, `.rm`, or `.@`, including when input arrives through a URL. This deliberately accepts that an externally supplied link can change state; history provides recovery, not authorization.
 
-Serialize the complete read → execute → save sequence across tabs using the Web Locks API, holding one named lock for the whole sequence, and read the latest persisted stack after acquiring it so concurrent commands do not overwrite one another. When the API is unavailable, execute without the lock rather than blocking, accepting a small lost-update risk for a single-user, short-running operation.
+Serialize the complete read → execute → save sequence across tabs using the Web Locks API. Because `.load` and `.save` run inside `execute`, and both `execute` and `localStorage` are synchronous, holding the lock around the single `interp.execute(program)` call encloses the whole sequence, and the read necessarily happens after the lock is acquired. When the API is unavailable, execute without the lock rather than blocking, accepting a small lost-update risk for a single-user, short-running operation.
 
 ## Persistence
 
@@ -91,7 +109,7 @@ Eviction removes elements from the front. With history limit `N`, the array hold
 
 When a save exceeds the storage quota, drop the oldest history entries and retry, always preserving the current stack. If saving still fails, report the failure explicitly rather than treating the execution as persisted.
 
-Malformed stored data must not trigger an automatic reset or be replaced by guessed state. Skip execution, render the error in place of the result list, and state that recovery happens through the settings reset, keeping the Settings control reachable. Only an explicit reset write replaces the stored record. When localStorage is unavailable rather than merely empty, show that as an error too: do not fall back to an in-memory session, execute programs, or navigate, because without persistence the execution loop has no valid starting point.
+Malformed stored data must not trigger an automatic reset or be replaced by guessed state. `.load` pushes an `E`, which seals the stack: the user's tokens are absorbed, `.out` captures the `E`, and `.save` finds an empty stack and writes nothing. Render the error in place of the result list and state that recovery happens through the settings reset, keeping the Settings control reachable. Only an explicit reset write replaces the stored record. When localStorage is unavailable rather than merely empty, show that as an error too: do not fall back to an in-memory session, execute programs, or navigate, because without persistence the execution loop has no valid starting point.
 
 ## Fallback UI and settings
 
@@ -107,7 +125,7 @@ While the target set is empty, the page shows setup instructions in place of the
 
 Provide a Settings control on the page, opening a modal containing stack history, manual state reset, and history-limit configuration. Do not reserve a settings URL or bypass normal execution with a parameter such as `view=settings`; users reach the page through a query with no matches or an ambiguous one, then open Settings.
 
-The reset editor accepts a JSON stack array directly, such as `[["S", {"targets": [], "focus": []}]]`, without an extra object wrapper. Validate each supplied value through `interp.pushToken`: an invalid value yields `E` and the reset is refused without touching the stored record. A successful reset makes the supplied stack current and pushes the previous current stack into history under the same difference rule; it neither clears history nor executes the supplied stack. When the stored record is unreadable there is no previous current stack to retain, so reset simply writes the new record.
+The reset editor accepts a JSON stack array directly, such as `[["S", {"targets": [], "focus": []}]]`, without an extra object wrapper. Reset is itself a program: the supplied values, then `.$ .out .save`. Each value passes through `interp.pushToken`, so an invalid value yields `E`; the client first dry-runs `[...values, '.$', '.out']` and refuses to save when the register's terminal is an `E`, leaving the stored record untouched. A successful reset makes the supplied stack current and pushes the previous current stack into history under the same difference rule; it does not clear history, replay any program, or navigate — the `.$` exists only so the epilogue has a terminal to capture. Restoration from history is the same program over a historical stack. When the stored record is unreadable there is no previous current stack to retain, so reset simply writes the new record.
 
 Navigation applies no client-side scheme allowlist and no scheme-based confirmation: for an otherwise eligible destination, attempt navigation and let the browser enforce its own restrictions. This is an explicit user-controlled policy — destinations such as `javascript:` can execute code in the page's context, potentially reading or modifying localStorage, and some schemes may simply be refused.
 

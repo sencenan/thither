@@ -6,6 +6,20 @@ Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 
 ## Language
 
+### Hosts
+
+**Host**:
+The program that embeds the interpreter and composes the programs it runs, such as the browser client or the REPL. The interpreter evaluates exactly what a host gives it and appends nothing.
+_Avoid_: Client (when the REPL is included), runtime, shell
+
+**Host operation**:
+An operation a host registers on the interpreter's environment beyond the language's own four, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
+_Avoid_: Plugin, hook, built-in
+
+**Output register**:
+The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R` or `E`, and facts about the run such as whether the persisted stack changed. The host reads the register, never the returned stack.
+_Avoid_: Result variable, side channel
+
 ### Targets and matching
 
 **Dimension (dim)**:

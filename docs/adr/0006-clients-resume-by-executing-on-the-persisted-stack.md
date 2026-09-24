@@ -1,5 +1,7 @@
 # Clients resume by executing the program on the persisted stack
 
+**Superseded by [ADR 0007](0007-hosts-compose-the-program.md)** as the browser client's resumption story: the client now loads the persisted stack with a host operation (`.load`) at the head of the program. `execute(program, stack?)` keeps its stack argument for hosts without persistence operations.
+
 Supersedes [ADR 0003](0003-clients-resume-from-last-stack-value.md).
 
 `execute(program, stack?)` takes the data stack to evaluate on; when omitted, evaluation starts empty. A client resumes by passing its current persisted stack as that argument, and the program holds only the user's input tokens. The interpreter copies the supplied stack before evaluating, so the persisted snapshot is never mutated. On first run there is no persisted stack, so the client seeds one as `[emptyState()]` — the core's helper for the state value with no targets and empty focus — without knowing the shape of `S`.
