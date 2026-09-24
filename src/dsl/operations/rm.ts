@@ -6,7 +6,7 @@ import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts
 
 const unexpectedStackError = thitherError('missing_operand', '.rm expects [.., S, L] or [.., S]');
 
-export const rm: OpFn = (stack) => {
+export const rm: OpFn = (_interp, stack) => {
   const ls = stack.pop();
 
   if (!ls) {

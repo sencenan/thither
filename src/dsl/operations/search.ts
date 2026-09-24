@@ -16,7 +16,7 @@ import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts
 
 const missingOperand = thitherError('missing_operand', '.$ expects [.., S, L] or [.., S]');
 
-export const search: OpFn = (stack) => {
+export const search: OpFn = (_interp, stack) => {
   const top = stack.pop();
 
   if (!top) {

@@ -1,6 +1,11 @@
 import { expect } from 'vitest';
+import { defaultEnv } from '../../env.ts';
 import { createInterpreter } from '../../interpreter.ts';
 import type { OpFn, Program, Stack, State, Target } from '../../types.ts';
+
+// A ready interpreter for tests that call an operation directly (bypassing the harness) to
+// observe its operand contract; the operation ignores it, but OpFn takes it as its first arg.
+export const testInterp = createInterpreter(defaultEnv());
 
 // Runs a program with the operations under test bound. The interpreter appends
 // nothing (ADR 0007), so the final stack shows exactly what the operations left behind.

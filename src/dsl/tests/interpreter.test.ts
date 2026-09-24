@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createInterpreter } from '../interpreter.ts';
 import type { InterpreterEnv, OpFn, Program, State } from '../types.ts';
 
-const identity: OpFn = (stack) => stack;
+const identity: OpFn = (_interp, stack) => stack;
 const envWith = (ops: Record<string, OpFn>): InterpreterEnv => ({
   symbols: new Map<string, OpFn>(Object.entries(ops)),
 });
@@ -72,7 +72,7 @@ describe('execute — evaluates exactly the program given (ADR 0007, dsl.md §1)
 
 describe('execute — operation dispatch (ADR 0005)', () => {
   it('ADR-0005 dispatches a registered operation and adopts its returned stack', () => {
-    const dup: OpFn = (stack) => {
+    const dup: OpFn = (_interp, stack) => {
       const top = stack[stack.length - 1];
       if (top) {
         stack.push(top);
@@ -96,7 +96,7 @@ describe('execute — operation dispatch (ADR 0005)', () => {
 // stack. On a sealed stack (top R or E) it has no operand, so it yields nothing
 // that survives — exactly as a real op's absorbed E' would.
 const state = (focus: readonly string[] = []): State => ['S', { targets: [], focus }];
-const pushR: OpFn = (stack) => {
+const pushR: OpFn = (_interp, stack) => {
   const top = stack[stack.length - 1];
   if (top && (top[0] === 'R' || top[0] === 'E')) {
     return stack;

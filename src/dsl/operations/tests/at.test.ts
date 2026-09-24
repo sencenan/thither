@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Stack } from '../../types.ts';
 import { at } from '../at.ts';
 import { set } from '../set.ts';
-import { type Case, error, explicitError, runWith, state, three } from './harness.ts';
+import { type Case, error, explicitError, runWith, state, testInterp, three } from './harness.ts';
 
 const run = runWith({ '.@': at, '.set': set });
 
@@ -99,6 +99,6 @@ describe('.@ — operand contract', () => {
       ['L', ['stray']],
       ['L', ['git']],
     ];
-    expect(at(stack)).toEqual([['L', ['stray']], error('missing_operand')]);
+    expect(at(testInterp, stack)).toEqual([['L', ['stray']], error('missing_operand')]);
   });
 });
