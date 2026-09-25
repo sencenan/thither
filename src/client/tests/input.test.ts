@@ -2,7 +2,7 @@
 // URLSearchParams decoding, whitespace tokenization, and stripping consumed input.
 
 import { describe, expect, it } from 'vitest';
-import { readInput, stripInput } from '../input.ts';
+import { readInput, stripInput, tokenize } from '../input.ts';
 
 const base = 'https://thither.app/';
 
@@ -58,6 +58,23 @@ describe('readInput — repeated `q` parameters', () => {
 describe('readInput — whitespace tokenization', () => {
   it.each(tokenization)('%s', (_name, url, tokens) => {
     expect(readInput(url)).toEqual(tokens);
+  });
+});
+
+// browser-client.md "Fallback UI and settings" — the text field splits exactly as the URL does.
+const fieldTokenization: ReadonlyArray<
+  readonly [name: string, text: string, tokens: readonly string[]]
+> = [
+  ['single spaces separate tokens', 'company git', ['company', 'git']],
+  ['runs of mixed whitespace collapse', ' company \t git\n', ['company', 'git']],
+  ['an empty field is empty input', '', []],
+  ['a whitespace-only field is empty input', '   ', []],
+  ['a lone separator is a token', 'docs . x', ['docs', '.', 'x']],
+];
+
+describe('tokenize — the text field splits like the URL', () => {
+  it.each(fieldTokenization)('%s', (_name, text, tokens) => {
+    expect(tokenize(text)).toEqual(tokens);
   });
 });
 

@@ -4,10 +4,11 @@
 // storage fake, then ask the register where to go.
 
 import { describe, expect, it } from 'vitest';
-import { createInterpreter, type Match, type Program } from '../../dsl/index.ts';
+import { createInterpreter, type Match } from '../../dsl/index.ts';
 import { createBrowserEnv, type OutputRegister } from '../browser-env.ts';
 import { resolveNavigationDestination } from '../navigation.ts';
 import type { StorageArea } from '../persistence.ts';
+import { run } from '../run.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 
@@ -92,40 +93,39 @@ const oneTargetRecord = JSON.stringify([
   [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
 ]);
 
-// The run as main.ts performs it: compose, execute, then ask the register where to go. The
-// destination is `undefined` when the rule rejected, so each case reads as one value.
-const run = async (storage: StorageArea, tokens: readonly string[]) => {
+// As main.ts performs it: run, then ask the register where to go. The destination is
+// `undefined` when the rule rejected, so each case reads as one value.
+const open = async (storage: StorageArea, tokens: readonly string[]) => {
   const env = createBrowserEnv(storage);
   const interp = createInterpreter(env);
-  const program = ['.load', ...tokens, '.$', '.out', '.save'].reduce<Program>(
-    (acc, token) => interp.pushToken(acc, token),
-    [],
-  );
-  interp.execute(program);
+  run(interp, tokens);
   const destination = await resolveNavigationDestination(env).catch(() => undefined);
   return { register: env, destination };
 };
 
 describe('the run, end to end (browser-client.md "Execution flow")', () => {
   it('a first empty run yields an R and no destination', async () => {
-    const { register, destination } = await run(fakeStorage(), []);
+    const { register, destination } = await open(fakeStorage(), []);
     expect(destination).toBeUndefined();
     expect(register.terminal?.[0]).toBe('R');
   });
 
   it('a plain search with a single complete match navigates', async () => {
-    const { destination } = await run(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['home']);
+    const { destination } = await open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['home']);
     expect(destination).toBe('https://example.com/');
   });
 
   it('a blank open never navigates, even with a single-target state', async () => {
-    const { register, destination } = await run(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    const { register, destination } = await open(
+      fakeStorage({ [STACKS_KEY]: oneTargetRecord }),
+      [],
+    );
     expect(destination).toBeUndefined();
     expect(register.terminal?.[0]).toBe('R');
   });
 
   it('set-and-go: `<u> a b .set a b` sets the target and navigates to it (ADR 0009)', async () => {
-    const { destination } = await run(fakeStorage(), [
+    const { destination } = await open(fakeStorage(), [
       'https://example.com/',
       'a',
       'b',
@@ -137,7 +137,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
   });
 
   it('set-to-confirm: `<u> home .set` with no query shows the list', async () => {
-    const { register, destination } = await run(fakeStorage(), [
+    const { register, destination } = await open(fakeStorage(), [
       'https://example.com/',
       'home',
       '.set',
@@ -147,7 +147,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
   });
 
   it('a focus-only search shows the page: focus is not part of the query', async () => {
-    const { register, destination } = await run(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), [
+    const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), [
       'home',
       '.@',
     ]);
@@ -159,7 +159,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
     const record = JSON.stringify([
       [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [] }]],
     ]);
-    const { register, destination } = await run(fakeStorage({ [STACKS_KEY]: record }), ['docs']);
+    const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), ['docs']);
 
     expect(destination).toBeUndefined();
     const terminal = register.terminal;
@@ -172,9 +172,10 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
   });
 
   it('a save that fails on quota surfaces the E and never navigates, even on a single complete match ("Persistence")', async () => {
-    const { register, destination } = await run(fakeStorage({ [STACKS_KEY]: oneTargetRecord }, 0), [
-      'home',
-    ]);
+    const { register, destination } = await open(
+      fakeStorage({ [STACKS_KEY]: oneTargetRecord }, 0),
+      ['home'],
+    );
 
     expect(destination).toBeUndefined();
     expect(register.terminal).toEqual([

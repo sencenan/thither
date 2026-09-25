@@ -1,11 +1,18 @@
 // browser-client.md "Fallback UI" — the minimal skeleton render: an `R` becomes its matches as
 // plain links in the order the core emits (the client never sorts); an `E` becomes its `type` and
 // `description` verbatim. When the stored data could not be loaded, add the settings-reset hint.
-// No styling, highlights, shortcuts, or setup instructions — those are S5.
+// No styling, highlights, shortcuts, or setup instructions — those are S5. `renderBareError` is the
+// other page: what an unavailable localStorage leaves, with no execution behind it.
 
 import type { OutputRegister } from './browser-env.ts';
 
 const RESET_HINT = 'Recovery is through the Settings reset.';
+
+export const renderBareError = (root: Element, error: unknown): void => {
+  const line = root.ownerDocument.createElement('p');
+  line.textContent = error instanceof Error ? error.message : String(error);
+  root.replaceChildren(line);
+};
 
 export const renderView = (root: Element, register: OutputRegister): void => {
   const doc = root.ownerDocument;
