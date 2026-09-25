@@ -1,7 +1,8 @@
 import { expect } from 'vitest';
 import { defaultEnv } from '../../env.ts';
 import { createInterpreter } from '../../interpreter.ts';
-import type { OpFn, Program, Stack, State, Target } from '../../types.ts';
+import type { OpFn, Program, Stack, State, Template } from '../../types.ts';
+import { arityOf, keyOf } from '../../utils.ts';
 
 // A ready interpreter for tests that call an operation directly (bypassing the harness) to
 // observe its operand contract; the operation ignores it, but OpFn takes it as its first arg.
@@ -22,16 +23,24 @@ export const runWith =
     return interp.execute(program);
   };
 
-export const state = (targets: readonly Target[], focus: readonly string[] = []): State => [
-  'S',
-  { targets: [...targets], focus },
-];
+// A target written in a test: its dimensions and one or more variants. `state` normalizes the
+// dimensions into a key and sorts the variants by arity, exactly as the parser and operations do,
+// so an expected state built the same way compares equal to the one the code produces.
+export type TargetSpec = readonly [dims: readonly string[], ...variants: Template[]];
+
+export const state = (specs: readonly TargetSpec[], focus: readonly string[] = []): State => {
+  const targets: Record<string, readonly Template[]> = {};
+  for (const [dims, ...variants] of specs) {
+    targets[keyOf(dims)] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
+  }
+  return ['S', { targets, focus }];
+};
 
 export const error = (type: string) => ['E', expect.objectContaining({ type })];
 
-export const companyGit: Target = [['company', 'git'], 'https://github.com/company/{}'];
-export const companyDocs: Target = [['company', 'docs'], 'https://docs.company.com/{}'];
-export const personalGit: Target = [['git', 'personal'], 'https://github.com/me/{}'];
+export const companyGit: TargetSpec = [['company', 'git'], 'https://github.com/company/{}'];
+export const companyDocs: TargetSpec = [['company', 'docs'], 'https://docs.company.com/{}'];
+export const personalGit: TargetSpec = [['git', 'personal'], 'https://github.com/me/{}'];
 export const three = [companyGit, companyDocs, personalGit];
 export const explicitError = ['E', { type: 'unknown_error', description: 'boom' }];
 

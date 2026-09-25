@@ -11,9 +11,9 @@ const run = runWith({ '.@': at, '.set': set });
 const cases: readonly Case[] = [
   // replace
   [
-    '§4.3 replaces focus with the normalized matching portion',
+    '§4.3 stores the matching portion verbatim: no normalization, typed order and case kept',
     [state(three, ['old']), 'GIT', 'Company', 'git', '.@'],
-    [state(three, ['company', 'git'])],
+    [state(three, ['GIT', 'Company', 'git'])],
   ],
   [
     '§4.3 does not combine with the old focus',
@@ -21,17 +21,17 @@ const cases: readonly Case[] = [
     [state(three, ['git'])],
   ],
   [
-    '§4.3 focus is stored dimensions, not search syntax: !personal .@ is invalid_dimension and leaves focus unchanged',
+    '§4.3 focus may carry search operators: !personal .@ stores the NOT term verbatim',
     [state(three, ['company']), '!personal', '.@'],
-    [state(three, ['company']), error('invalid_dimension')],
+    [state(three, ['!personal'])],
   ],
   [
-    '§4.3 the OR operator cannot enter focus: git | docs .@ is invalid_dimension',
+    '§4.3 the OR token may enter focus: git | docs .@ stores all three terms',
     [state(three), 'git', '|', 'docs', '.@'],
-    [state(three), error('invalid_dimension')],
+    [state(three, ['git', '|', 'docs'])],
   ],
   [
-    '§4.3 a bare $ is plain text to fzf, so it is a valid focus dimension',
+    '§4.3 a bare $ is plain text, a valid focus term',
     [state(three), '$', '.@'],
     [state(three, ['$'])],
   ],
@@ -46,9 +46,9 @@ const cases: readonly Case[] = [
     [state(three, ['nonexistent'])],
   ],
   [
-    '§2 an escaped literal is resolved when stored: ..git becomes the focus .git',
+    '§2/§3 an escaped literal is stored in accumulated form: ..git is kept verbatim, resolved on use',
     [state(three), '..git', '.@'],
-    [state(three, ['.git'])],
+    [state(three, ['..git'])],
   ],
 
   // clear
@@ -75,8 +75,8 @@ const cases: readonly Case[] = [
   ],
   [
     '§6 earlier operations are not rolled back: the error stack retains the cleared focus',
-    [state(three, ['personal']), 'company', '.@', '.@', 'https://example.com/{}', 'git', '.set'],
-    [state(three), error('ambiguous_set')],
+    [state(three, ['personal']), 'company', '.@', '.@', 'example.com/{}', 'git', '.set'],
+    [state(three), error('invalid_destination')],
   ],
   [
     '§1 on a sealed stack .@ produces nothing that survives',

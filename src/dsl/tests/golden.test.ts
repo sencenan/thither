@@ -19,18 +19,15 @@ describe('execute resumes from a caller-supplied stack', () => {
 
     expect(stack[0]).toEqual([
       'S',
-      { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
     ]);
     expect(stack[1]?.[0]).toBe('R');
-    expect(persisted).toEqual([['S', { targets: [], focus: [] }]]);
+    expect(persisted).toEqual([['S', { targets: {}, focus: [] }]]);
   });
 });
 
 describe('the public surface holds the browser-client.md contract', () => {
-  const state = [
-    'S',
-    { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
-  ];
+  const state = ['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }];
 
   it('§2 a whitespace-bearing token is an E in the stream: earlier items execute, then it stops', () => {
     // The client splits on whitespace, so it can never send this; a host extension could.
@@ -57,7 +54,7 @@ describe('the public surface holds the browser-client.md contract', () => {
 describe('dsl.md §7 worked programs', () => {
   it('§7 create and search', () => {
     const stack = run([
-      ['S', { targets: [], focus: [] }],
+      ['S', { targets: {}, focus: [] }],
       'https://github.com/company/{}',
       'company',
       'git',
@@ -66,14 +63,14 @@ describe('dsl.md §7 worked programs', () => {
     ]);
 
     expect(stack).toEqual([
-      ['S', { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] }],
+      ['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }],
       [
         'R',
         {
           matches: [
             [
               'https://github.com/company/{}',
-              ['company', 'git'],
+              'company git',
               [],
               { argDelta: -1, positions: [], score: 0 },
             ],
@@ -87,7 +84,7 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 navigate with inferred arguments', () => {
     const state = [
       'S',
-      { targets: [[['company', 'git'], 'https://github.com/company/{}']], focus: [] },
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
     ];
     const stack = run([state, 'company', 'git', 'MyRepo', '.$']);
 
@@ -99,7 +96,7 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/MyRepo',
-              ['company', 'git'],
+              'company git',
               ['MyRepo'],
               expect.objectContaining({ argDelta: 0 }),
             ],
@@ -114,10 +111,10 @@ describe('dsl.md §7 worked programs', () => {
     const state = [
       'S',
       {
-        targets: [
-          [['company', 'git'], 'https://github.com/company/{}'],
-          [['git', 'personal'], 'https://github.com/personal/{}/tree/{}'],
-        ],
+        targets: {
+          'company git': ['https://github.com/company/{}'],
+          'git personal': ['https://github.com/personal/{}/tree/{}'],
+        },
         focus: [],
       },
     ];
@@ -131,13 +128,13 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/thither',
-              ['company', 'git'],
+              'company git',
               ['thither'],
               expect.objectContaining({ argDelta: 0 }),
             ],
             [
               'https://github.com/personal/thither/tree/{}',
-              ['git', 'personal'],
+              'git personal',
               ['thither'],
               expect.objectContaining({ argDelta: -1 }),
             ],
@@ -148,14 +145,99 @@ describe('dsl.md §7 worked programs', () => {
     ]);
   });
 
+  it('§7 variants of one target', () => {
+    // Two .set programs build one target with an arity-0 and an arity-1 variant.
+    const created = run([
+      ['S', { targets: {}, focus: [] }],
+      'https://jira.example.com',
+      'jira',
+      '.set',
+      'https://jira.example.com/browse/{}',
+      'jira',
+      '.set',
+    ]);
+    const state = [
+      'S',
+      {
+        targets: {
+          jira: ['https://jira.example.com', 'https://jira.example.com/browse/{}'],
+        },
+        focus: [],
+      },
+    ];
+    expect(created).toEqual([state]);
+
+    // jira with no arguments: the arity-0 variant is the best fit — one match, a nav candidate.
+    expect(run([state, 'jira', '.$'])).toEqual([
+      state,
+      [
+        'R',
+        {
+          matches: [
+            ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 0 })],
+          ],
+          inputs: ['jira'],
+        },
+      ],
+    ]);
+
+    // jira PROJ: the arity-1 variant is the best fit — one match.
+    expect(run([state, 'jira', 'PROJ', '.$'])[1]).toEqual([
+      'R',
+      {
+        matches: [
+          [
+            'https://jira.example.com/browse/PROJ',
+            'jira',
+            ['PROJ'],
+            expect.objectContaining({ argDelta: 0 }),
+          ],
+        ],
+        inputs: ['jira'],
+      },
+    ]);
+
+    // jira PROJ extra: no variant has arity 2, so both are listed (not a nav candidate).
+    expect(run([state, 'jira', 'PROJ', 'extra', '.$'])[1]).toEqual([
+      'R',
+      {
+        matches: [
+          [
+            'https://jira.example.com/browse/PROJ',
+            'jira',
+            ['PROJ'],
+            expect.objectContaining({ argDelta: 1 }),
+          ],
+          ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 2 })],
+        ],
+        inputs: ['jira'],
+      },
+    ]);
+
+    // Removing the arity-1 variant leaves the arity-0 variant, and jira PROJ then navigates.
+    const removed = run([state, 'jira', '.', 'x', '.rm']);
+    expect(removed).toEqual([
+      ['S', { targets: { jira: ['https://jira.example.com'] }, focus: [] }],
+    ]);
+    expect(run([removed[0], 'jira', 'PROJ', '.$'])[1]).toEqual([
+      'R',
+      {
+        matches: [
+          ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 1 })],
+        ],
+        inputs: ['jira'],
+      },
+    ]);
+  });
+
   it('§7 select every target with an empty query', () => {
     const state = [
       'S',
       {
-        targets: [
-          [['company', 'git'], 'https://github.com/company/{}'],
-          [['docs'], 'https://docs.example.com/'],
-        ],
+        targets: {
+          'company git': ['https://github.com/company/{}'],
+          docs: ['https://docs.example.com/'],
+        },
         focus: [],
       },
     ];
@@ -167,13 +249,13 @@ describe('dsl.md §7 worked programs', () => {
         'R',
         {
           matches: [
-            ['https://docs.example.com/', ['docs'], [], { argDelta: 0, positions: [], score: 0 }],
             [
               'https://github.com/company/{}',
-              ['company', 'git'],
+              'company git',
               [],
               { argDelta: -1, positions: [], score: 0 },
             ],
+            ['https://docs.example.com/', 'docs', [], { argDelta: 0, positions: [], score: 0 }],
           ],
           inputs: [],
         },
@@ -182,8 +264,8 @@ describe('dsl.md §7 worked programs', () => {
   });
 
   it('§7 stop at the first result', () => {
-    const s0 = ['S', { targets: [[['git'], 'https://github.com/']], focus: [] }];
-    const s1 = ['S', { targets: [[['docs'], 'https://docs.example.com/']], focus: [] }];
+    const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [] }];
+    const s1 = ['S', { targets: { docs: ['https://docs.example.com/'] }, focus: [] }];
     const stack = run([s0, 'git', '.$', s1, 'docs', '.$']);
 
     expect(stack).toHaveLength(2);
@@ -191,7 +273,7 @@ describe('dsl.md §7 worked programs', () => {
     expect(stack[1]).toEqual([
       'R',
       expect.objectContaining({
-        matches: [['https://github.com/', ['git'], [], expect.objectContaining({ argDelta: 0 })]],
+        matches: [['https://github.com/', 'git', [], expect.objectContaining({ argDelta: 0 })]],
         inputs: ['git'],
       }),
     ]);
@@ -220,11 +302,11 @@ const alphabet: readonly unknown[] = [
   'not a url',
   'Ünïcödé',
   '$&',
-  '["S", {"targets": [], "focus": []}]',
-  ['S', { targets: [], focus: [] }],
-  ['S', { targets: [[['a'], 'https://a/{}']], focus: ['a'] }],
+  '["S", {"targets": {}, "focus": []}]',
+  ['S', { targets: {}, focus: [] }],
+  ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'] }],
   ['S', { targets: 'wrong' }],
-  ['S', { targets: [[['a'], 'not-a-url']], focus: [] }],
+  ['S', { targets: { a: ['not-a-url'] }, focus: [] }],
   ['R', { matches: [], inputs: [] }],
   ['R', 'wrong'],
   ['E', { type: 'unknown_error', description: 'boom' }],

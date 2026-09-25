@@ -1,4 +1,4 @@
-// dsl.md §4.2 — .rm: remove matching targets
+// dsl.md §4.2 — .rm: remove matching targets, or a single variant by arity
 
 import { describe, expect, it } from 'vitest';
 import type { Stack } from '../../types.ts';
@@ -12,14 +12,24 @@ import {
   personalGit,
   runWith,
   state,
+  type TargetSpec,
   testInterp,
   three,
 } from './harness.ts';
 
 const run = runWith({ '.rm': rm });
 
+// A single target with two variants (arity 0 and arity 1), to exercise arity-targeted removal.
+const jira: TargetSpec = [
+  ['jira'],
+  'https://jira.example.com',
+  'https://jira.example.com/browse/{}',
+];
+const jira0: TargetSpec = [['jira'], 'https://jira.example.com'];
+const jira1: TargetSpec = [['jira'], 'https://jira.example.com/browse/{}'];
+
 const cases: readonly Case[] = [
-  // removal
+  // whole-target removal (no separator)
   [
     '§4.2 removes every target matching the complete combined query',
     [state(three), 'git', '.rm'],
@@ -37,9 +47,36 @@ const cases: readonly Case[] = [
     [state(three)],
   ],
   [
-    "§4.2 the separator's suffix plays no part",
-    [state(three), 'git', '.', 'company', '.rm'],
-    [state([companyDocs])],
+    '§4.2 without a separator removes the whole target with all its variants',
+    [state([jira]), 'jira', '.rm'],
+    [state([])],
+  ],
+
+  // arity-targeted removal (with a separator)
+  [
+    '§4.2 with a separator, the suffix length names the arity to remove: jira . x removes arity 1',
+    [state([jira]), 'jira', '.', 'x', '.rm'],
+    [state([jira0])],
+  ],
+  [
+    '§4.2 jira . .rm removes the arity-0 variant',
+    [state([jira]), 'jira', '.', '.rm'],
+    [state([jira1])],
+  ],
+  [
+    "§4.2 removing a target's last variant drops the target",
+    [state([jira0]), 'jira', '.', '.rm'],
+    [state([])],
+  ],
+  [
+    '§4.2 an arity with no matching variant leaves the target unchanged',
+    [state([jira]), 'jira', '.', 'a', 'b', '.rm'],
+    [state([jira])],
+  ],
+  [
+    '§4.2 the suffix count is read, not its text: jira . anything removes arity 1',
+    [state([jira]), 'jira', '.', 'anything', '.rm'],
+    [state([jira0])],
   ],
 
   // focus never authorizes removal
@@ -66,7 +103,7 @@ const cases: readonly Case[] = [
     [state([companyDocs, personalGit])],
   ],
   [
-    '§3 smart-case: an uppercase term is case-sensitive, so GIT matches no lowercase dimension and removes nothing',
+    '§3 smart-case: an uppercase term is case-sensitive, so GIT matches no key and removes nothing',
     [state(three), 'GIT', '.rm'],
     [state(three)],
   ],

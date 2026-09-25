@@ -16,7 +16,7 @@ import {
   type Match,
   type Stack,
   type StackValue,
-  type Target,
+  type TargetSet,
 } from '../src/dsl/index.ts';
 
 const interp = createInterpreter(defaultEnv());
@@ -35,13 +35,15 @@ const yellow = paint('33');
 const cyan = paint('36');
 const underline = paint('4;1');
 
-const seed: readonly Target[] = [
-  [['company', 'git'], 'https://github.com/company/{}'],
-  [['company', 'docs'], 'https://docs.company.com/{}'],
-  [['git', 'personal'], 'https://github.com/me/{}'],
-  [['personal', 'git', 'pr'], 'https://github.com/me/{}/pull/{}'],
-  [['docs'], 'https://docs.example.com/'],
-];
+// A target is a key -> variants (dsl.md section 1); `jira` shows one target with two variants.
+const seed: TargetSet = {
+  'company git': ['https://github.com/company/{}'],
+  'company docs': ['https://docs.company.com/{}'],
+  'git personal': ['https://github.com/me/{}'],
+  'git personal pr': ['https://github.com/me/{}/pull/{}'],
+  jira: ['https://jira.example.com', 'https://jira.example.com/browse/{}'],
+  docs: ['https://docs.example.com/'],
+};
 
 const help = `
 ${bold('tokens')}      anything else is a program: split on whitespace, executed on the current stack
@@ -60,26 +62,26 @@ const showState = (value: StackValue | undefined): string => {
     return dim(`(top of stack is ${value?.[0] ?? 'nothing'}, not S)`);
   }
   const { targets, focus } = value[1];
-  const lines = targets.map(
-    ([dims, dest], i) =>
-      `  ${dim(String(i + 1).padStart(2))}  ${cyan(dims.join(' ').padEnd(28))} ${dest}`,
+  const entries = Object.entries(targets);
+  const lines = entries.map(
+    ([key, variants], i) =>
+      `  ${dim(String(i + 1).padStart(2))}  ${cyan(key.padEnd(28))} ${variants.join('  ')}`,
   );
   return [
     `${bold('focus')}: ${focus.length ? cyan(focus.join(' ')) : dim('(none)')}`,
-    `${bold('targets')}: ${targets.length ? '' : dim('(none)')}`,
+    `${bold('targets')}: ${entries.length ? '' : dim('(none)')}`,
     ...lines,
   ].join('\n');
 };
 
 // Highlight the matched positions inside the target's searchable string (dsl.md §5 evidence).
-const evidence = (dims: readonly string[], positions: readonly number[]): string => {
-  const text = dims.join(' ');
+const evidence = (key: string, positions: readonly number[]): string => {
   const hit = new Set(positions);
-  return [...text].map((ch, i) => (hit.has(i) ? underline(ch) : dim(ch))).join('');
+  return [...key].map((ch, i) => (hit.has(i) ? underline(ch) : dim(ch))).join('');
 };
 
 const showMatch = (match: Match, i: number, unique: boolean): string => {
-  const [dest, dims, args, hint] = match;
+  const [dest, key, args, hint] = match;
   const complete = hint.argDelta >= 0;
   const marker = complete ? green('●') : yellow('○');
   const nav = unique && complete ? green('  ← navigate') : '';
@@ -87,7 +89,7 @@ const showMatch = (match: Match, i: number, unique: boolean): string => {
     hint.argDelta === 0 ? '' : dim(` argDelta ${hint.argDelta > 0 ? '+' : ''}${hint.argDelta}`);
   return [
     `  ${dim(String(i + 1))} ${marker} ${complete ? dest : yellow(dest)}${nav}`,
-    `      ${evidence(dims, hint.positions)}${dim(`  score ${hint.score}`)}${balance}${
+    `      ${evidence(key, hint.positions)}${dim(`  score ${hint.score}`)}${balance}${
       args.length ? dim(`  args ${JSON.stringify(args)}`) : ''
     }`,
   ].join('\n');
@@ -188,7 +190,7 @@ const command = (line: string): boolean => {
       break;
     case ':seed':
       history.push(stack);
-      stack = [['S', { targets: [...seed], focus: [] }]];
+      stack = [['S', { targets: { ...seed }, focus: [] }]];
       console.log(showState(stack[0]));
       break;
     case ':reset':

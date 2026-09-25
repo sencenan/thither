@@ -20,11 +20,11 @@ export const renderView = (root: Element, register: OutputRegister): void => {
       nodes.push(empty);
     } else {
       const list = doc.createElement('ul');
-      for (const [destination, dims] of matches) {
+      for (const [destination, key] of matches) {
         const item = doc.createElement('li');
         const link = doc.createElement('a');
         link.href = destination;
-        link.textContent = dims.length > 0 ? `${dims.join(' ')} — ${destination}` : destination;
+        link.textContent = key.length > 0 ? `${key} — ${destination}` : destination;
         item.appendChild(link);
         list.appendChild(item);
       }

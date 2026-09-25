@@ -26,8 +26,8 @@ describe('renderView', () => {
         'R',
         {
           matches: [
-            ['https://b.example/', ['beta'], [], { argDelta: 0, positions: [], score: 1 }],
-            ['https://a.example/', ['alpha'], [], { argDelta: 0, positions: [], score: 2 }],
+            ['https://b.example/', 'beta', [], { argDelta: 0, positions: [], score: 1 }],
+            ['https://a.example/', 'alpha', [], { argDelta: 0, positions: [], score: 2 }],
           ],
           inputs: [],
         },
