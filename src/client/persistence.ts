@@ -2,7 +2,7 @@
 // and their formats. This module is the only place that names `thither.stacks.v1` and
 // `thither.settings.v1`; the host operations in `browser-env.ts` read and write through it.
 
-import type { Stack, ThitherError } from '../dsl/index.ts';
+import type { Interpreter, Program, Stack, ThitherError } from '../dsl/index.ts';
 import { emptyState } from '../dsl/index.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
@@ -100,6 +100,35 @@ const appendHistory = (
     previousCurrent !== undefined && JSON.stringify(previousCurrent) === JSON.stringify(current);
   const next = unchanged ? [...previous.slice(0, -1), current] : [...previous, current];
   return next.slice(Math.max(0, next.length - (historyLimit + 1)));
+};
+
+// browser-client.md "Fallback UI and settings" — revert: the entry at `index` becomes the last
+// (current) stack; everything newer is dropped. Values are not re-validated; they were validated
+// when saved. An unreadable record or an index outside it changes nothing.
+export const revertHistory = (storage: StorageArea, index: number): void => {
+  const history = readHistory(storage);
+  if (history === null || index < 0 || index >= history.length) {
+    return;
+  }
+  storage.setItem(STACKS_KEY, JSON.stringify(history.slice(0, index + 1)));
+};
+
+// browser-client.md "Fallback UI and settings": clear the history. Absence of the key is first
+// initialization, so the next `.load` seeds `[emptyState()]`. Settings are kept.
+export const clearHistory = (storage: StorageArea): void => {
+  storage.removeItem(STACKS_KEY);
+};
+
+// browser-client.md "Fallback UI and settings": import a stack pasted from elsewhere. The values
+// are pushed through the interpreter and whatever stack results becomes the last entry, unvalidated:
+// an invalid value lands as the `E` it parses to, for the user to revert or clear.
+export const importStack = (
+  interp: Interpreter,
+  storage: StorageArea,
+  values: readonly unknown[],
+): void => {
+  const program = values.reduce<Program>((acc, value) => interp.pushToken(acc, value), []);
+  writeCurrentStack(storage, interp.execute(program));
 };
 
 // Make `stack` the current stack of the record. An unreadable record has no previous current

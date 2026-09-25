@@ -52,7 +52,7 @@ The interpreter exposes a **program** as an ordered, mutable list of values; the
 - `interp.pushToken(program, item)`: append one string token or one structured value, validated against the environment, mutating and returning `program`.
 - `interp.execute(program, stack?)`: evaluate exactly the program given, on a copy of `stack` (empty when omitted), producing a data stack. The interpreter appends nothing — not even `.$` — so a host closes its programs itself ([ADR 0007](adr/0007-hosts-compose-the-program.md)). Neither argument is mutated.
 
-Parse failures are values, not exceptions: a failed `pushToken` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path and no validation of its own. The same entry point validates any data the client holds: the persisted stack on load, and manually supplied reset JSON.
+Parse failures are values, not exceptions: a failed `pushToken` yields an `E` value in the program, and executing `E` pushes it and stops. The client therefore needs no parse-error path and no validation of its own. The same entry point validates the persisted stack on load, and parses an imported stack's values.
 
 ### Host operations
 
@@ -109,7 +109,7 @@ Eviction removes elements from the front. With history limit `N`, the array hold
 
 When a save exceeds the storage quota, the write simply fails: the stored record is left as it was and the failure is reported explicitly rather than treating the execution as persisted. History is not evicted to make room — exceeding the quota is unlikely at these sizes, and the user can lower the history limit or reset through the settings if it ever happens.
 
-Malformed stored data must not trigger an automatic reset or be replaced by guessed state. `.load` pushes an `E`, which seals the stack: the user's tokens are absorbed, `.out` captures the `E`, and `.save` finds an empty stack and writes nothing. Render the error in place of the result list and state that recovery happens through the settings reset, keeping the Settings control reachable. Only an explicit reset write replaces the stored record. When localStorage is unavailable rather than merely empty, show that as an error too: do not fall back to an in-memory session, execute programs, or navigate, because without persistence the execution loop has no valid starting point.
+Malformed stored data must not trigger an automatic reset or be replaced by guessed state. `.load` pushes an `E`, which seals the stack: the user's tokens are absorbed, `.out` captures the `E`, and `.save` finds an empty stack and writes nothing. Render the error in place of the result list and state that recovery happens through the settings modal (revert, clear, or import), keeping the Settings control reachable. Only one of those explicit actions replaces the stored record. When localStorage is unavailable rather than merely empty, show that as an error too: do not fall back to an in-memory session, execute programs, or navigate, because without persistence the execution loop has no valid starting point.
 
 ## Fallback UI and settings
 
@@ -123,9 +123,9 @@ The first ten rows have navigation shortcuts `1` through `9`, then `0` for the t
 
 While the target set is empty, the page shows setup instructions in place of the result list: both shortcut URL templates and one example `.set` program. They disappear once the target set is non-empty and are not reachable from a dedicated URL.
 
-Provide a Settings control on the page, opening a modal containing stack history, manual state reset, and history-limit configuration. Do not reserve a settings URL or bypass normal execution with a parameter such as `view=settings`; users reach the page through a query with no matches or an ambiguous one, then open Settings.
+Provide a Settings control on the page, opening a modal that lists the stack history and offers three actions on it plus history-limit configuration: **revert** to a listed stack, **clear** everything and start from scratch, and **import** a stack pasted from another machine. Do not reserve a settings URL or bypass normal execution with a parameter such as `view=settings`; users reach the page through a query with no matches or an ambiguous one, then open Settings.
 
-The reset editor accepts a JSON stack array directly, such as `[["S", {"targets": {}, "focus": []}]]`, without an extra object wrapper. Reset is itself a program: the supplied values, then `.$ .out .save`. Each value passes through `interp.pushToken`, so an invalid value yields `E`; the client first dry-runs `[...values, '.$', '.out']` and refuses to save when the register's terminal is an `E`, leaving the stored record untouched. A successful reset makes the supplied stack current and pushes the previous current stack into history under the same difference rule; it does not clear history, replay any program, or navigate — the `.$` exists only so the epilogue has a terminal to capture. Restoration from history is the same program over a historical stack. When the stored record is unreadable there is no previous current stack to retain, so reset simply writes the new record.
+The three actions act directly on the stored record and are not programs; none replays a program, searches, or navigates. **Revert** to a listed stack drops every entry newer than it, so the selected stack is the last — that is, current — one; values are not re-validated, since they were validated when saved. **Clear** removes the record outright; absence is first initialization, so the next run seeds `[emptyState()]`. Settings are kept. **Import** accepts a JSON stack array directly, such as `[["S", {"targets": {}, "focus": []}]]`, without an extra object wrapper: each value is pushed through the interpreter and whatever stack results is appended as the last entry under the ordinary difference and eviction rules. Import does not validate — a value that fails to parse lands in the stack as the `E` it parses to, and the next `.load` reports it; the user reverts or clears. When the stored record is unreadable there is no previous entry to retain, so import simply writes the new record.
 
 Navigation applies no client-side scheme allowlist and no scheme-based confirmation: for an otherwise eligible destination, attempt navigation and let the browser enforce its own restrictions. This is an explicit user-controlled policy — destinations such as `javascript:` can execute code in the page's context, potentially reading or modifying localStorage, and some schemes may simply be refused.
 
@@ -135,11 +135,11 @@ Retain the current persisted stack and at most **N previous persisted stacks**, 
 
 On first initialization the current stack is `[emptyState()]`. It becomes a historical entry after the first execution that changes the stack, so the first mutation can be undone. History is a plain list of previous stacks, with no input, timestamp, or origin metadata.
 
-Push the previous current stack into history only when the new current stack differs from it, comparing by structural JSON equality. Ordinary searches therefore add no entry. This deduplication applies to executions, resets, and restorations alike. Executing on the whole current stack leaves the values beneath the top state in place, so a previous stack `[A, B]` becomes `[A, B']`, which differs structurally and so does add an entry.
+Push the previous current stack into history only when the new current stack differs from it, comparing by structural JSON equality. Ordinary searches therefore add no entry. This deduplication applies to executions and imports alike. Executing on the whole current stack leaves the values beneath the top state in place, so a previous stack `[A, B]` becomes `[A, B']`, which differs structurally and so does add an entry.
 
-History is inspected and restored from the settings modal, which lists stacks without descriptive labels. The history-limit setting accepts nonnegative integers; `0` retains only the current stack, and lowering the limit evicts the oldest excess entries.
+History is inspected and acted on from the settings modal, which lists stacks without descriptive labels; there is no current stack apart from the last entry. The history-limit setting accepts nonnegative integers; `0` retains only the current stack, and lowering the limit evicts the oldest excess entries.
 
-Restoration restores the entire historical stack without interpreting its values, does not re-execute the original program or replay navigation, and makes the restored stack current while pushing the prior current stack into history under the same difference rule — so restoration is itself reversible while that entry survives eviction.
+Reverting restores the entire selected stack without interpreting its values and does not re-execute the original program or replay navigation. It is not itself undoable: the entries it drops are gone.
 
 ## Source, build, and deployment
 

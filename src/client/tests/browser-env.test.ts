@@ -5,7 +5,16 @@
 import { describe, expect, it } from 'vitest';
 import { createInterpreter, emptyState, type Program } from '../../dsl/index.ts';
 import { createBrowserEnv } from '../browser-env.ts';
-import { isHistoryLimit, readSettings, type StorageArea, writeSettings } from '../persistence.ts';
+import {
+  clearHistory,
+  importStack,
+  isHistoryLimit,
+  readHistory,
+  readSettings,
+  revertHistory,
+  type StorageArea,
+  writeSettings,
+} from '../persistence.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 const SETTINGS_KEY = 'thither.settings.v1';
@@ -299,6 +308,79 @@ describe('bounded history', () => {
 
 // browser-client.md "Persistence" / "Bounded history" — `thither.settings.v1` holds configuration
 // only; `historyLimit` is a nonnegative integer defaulting to 10.
+// browser-client.md "Fallback UI and settings" — the three actions the settings modal performs
+// on the stored record. There is no current stack apart from the last entry of the history.
+describe('settings actions on the history', () => {
+  const stateWith = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];
+  const A = stateWith({ home: ['https://example.com/'] });
+  const B = stateWith({ git: ['https://github.com/{}'] });
+  const C = stateWith({ jira: ['https://jira.example.com/{}'] });
+
+  it('"Bounded history": revert makes the selected entry the last one, dropping everything newer', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A], [B], [C]]) });
+
+    revertHistory(storage, 0);
+
+    expect(record(storage)).toEqual([[A]]);
+  });
+
+  it('"Bounded history": revert to the last entry, or outside the record, changes nothing', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A], [B]]) });
+
+    revertHistory(storage, 1);
+    revertHistory(storage, 2);
+    revertHistory(storage, -1);
+
+    expect(record(storage)).toEqual([[A], [B]]);
+  });
+
+  it('"Persistence": clear removes the record, so the next run starts from scratch', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A], [B]]) });
+    writeSettings(storage, { historyLimit: 3 });
+
+    clearHistory(storage);
+
+    expect(storage.map.has(STACKS_KEY)).toBe(false);
+    expect(readSettings(storage)).toEqual({ historyLimit: 3 });
+    runClient(storage, []);
+    expect(record(storage)).toEqual(emptyRecord);
+  });
+
+  it('"Fallback UI and settings": import pushes the pasted values and appends the resulting stack as the last entry', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A]]) });
+    const { interp } = wire(storage);
+
+    importStack(interp, storage, [B, C]);
+
+    expect(record(storage)).toEqual([[A], [B, C]]);
+  });
+
+  it('"Fallback UI and settings": import does not validate: an invalid value lands as the E it parses to', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A]]) });
+    const { interp } = wire(storage);
+
+    importStack(interp, storage, [B, ['S', { bad: true }]]);
+
+    const last = (readHistory(storage) ?? []).at(-1) ?? [];
+    expect(last[0]).toEqual(B);
+    expect(last[1]).toEqual(['E', { type: 'parse_error', description: expect.any(String) }]);
+    expect(last).toHaveLength(2);
+  });
+
+  it('"Bounded history": import obeys the difference rule and the limit like any other write', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A]]) });
+    writeSettings(storage, { historyLimit: 1 });
+    const { interp } = wire(storage);
+
+    importStack(interp, storage, [A]);
+    expect(record(storage)).toEqual([[A]]);
+
+    importStack(interp, storage, [B]);
+    importStack(interp, storage, [C]);
+    expect(record(storage)).toEqual([[B], [C]]);
+  });
+});
+
 describe('settings record', () => {
   it('"Bounded history": historyLimit defaults to 10 when the key is absent', () => {
     expect(readSettings(fakeStorage())).toEqual({ historyLimit: 10 });
