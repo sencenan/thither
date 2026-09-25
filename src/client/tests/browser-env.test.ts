@@ -10,10 +10,11 @@ import { isHistoryLimit, readSettings, type StorageArea, writeSettings } from '.
 const STACKS_KEY = 'thither.stacks.v1';
 const SETTINGS_KEY = 'thither.settings.v1';
 
-// A Map-backed localStorage fake. `throwOnRead` models an unavailable localStorage.
+// A Map-backed localStorage fake. `throwOnRead` models an unavailable localStorage; `quota` is
+// the longest value `setItem` accepts before throwing the browser's `QuotaExceededError`.
 const fakeStorage = (
   initial: Record<string, string> = {},
-  throwOnRead = false,
+  { throwOnRead = false, quota = Number.POSITIVE_INFINITY } = {},
 ): StorageArea & { map: Map<string, string> } => {
   const map = new Map(Object.entries(initial));
   return {
@@ -25,6 +26,9 @@ const fakeStorage = (
       return map.get(key) ?? null;
     },
     setItem: (key, value) => {
+      if (value.length > quota) {
+        throw new DOMException('quota exceeded', 'QuotaExceededError');
+      }
       map.set(key, value);
     },
     removeItem: (key) => {
@@ -157,7 +161,7 @@ describe('browser env host operations', () => {
   });
 
   it('lets an unavailable localStorage throw', () => {
-    const storage = fakeStorage({}, true);
+    const storage = fakeStorage({}, { throwOnRead: true });
     expect(() => runClient(storage, [])).toThrow('localStorage unavailable');
   });
 
@@ -267,6 +271,22 @@ describe('bounded history', () => {
     expect(record(storage)).toEqual([[B]]);
   });
 
+  it('"Persistence": a save over quota is not retried; E(unknown_error) becomes the terminal and the record is untouched', () => {
+    const storage = fakeStorage();
+    runClient(storage, set('https://example.com/', 'home'));
+    const before = record(storage);
+
+    const constrained = fakeStorage(Object.fromEntries(storage.map), { quota: 0 });
+    const { register, stack } = runClient(constrained, set('https://github.com/{}', 'git'));
+
+    expect(register.terminal).toEqual([
+      'E',
+      { type: 'unknown_error', description: expect.any(String) },
+    ]);
+    expect(stack.at(-1)).toEqual(register.terminal);
+    expect(record(constrained)).toEqual(before);
+  });
+
   it('"Bounded history": snapshots are not mutated by later executions', () => {
     const storage = fakeStorage();
     runClient(storage, set('https://example.com/', 'home'));
@@ -335,6 +355,8 @@ describe('settings record', () => {
   });
 
   it('lets an unavailable localStorage throw on read', () => {
-    expect(() => readSettings(fakeStorage({}, true))).toThrow('localStorage unavailable');
+    expect(() => readSettings(fakeStorage({}, { throwOnRead: true }))).toThrow(
+      'localStorage unavailable',
+    );
   });
 });

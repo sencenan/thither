@@ -1,9 +1,8 @@
 // browser-client.md "Persistence" / "Bounded history" — the two versioned localStorage records
 // and their formats. This module is the only place that names `thither.stacks.v1` and
 // `thither.settings.v1`; the host operations in `browser-env.ts` read and write through it.
-// No quota retry yet.
 
-import type { Stack } from '../dsl/index.ts';
+import type { Stack, ThitherError } from '../dsl/index.ts';
 import { emptyState } from '../dsl/index.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
@@ -104,9 +103,18 @@ const appendHistory = (
 };
 
 // Make `stack` the current stack of the record. An unreadable record has no previous current
-// stack to retain, so the new record is `[stack]` alone.
+// stack to retain, so the new record is `[stack]` alone. A write the storage refuses (quota) is
+// not retried: the failure is pushed onto the stack as an `E` and the record is left as it was.
 export const writeCurrentStack = (storage: StorageArea, stack: Stack): void => {
   const previous = readHistory(storage) ?? [];
   const next = appendHistory(previous, stack, readSettings(storage).historyLimit);
-  storage.setItem(STACKS_KEY, JSON.stringify(next));
+  try {
+    storage.setItem(STACKS_KEY, JSON.stringify(next));
+  } catch (_ex) {
+    const failure: ThitherError = [
+      'E',
+      { type: 'unknown_error', description: 'the stack could not be saved: storage is full' },
+    ];
+    stack.push(failure);
+  }
 };

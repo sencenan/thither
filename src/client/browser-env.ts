@@ -98,10 +98,16 @@ export const createBrowserEnv = (
 
   // browser-client.md "Host operations" — persist the stack as it stands, never an empty one.
   // The record is re-read by the write rather than carried from `.load`: the Web Lock encloses
-  // both, and reset/restore programs (`<values> .$ .out .save`) have no `.load` at all.
+  // both, and reset/restore programs (`<values> .$ .out .save`) have no `.load` at all. A failed
+  // write leaves its `E` on the stack; it becomes the run's terminal in place of the `R` that
+  // `.out` captured, so the client never treats the execution as persisted.
   const save: OpFn = (_interp, stack) => {
     if (stack.length > 0) {
       writeCurrentStack(storage, stack);
+      const top = stack[stack.length - 1];
+      if (top !== undefined && top[0] === 'E') {
+        env.terminal = top;
+      }
     }
     return stack;
   };
