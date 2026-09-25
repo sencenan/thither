@@ -17,7 +17,7 @@ An operation a host registers on the interpreter's environment beyond the langua
 _Avoid_: Plugin, hook, built-in
 
 **Output register**:
-The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R` or `E`, and facts about the run such as whether the stored record loaded. The host reads the register, never the returned stack.
+The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R` or `E`, the state of the world the run left behind, and facts about the run such as whether the stored record loaded. The host reads the register, never the returned stack.
 _Avoid_: Result variable, side channel
 
 ### Targets and matching
