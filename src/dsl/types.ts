@@ -25,7 +25,15 @@ export interface Hint {
   readonly score: number;
 }
 
-export type Match = readonly [destination: Template, key: string, args: readonly Dim[], hint: Hint];
+// dsl.md §5 — a match carries the variant's template beside its rendering, so a presentation
+// layer can tell which `{}` each applied argument filled without searching the destination.
+export type Match = readonly [
+  destination: Template,
+  template: Template,
+  key: string,
+  args: readonly Dim[],
+  hint: Hint,
+];
 
 export const ErrorTypes = [
   'parse_error',

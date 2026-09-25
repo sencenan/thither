@@ -127,7 +127,13 @@ const parseResult = (raw: unknown): Result | ThitherError => {
       return [
         'R',
         {
-          matches: matches.map(([dest, key, args, hint]) => [dest, key, args, hint]),
+          matches: matches.map(([dest, template, key, args, hint]) => [
+            dest,
+            template,
+            key,
+            args,
+            hint,
+          ]),
           inputs,
         },
       ];
@@ -157,12 +163,14 @@ const createParseError = (description: string): ThitherError =>
   thitherError('parse_error', description);
 
 const isMatch = (value: readonly unknown[]): value is Match => {
-  const [dest, key, args, hint, ...rest] = value;
+  const [dest, template, key, args, hint, ...rest] = value;
 
   return (
     rest.length === 0 &&
     typeof dest === 'string' &&
     isTemplate(dest) &&
+    typeof template === 'string' &&
+    isTemplate(template) &&
     typeof key === 'string' &&
     isDimList(args) &&
     isHint(hint)

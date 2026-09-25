@@ -59,7 +59,7 @@ A single space-separated token supplied to fill one destination template placeho
 A standalone `.` token separating the dimension-matching portion of an input from its arguments. For search, the following tokens are arguments. For removal, only their count matters: it names the arity of the variant to remove. Target-setting and focus-setting ignore the separator and everything after it.
 
 **Match**:
-One variant of a search-selected target represented with its fully or partially rendered destination, the target's key, applied arguments, and hints. Missing arguments leave their `{}` placeholders intact and prevent direct navigation; the argument balance is recorded in the hints.
+One variant of a search-selected target represented with its fully or partially rendered destination, the variant's template, the target's key, applied arguments, and hints. Missing arguments leave their `{}` placeholders intact and prevent direct navigation; the argument balance is recorded in the hints. The template travels with the rendering so a presentation layer can show which placeholder each argument filled by walking the template, rather than searching the destination.
 
 **Best fit**:
 The variant of a selected target whose arity equals the number of supplied arguments. A target with a best fit yields exactly one match, for that variant; a target without one yields one match per variant, each rendered as far as the arguments allow, so it can never be navigated to directly.

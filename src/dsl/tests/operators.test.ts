@@ -37,7 +37,7 @@ const selectedKeys = (stack: Stack): readonly string[] => {
   if (top?.[0] !== 'R') {
     throw new Error(`expected R on top, got ${JSON.stringify(top)}`);
   }
-  return top[1].matches.map((match) => match[1]);
+  return top[1].matches.map((match) => match[2]);
 };
 
 // operator → the query that exercises it → the targets it selects out of `all`

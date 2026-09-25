@@ -23,14 +23,15 @@ const hint = (argDelta: number, positions?: readonly number[]) =>
     ? expect.objectContaining({ argDelta })
     : expect.objectContaining({ argDelta, positions });
 
-// m carries the target's key (a string) in its second slot (dsl.md §1).
+// m carries the variant's template in its second slot and the target's key in its third (dsl.md §1).
 const m = (
   dest: string,
+  template: string,
   key: string,
   args: readonly string[],
   argDelta: number,
   positions?: readonly number[],
-) => [dest, key, args, hint(argDelta, positions)];
+) => [dest, template, key, args, hint(argDelta, positions)];
 
 const result = (matches: readonly unknown[], inputs: readonly string[]) => [
   'R',
@@ -41,6 +42,8 @@ const result = (matches: readonly unknown[], inputs: readonly string[]) => [
 const one: TargetSpec = [['x'], 'https://example.com/{}'];
 const two: TargetSpec = [['x'], 'https://example.com/{}/tree/{}'];
 const zero: TargetSpec = [['x'], 'https://example.com/'];
+// an argument's text also occurs in the template, before its placeholder
+const echo: TargetSpec = [['echo'], 'https://example.com/thither/{}'];
 
 // variant targets — one target, several arities
 const gap: TargetSpec = [['gap'], 'https://gap/', 'https://gap/{}/{}']; // arities {0, 2}
@@ -60,7 +63,16 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/{}', 'company git', [], -1, [0, 1, 2, 3, 4, 5, 6])],
+        [
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [0, 1, 2, 3, 4, 5, 6],
+          ),
+        ],
         ['company'],
       ),
     ],
@@ -73,6 +85,7 @@ const cases: readonly Case[] = [
       result(
         [
           m(
+            'https://github.com/company/{}',
             'https://github.com/company/{}',
             'company git',
             [],
@@ -90,7 +103,15 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/thither', 'company git', ['thither'], 0)],
+        [
+          m(
+            'https://github.com/company/thither',
+            'https://github.com/company/{}',
+            'company git',
+            ['thither'],
+            0,
+          ),
+        ],
         ['company', 'git'],
       ),
     ],
@@ -107,7 +128,18 @@ const cases: readonly Case[] = [
     [state([companyGit, personalGit], ['company'])],
     [
       state([companyGit, personalGit], ['company']),
-      result([m('https://github.com/company/{}', 'company git', [], -1)], []),
+      result(
+        [
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+          ),
+        ],
+        [],
+      ),
     ],
   ],
   [
@@ -117,8 +149,15 @@ const cases: readonly Case[] = [
       state([companyGit, [['docs'], 'https://docs.example.com/']]),
       result(
         [
-          m('https://github.com/company/{}', 'company git', [], -1, []),
-          m('https://docs.example.com/', 'docs', [], 0, []),
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [],
+          ),
+          m('https://docs.example.com/', 'https://docs.example.com/', 'docs', [], 0, []),
         ],
         [],
       ),
@@ -132,7 +171,15 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)],
+        [
+          m(
+            'https://github.com/company/MyRepo',
+            'https://github.com/company/{}',
+            'company git',
+            ['MyRepo'],
+            0,
+          ),
+        ],
         ['company', 'git'],
       ),
     ],
@@ -142,7 +189,18 @@ const cases: readonly Case[] = [
     [state([companyGit]), 'company', 'Git'],
     [
       state([companyGit]),
-      result([m('https://github.com/company/Git', 'company git', ['Git'], 0)], ['company']),
+      result(
+        [
+          m(
+            'https://github.com/company/Git',
+            'https://github.com/company/{}',
+            'company git',
+            ['Git'],
+            0,
+          ),
+        ],
+        ['company'],
+      ),
     ],
   ],
 
@@ -154,9 +212,16 @@ const cases: readonly Case[] = [
       state([companyGit, companyDocs, personalGit]),
       result(
         [
-          m('https://docs.company.com/{}', 'company docs', [], -1), // docs outscores git (4 chars vs 3)
-          m('https://github.com/company/{}', 'company git', [], -1),
-          m('https://github.com/me/{}', 'git personal', [], -1),
+          // docs outscores git (4 chars vs 3)
+          m('https://docs.company.com/{}', 'https://docs.company.com/{}', 'company docs', [], -1),
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+          ),
+          m('https://github.com/me/{}', 'https://github.com/me/{}', 'git personal', [], -1),
         ],
         ['git', '|', 'docs'],
       ),
@@ -168,7 +233,16 @@ const cases: readonly Case[] = [
     [
       state([companyGit, companyDocs, personalGit]),
       result(
-        [m('https://github.com/company/{}', 'company git', [], -1, [8, 9, 10])],
+        [
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [8, 9, 10],
+          ),
+        ],
         ['git', '!personal'],
       ),
     ],
@@ -179,7 +253,16 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/{}', 'company git', [], -1, [1, 2, 3, 4, 5, 6])],
+        [
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [1, 2, 3, 4, 5, 6],
+          ),
+        ],
         ["'ompany"],
       ),
     ],
@@ -189,7 +272,19 @@ const cases: readonly Case[] = [
     [state([companyGit, personalGit]), '^git', '.'],
     [
       state([companyGit, personalGit]),
-      result([m('https://github.com/me/{}', 'git personal', [], -1, [0, 1, 2])], ['^git']),
+      result(
+        [
+          m(
+            'https://github.com/me/{}',
+            'https://github.com/me/{}',
+            'git personal',
+            [],
+            -1,
+            [0, 1, 2],
+          ),
+        ],
+        ['^git'],
+      ),
     ],
   ],
   [
@@ -197,7 +292,19 @@ const cases: readonly Case[] = [
     [state([companyGit, personalGit]), 'git$', '.'],
     [
       state([companyGit, personalGit]),
-      result([m('https://github.com/company/{}', 'company git', [], -1, [8, 9, 10])], ['git$']),
+      result(
+        [
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [8, 9, 10],
+          ),
+        ],
+        ['git$'],
+      ),
     ],
   ],
   [
@@ -206,7 +313,15 @@ const cases: readonly Case[] = [
     [
       state([companyGit, personalGit]),
       result(
-        [m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)],
+        [
+          m(
+            'https://github.com/company/MyRepo',
+            'https://github.com/company/{}',
+            'company git',
+            ['MyRepo'],
+            0,
+          ),
+        ],
         ['git', '!personal'],
       ),
     ],
@@ -218,8 +333,14 @@ const cases: readonly Case[] = [
       state([companyGit, companyDocs, personalGit], ['company']),
       result(
         [
-          m('https://docs.company.com/{}', 'company docs', [], -1),
-          m('https://github.com/company/{}', 'company git', [], -1),
+          m('https://docs.company.com/{}', 'https://docs.company.com/{}', 'company docs', [], -1),
+          m(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+          ),
         ],
         ['git', '|', 'docs'],
       ),
@@ -233,7 +354,19 @@ const cases: readonly Case[] = [
     [state([apple]), 'm', 'ppl'],
     [
       state([apple]),
-      result([m('https://fruit.example/{}', 'apple mango', [], -1, [1, 2, 3, 6])], ['m', 'ppl']),
+      result(
+        [
+          m(
+            'https://fruit.example/{}',
+            'https://fruit.example/{}',
+            'apple mango',
+            [],
+            -1,
+            [1, 2, 3, 6],
+          ),
+        ],
+        ['m', 'ppl'],
+      ),
     ],
   ],
 
@@ -244,7 +377,15 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/.git', 'company git', ['.git'], 0)],
+        [
+          m(
+            'https://github.com/company/.git',
+            'https://github.com/company/{}',
+            'company git',
+            ['.git'],
+            0,
+          ),
+        ],
         ['company', 'git'],
       ),
     ],
@@ -252,14 +393,28 @@ const cases: readonly Case[] = [
   [
     '§2 an escaped separator argument renders as a single dot',
     [state([one]), 'x', '.', '..'],
-    [state([one]), result([m('https://example.com/.', 'x', ['.'], 0)], ['x'])],
+    [
+      state([one]),
+      result([m('https://example.com/.', 'https://example.com/{}', 'x', ['.'], 0)], ['x']),
+    ],
   ],
   [
     '§2 an escaped matching literal is resolved when matched but kept verbatim in inputs',
     [state([[['.git', 'hooks'], 'https://hooks.example/{}']]), '..git', 'pre-commit'],
     [
       state([[['.git', 'hooks'], 'https://hooks.example/{}']]),
-      result([m('https://hooks.example/pre-commit', '.git hooks', ['pre-commit'], 0)], ['..git']),
+      result(
+        [
+          m(
+            'https://hooks.example/pre-commit',
+            'https://hooks.example/{}',
+            '.git hooks',
+            ['pre-commit'],
+            0,
+          ),
+        ],
+        ['..git'],
+      ),
     ],
   ],
 
@@ -267,32 +422,96 @@ const cases: readonly Case[] = [
   [
     '§5 one placeholder, one argument: rendered exactly, argDelta 0',
     [state([one]), 'x', 'MyRepo'],
-    [state([one]), result([m('https://example.com/MyRepo', 'x', ['MyRepo'], 0)], ['x'])],
+    [
+      state([one]),
+      result(
+        [m('https://example.com/MyRepo', 'https://example.com/{}', 'x', ['MyRepo'], 0)],
+        ['x'],
+      ),
+    ],
   ],
   [
     '§5 an extra argument is ignored during substitution but counted in argDelta',
     [state([one]), 'x', 'thither', 'extra'],
-    [state([one]), result([m('https://example.com/thither', 'x', ['thither'], 1)], ['x'])],
+    [
+      state([one]),
+      result(
+        [m('https://example.com/thither', 'https://example.com/{}', 'x', ['thither'], 1)],
+        ['x'],
+      ),
+    ],
   ],
   [
     '§5 a slash in an argument produces a path segment, not new template syntax',
     [state([one]), 'x', 'a/b'],
-    [state([one]), result([m('https://example.com/a/b', 'x', ['a/b'], 0)], ['x'])],
+    [
+      state([one]),
+      result([m('https://example.com/a/b', 'https://example.com/{}', 'x', ['a/b'], 0)], ['x']),
+    ],
   ],
   [
     '§5 a missing argument leaves its placeholder intact in a later slot',
     [state([two]), 'x', 'thither'],
-    [state([two]), result([m('https://example.com/thither/tree/{}', 'x', ['thither'], -1)], ['x'])],
+    [
+      state([two]),
+      result(
+        [
+          m(
+            'https://example.com/thither/tree/{}',
+            'https://example.com/{}/tree/{}',
+            'x',
+            ['thither'],
+            -1,
+          ),
+        ],
+        ['x'],
+      ),
+    ],
   ],
   [
     '§5 no argument leaves the whole template intact with argDelta -1',
     [state([one]), 'x'],
-    [state([one]), result([m('https://example.com/{}', 'x', [], -1)], ['x'])],
+    [
+      state([one]),
+      result([m('https://example.com/{}', 'https://example.com/{}', 'x', [], -1)], ['x']),
+    ],
   ],
   [
     '§5 a zero-placeholder template ignores its argument, argDelta +1',
     [state([zero]), 'x', 'ignored'],
-    [state([zero]), result([m('https://example.com/', 'x', [], 1)], ['x'])],
+    [state([zero]), result([m('https://example.com/', 'https://example.com/', 'x', [], 1)], ['x'])],
+  ],
+
+  // §5 the template travels with its rendering
+  [
+    '§5 the match carries its template, so an argument echoing template text before its {} is still located by slot',
+    [state([echo]), 'echo', '.', 'thither'],
+    [
+      state([echo]),
+      result(
+        [
+          m(
+            'https://example.com/thither/thither',
+            'https://example.com/thither/{}',
+            'echo',
+            ['thither'],
+            0,
+          ),
+        ],
+        ['echo'],
+      ),
+    ],
+  ],
+  [
+    '§5 an argument that is itself {} is content, not a new placeholder: the next argument fills the next slot',
+    [state([two]), 'x', '.', '{}', 'y'],
+    [
+      state([two]),
+      result(
+        [m('https://example.com/{}/tree/y', 'https://example.com/{}/tree/{}', 'x', ['{}', 'y'], 0)],
+        ['x'],
+      ),
+    ],
   ],
 
   // §4.4 the separator: matching portion matched in full, suffix taken as arguments
@@ -302,7 +521,15 @@ const cases: readonly Case[] = [
     [
       state([[['lookup'], 'https://example.com/{}']]),
       result(
-        [m('https://example.com/https://example.com', 'lookup', ['https://example.com'], 0)],
+        [
+          m(
+            'https://example.com/https://example.com',
+            'https://example.com/{}',
+            'lookup',
+            ['https://example.com'],
+            0,
+          ),
+        ],
         ['lookup'],
       ),
     ],
@@ -312,7 +539,18 @@ const cases: readonly Case[] = [
     [state([companyGit], ['company']), '.', 'MyRepo'],
     [
       state([companyGit], ['company']),
-      result([m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)], []),
+      result(
+        [
+          m(
+            'https://github.com/company/MyRepo',
+            'https://github.com/company/{}',
+            'company git',
+            ['MyRepo'],
+            0,
+          ),
+        ],
+        [],
+      ),
     ],
   ],
 
@@ -320,14 +558,20 @@ const cases: readonly Case[] = [
   [
     '§4.4 a best fit yields exactly one match: ladder with one argument uses the arity-1 variant',
     [state([ladder]), 'ladder', '.', 'q'],
-    [state([ladder]), result([m('https://l/q', 'ladder', ['q'], 0)], ['ladder'])],
+    [state([ladder]), result([m('https://l/q', 'https://l/{}', 'ladder', ['q'], 0)], ['ladder'])],
   ],
   [
     '§4.4 no best fit fans out one row per variant: gap with one argument lists both',
     [state([gap]), 'gap', '.', 'q'],
     [
       state([gap]),
-      result([m('https://gap/', 'gap', [], 1), m('https://gap/q/{}', 'gap', ['q'], -1)], ['gap']),
+      result(
+        [
+          m('https://gap/', 'https://gap/', 'gap', [], 1),
+          m('https://gap/q/{}', 'https://gap/{}/{}', 'gap', ['q'], -1),
+        ],
+        ['gap'],
+      ),
     ],
   ],
 
@@ -339,9 +583,9 @@ const cases: readonly Case[] = [
       state([ladder]),
       result(
         [
-          m('https://l/q/w', 'ladder', ['q', 'w'], 1),
-          m('https://l/q', 'ladder', ['q'], 2),
-          m('https://l/', 'ladder', [], 3),
+          m('https://l/q/w', 'https://l/{}/{}', 'ladder', ['q', 'w'], 1),
+          m('https://l/q', 'https://l/{}', 'ladder', ['q'], 2),
+          m('https://l/', 'https://l/', 'ladder', [], 3),
         ],
         ['ladder'],
       ),
@@ -354,9 +598,9 @@ const cases: readonly Case[] = [
       state([neg]),
       result(
         [
-          m('https://n/{}', 'neg', [], -1),
-          m('https://n/{}/{}', 'neg', [], -2),
-          m('https://n/{}/{}/{}', 'neg', [], -3),
+          m('https://n/{}', 'https://n/{}', 'neg', [], -1),
+          m('https://n/{}/{}', 'https://n/{}/{}', 'neg', [], -2),
+          m('https://n/{}/{}/{}', 'https://n/{}/{}/{}', 'neg', [], -3),
         ],
         ['neg'],
       ),
@@ -379,7 +623,10 @@ const cases: readonly Case[] = [
         [['shared'], 'https://hi/{}'],
       ]),
       result(
-        [m('https://hi/{}', 'shared', [], -1), m('https://lo/{}', 'ashared', [], -1)],
+        [
+          m('https://hi/{}', 'https://hi/{}', 'shared', [], -1),
+          m('https://lo/{}', 'https://lo/{}', 'ashared', [], -1),
+        ],
         ['shared'],
       ),
     ],
@@ -397,7 +644,13 @@ const cases: readonly Case[] = [
         [['bbb'], 'https://b1/{}'],
         [['aaa'], 'https://a2/{}'],
       ]),
-      result([m('https://b1/{}', 'bbb', [], -1, []), m('https://a2/{}', 'aaa', [], -1, [])], []),
+      result(
+        [
+          m('https://b1/{}', 'https://b1/{}', 'bbb', [], -1, []),
+          m('https://a2/{}', 'https://a2/{}', 'aaa', [], -1, []),
+        ],
+        [],
+      ),
     ],
   ],
   [
@@ -417,9 +670,9 @@ const cases: readonly Case[] = [
       ]),
       result(
         [
-          m('https://a/', 'shared', [], 1),
-          m('https://a/q/{}', 'shared', ['q'], -1),
-          m('https://b/q', 'ashared', ['q'], 0),
+          m('https://a/', 'https://a/', 'shared', [], 1),
+          m('https://a/q/{}', 'https://a/{}/{}', 'shared', ['q'], -1),
+          m('https://b/q', 'https://b/{}', 'ashared', ['q'], 0),
         ],
         ['shared'],
       ),
@@ -430,6 +683,31 @@ const cases: readonly Case[] = [
 describe('.$ (dsl.md §4.4, §5)', () => {
   it.each(cases)('%s', (_name, program, stack) => {
     expect(run(program)).toEqual(stack);
+  });
+});
+
+// dsl.md §5 — filling the template's `{}` left to right with the applied arguments, an unfilled
+// slot keeping its placeholder. This is the walk a presentation layer performs to show which slot
+// each argument filled, so it must reproduce the destination the core rendered.
+const fillSlots = (template: string, args: readonly string[]): string => {
+  const pieces = template.split('{}');
+  let out = pieces[0] ?? '';
+  for (let i = 1; i < pieces.length; i++) {
+    out += (args[i - 1] ?? '{}') + pieces[i];
+  }
+  return out;
+};
+
+describe('.$ — the template travels with its rendering (dsl.md §5)', () => {
+  it.each(cases)('%s: template filled slot by slot equals the destination', (_name, program) => {
+    const stack = run(program);
+    const top = stack[stack.length - 1];
+    if (top?.[0] !== 'R') {
+      expect.fail(`expected an R on top, got ${JSON.stringify(top)}`);
+    }
+    for (const [destination, template, , args] of top[1].matches) {
+      expect(fillSlots(template, args)).toBe(destination);
+    }
   });
 });
 

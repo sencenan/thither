@@ -70,6 +70,7 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/{}',
+              'https://github.com/company/{}',
               'company git',
               [],
               { argDelta: -1, positions: [], score: 0 },
@@ -96,6 +97,7 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/MyRepo',
+              'https://github.com/company/{}',
               'company git',
               ['MyRepo'],
               expect.objectContaining({ argDelta: 0 }),
@@ -128,12 +130,14 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/thither',
+              'https://github.com/company/{}',
               'company git',
               ['thither'],
               expect.objectContaining({ argDelta: 0 }),
             ],
             [
               'https://github.com/personal/thither/tree/{}',
+              'https://github.com/personal/{}/tree/{}',
               'git personal',
               ['thither'],
               expect.objectContaining({ argDelta: -1 }),
@@ -174,7 +178,13 @@ describe('dsl.md §7 worked programs', () => {
         'R',
         {
           matches: [
-            ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 0 })],
+            [
+              'https://jira.example.com',
+              'https://jira.example.com',
+              'jira',
+              [],
+              expect.objectContaining({ argDelta: 0 }),
+            ],
           ],
           inputs: ['jira'],
         },
@@ -188,6 +198,7 @@ describe('dsl.md §7 worked programs', () => {
         matches: [
           [
             'https://jira.example.com/browse/PROJ',
+            'https://jira.example.com/browse/{}',
             'jira',
             ['PROJ'],
             expect.objectContaining({ argDelta: 0 }),
@@ -204,11 +215,18 @@ describe('dsl.md §7 worked programs', () => {
         matches: [
           [
             'https://jira.example.com/browse/PROJ',
+            'https://jira.example.com/browse/{}',
             'jira',
             ['PROJ'],
             expect.objectContaining({ argDelta: 1 }),
           ],
-          ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 2 })],
+          [
+            'https://jira.example.com',
+            'https://jira.example.com',
+            'jira',
+            [],
+            expect.objectContaining({ argDelta: 2 }),
+          ],
         ],
         inputs: ['jira'],
       },
@@ -223,7 +241,13 @@ describe('dsl.md §7 worked programs', () => {
       'R',
       {
         matches: [
-          ['https://jira.example.com', 'jira', [], expect.objectContaining({ argDelta: 1 })],
+          [
+            'https://jira.example.com',
+            'https://jira.example.com',
+            'jira',
+            [],
+            expect.objectContaining({ argDelta: 1 }),
+          ],
         ],
         inputs: ['jira'],
       },
@@ -251,11 +275,18 @@ describe('dsl.md §7 worked programs', () => {
           matches: [
             [
               'https://github.com/company/{}',
+              'https://github.com/company/{}',
               'company git',
               [],
               { argDelta: -1, positions: [], score: 0 },
             ],
-            ['https://docs.example.com/', 'docs', [], { argDelta: 0, positions: [], score: 0 }],
+            [
+              'https://docs.example.com/',
+              'https://docs.example.com/',
+              'docs',
+              [],
+              { argDelta: 0, positions: [], score: 0 },
+            ],
           ],
           inputs: [],
         },
@@ -273,7 +304,15 @@ describe('dsl.md §7 worked programs', () => {
     expect(stack[1]).toEqual([
       'R',
       expect.objectContaining({
-        matches: [['https://github.com/', 'git', [], expect.objectContaining({ argDelta: 0 })]],
+        matches: [
+          [
+            'https://github.com/',
+            'https://github.com/',
+            'git',
+            [],
+            expect.objectContaining({ argDelta: 0 }),
+          ],
+        ],
         inputs: ['git'],
       }),
     ]);

@@ -34,6 +34,7 @@ const fakeStorage = (
 
 const match = (argDelta: number): Match => [
   'https://example.com/',
+  'https://example.com/',
   'home',
   [],
   { argDelta, positions: [], score: 1 },
@@ -164,7 +165,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
     const terminal = register.terminal;
     if (terminal?.[0] === 'R') {
       expect(terminal[1].matches).toHaveLength(1);
-      expect(terminal[1].matches[0]?.[3].argDelta).toBe(-1);
+      expect(terminal[1].matches[0]?.[4].argDelta).toBe(-1);
     } else {
       expect.fail('expected an R');
     }

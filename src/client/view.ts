@@ -20,7 +20,7 @@ export const renderView = (root: Element, register: OutputRegister): void => {
       nodes.push(empty);
     } else {
       const list = doc.createElement('ul');
-      for (const [destination, key] of matches) {
+      for (const [destination, , key] of matches) {
         const item = doc.createElement('li');
         const link = doc.createElement('a');
         link.href = destination;
