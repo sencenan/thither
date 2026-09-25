@@ -109,6 +109,24 @@ describe('browser env host operations', () => {
     expect(record(storage)).toEqual({ not: 'a stack record' });
   });
 
+  it('flags a pre-variants record: the old target-set shape no longer validates (ADR 0008)', () => {
+    // ADR 0008 changed the persisted shape (targets: array -> keyed object) with no migration; an
+    // existing record parses to parse_error and is reset by hand rather than silently converted.
+    const oldShape = JSON.stringify([
+      [['S', { targets: [[['home'], 'https://example.com/']], focus: [] }]],
+    ]);
+    const storage = fakeStorage({ [STACKS_KEY]: oldShape });
+    const { register } = runClient(storage, ['home']);
+
+    expect(register.loaded).toBe(false);
+    expect(register.terminal?.[0]).toBe('E');
+    if (register.terminal?.[0] === 'E') {
+      expect(register.terminal[1].type).toBe('parse_error');
+    }
+    // The bad record is left untouched for the human to reset.
+    expect(record(storage)).toEqual(JSON.parse(oldShape));
+  });
+
   it('flags a record whose current value fails validation', () => {
     const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[['S', { bad: true }]]]) });
     const { register } = runClient(storage, []);

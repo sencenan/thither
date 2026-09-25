@@ -11,15 +11,16 @@ import {
   SEP,
   SEP_ESCAPE,
   type Separator,
-  type Target,
+  type Template,
   type ThitherError,
   type Token,
 } from './types.ts';
 import {
+  arityOf,
   isOperatorOnly,
   isOperatorTerm,
   isTemplate,
-  normalizeDimensions,
+  keyOf,
   thitherError,
 } from './utils.ts';
 
@@ -76,26 +77,46 @@ export const parse = (env: InterpreterEnv, raw: unknown): Token => {
 };
 
 const parseState = (raw: unknown): Token => {
-  if (isRecord(raw)) {
-    const { targets, focus } = raw;
-
-    if (Array.isArray(targets) && isStoredDimList(focus) && targets.every(isTarget)) {
-      const normalized = targets.map(normalizeTarget);
-
-      const dimSet = new Set<string>();
-      for (const [dims] of normalized) {
-        const key = dims.join(' ');
-        if (dimSet.has(key)) {
-          return createParseError('duplicated targets in State');
-        }
-        dimSet.add(key);
-      }
-
-      return ['S', { targets: normalized, focus: normalizeDimensions(focus) }];
-    }
+  if (!isRecord(raw)) {
+    return createParseError('malformed State');
   }
 
-  return createParseError('malformed State');
+  const { targets, focus } = raw;
+  if (!isRecord(targets) || !isFocusList(focus)) {
+    return createParseError('malformed State');
+  }
+
+  // §2/§3 — re-normalize each supplied key from its dimensions; duplicates after normalization,
+  // an empty key, or a key carrying operator syntax make the state invalid. Variants are validated
+  // as destinations, must not share an arity, and are stored in arity-ascending order.
+  const normalized: Record<string, readonly Template[]> = {};
+  for (const [rawKey, variants] of Object.entries(targets)) {
+    const dims = rawKey.split(/\s+/).filter((dim) => dim.length > 0);
+    if (dims.length === 0 || dims.some(isOperatorTerm)) {
+      return createParseError('invalid target key');
+    }
+
+    if (
+      !Array.isArray(variants) ||
+      variants.length === 0 ||
+      !variants.every((variant) => typeof variant === 'string' && isTemplate(variant.trim()))
+    ) {
+      return createParseError('malformed target variants');
+    }
+
+    const arities = variants.map(arityOf);
+    if (new Set(arities).size !== arities.length) {
+      return createParseError('two variants of one target share an arity');
+    }
+
+    const key = keyOf(dims);
+    if (key in normalized) {
+      return createParseError('duplicated targets in State');
+    }
+    normalized[key] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
+  }
+
+  return ['S', { targets: normalized, focus: [...focus] }];
 };
 
 const parseResult = (raw: unknown): Result | ThitherError => {
@@ -106,7 +127,7 @@ const parseResult = (raw: unknown): Result | ThitherError => {
       return [
         'R',
         {
-          matches: matches.map(([dest, dims, args, hint]) => [dest, dims, args, hint]),
+          matches: matches.map(([dest, key, args, hint]) => [dest, key, args, hint]),
           inputs,
         },
       ];
@@ -136,13 +157,13 @@ const createParseError = (description: string): ThitherError =>
   thitherError('parse_error', description);
 
 const isMatch = (value: readonly unknown[]): value is Match => {
-  const [dest, dims, args, hint, ...rest] = value;
+  const [dest, key, args, hint, ...rest] = value;
 
   return (
     rest.length === 0 &&
     typeof dest === 'string' &&
     isTemplate(dest) &&
-    isDimList(dims) &&
+    typeof key === 'string' &&
     isDimList(args) &&
     isHint(hint)
   );
@@ -158,21 +179,21 @@ const isHint = (value: unknown): value is Hint => {
   );
 };
 
-const isTarget = (value: readonly unknown[]): value is Target => {
-  const [dims, dest, ...rest] = value;
-
+// dsl.md §3 — focus is stored verbatim, but each term must still be a valid single literal:
+// non-empty, whitespace-free, and not operator-only. Operators are legal (focus is a search
+// prefix), so unlike a target key the operator syntax itself is not rejected here.
+const isFocusList = (value: unknown): value is Dim[] => {
   return (
-    rest.length === 0 &&
-    isStoredDimList(dims) &&
-    typeof dest === 'string' &&
-    isTemplate(dest.trim())
+    Array.isArray(value) &&
+    value.every(
+      (term) =>
+        typeof term === 'string' &&
+        term.length > 0 &&
+        !/\s/.test(term) &&
+        term !== SEP &&
+        !isOperatorOnly(term),
+    )
   );
-};
-
-// dsl.md §3 — a stored dimension (target or focus) is plain text: fzf operator syntax is
-// query-only, so a supplied S carrying `!git` or `|` as a dimension is malformed.
-const isStoredDimList = (value: unknown): value is Dim[] => {
-  return isDimList(value) && !value.some(isOperatorTerm);
 };
 
 const isStringArray = (value: unknown): value is string[] => {
@@ -202,11 +223,4 @@ const isOp = (value: string): value is Op => {
 
 const isErrorType = (value: unknown): value is ErrorType => {
   return ErrorTypes.some((it) => it === value);
-};
-
-// normalizers
-
-const normalizeTarget = (target: Target): Target => {
-  const [dims, dest] = target;
-  return [normalizeDimensions(dims), dest];
 };

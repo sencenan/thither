@@ -1,11 +1,11 @@
-// dsl.md §4.1 — .set: insert or update a target
+// dsl.md §4.1 — .set: insert or update a target by exact key
 
-import { searchTargets } from '../selector.ts';
-import type { OpFn, State } from '../types.ts';
+import type { OpFn, State, Template } from '../types.ts';
 import {
+  arityOf,
   isOperatorTerm,
   isTemplate,
-  normalizeDimensions,
+  keyOf,
   push,
   resolveEscape,
   splitAtSeparator,
@@ -42,7 +42,7 @@ export const set: OpFn = (_interp, stack) => {
     return push(stack, thitherError('missing_operand', 'no explicit dimension'));
   }
 
-  // §4.1 — what .set matches on is what it stores, so fzf operator syntax cannot be a dimension.
+  // §4.1 — what .set stores is a key, and a key is plain text, so operator syntax is refused.
   const operator = explicit.find(isOperatorTerm);
   if (operator !== undefined) {
     return push(
@@ -51,31 +51,25 @@ export const set: OpFn = (_interp, stack) => {
     );
   }
 
-  // .set matches on the *normalized* combined dimensions, exactly the set it would store: under
-  // fzf's smart-case a raw `Git` would be case-sensitive, miss the stored `git`, and insert a
-  // duplicate dimension set. Lowercase-on-lowercase always finds an identical existing target.
+  // §4.1 — exact key lookup, no search, no focus. A missing key inserts; an existing key gains
+  // or replaces the variant of the destination's arity, keeping its position and other variants.
   const { targets, focus } = state[1];
-  const query = normalizeDimensions([...focus, ...explicit]);
-  const matched = searchTargets(targets, query).map((selection) => selection.target);
+  const key = keyOf(explicit);
+  const existing = targets[key];
+  const variants = existing === undefined ? [dest] : upsertVariant(existing, dest);
 
-  if (matched.length > 1) {
-    return push(
-      stack,
-      thitherError('ambiguous_set', `${query.join(' ')} matches more than one target`),
-    );
-  }
-
-  const nextState: State = [
-    'S',
-    {
-      targets:
-        matched.length === 0
-          ? [...targets, [query, dest]]
-          : targets.map((target) => (target === matched[0] ? [target[0], dest] : target)),
-      focus,
-    },
-  ];
+  const nextTargets: Record<string, readonly Template[]> = { ...targets, [key]: variants };
 
   stack.pop();
+  const nextState: State = ['S', { targets: nextTargets, focus }];
   return push(stack, nextState);
+};
+
+// §4.1 — a variant is addressed by arity: replace the same-arity variant when present, otherwise
+// add it, keeping the list in arity-ascending order.
+const upsertVariant = (variants: readonly Template[], dest: Template): Template[] => {
+  const arity = arityOf(dest);
+  return [...variants.filter((variant) => arityOf(variant) !== arity), dest].sort(
+    (a, b) => arityOf(a) - arityOf(b),
+  );
 };

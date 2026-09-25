@@ -39,12 +39,12 @@ const wireSession = (storage: StorageArea, locks?: LockRunner) => {
 
 // A record whose current stack holds one complete, single-match target.
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: [[['home'], 'https://example.com/']], focus: [] }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
 ]);
 
 const match = (argDelta: number): Match => [
   'https://example.com/',
-  ['home'],
+  'home',
   [],
   { argDelta, positions: [], score: 1 },
 ];

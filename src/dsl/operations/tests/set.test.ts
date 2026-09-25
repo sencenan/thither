@@ -1,7 +1,7 @@
-// dsl.md §4.1 — .set: insert or update a target
+// dsl.md §4.1 — .set: insert or update a target by exact key
 
 import { describe, expect, it } from 'vitest';
-import type { Stack, Target } from '../../types.ts';
+import type { Stack } from '../../types.ts';
 import { set } from '../set.ts';
 import {
   type Case,
@@ -12,12 +12,19 @@ import {
   personalGit,
   runWith,
   state,
+  type TargetSpec,
   testInterp,
   three,
 } from './harness.ts';
 
 const run = runWith({ '.set': set });
-const companyGitLab: Target = [['company', 'git'], 'https://gitlab.com/company/{}'];
+const companyGitLab: TargetSpec = [['company', 'git'], 'https://gitlab.com/company/{}'];
+const jira0: TargetSpec = [['jira'], 'https://jira.example.com'];
+const jira01: TargetSpec = [
+  ['jira'],
+  'https://jira.example.com',
+  'https://jira.example.com/browse/{}',
+];
 
 const cases: readonly Case[] = [
   // operand extraction
@@ -42,67 +49,65 @@ const cases: readonly Case[] = [
     [state([[['proto'], '{}://example.com']])],
   ],
 
-  // cardinality
+  // exact-key insert / replace
   [
-    '§4.1 zero matches appends a target to the end with normalized combined dimensions',
+    '§4.1 an unknown key appends a target to the end with the normalized combined dimensions',
     [state([companyDocs]), 'https://github.com/company/{}', 'GIT', 'Company', 'git', '.set'],
     [state([companyDocs, companyGit])],
   ],
   [
-    '§4.1 exactly one match replaces only that destination, keeping dimensions and position',
-    [state(three), 'https://gitlab.com/company/{}', 'comp', 'git', '.set'],
+    '§4.1 an existing key replaces only that arity, keeping the key and position',
+    [state(three), 'https://gitlab.com/company/{}', 'company', 'git', '.set'],
     [state([companyGitLab, companyDocs, personalGit])],
   ],
   [
-    '§4.1 fuzzy updating does not rename dimensions: comp git keeps [company, git]',
-    [state([companyGit]), 'https://gitlab.com/company/{}', 'comp', 'git', '.set'],
-    [state([companyGitLab])],
-  ],
-  [
-    '§4.1 more than one match is ambiguous_set and leaves the input state unchanged',
-    [state(three), 'https://gitlab.com/{}', 'git', '.set'],
-    [state(three), error('ambiguous_set')],
-  ],
-
-  // §4.1 fuzzy selection has no exact-match preference: a query that is a subset of an
-  // existing target's dimensions selects that target, so the subset can never be inserted
-  // beside it. Pinned here so the consequence is visible; changing it is a §4.1 amendment.
-  [
-    '§4.1 a subset query updates its superset target: company alone rewrites [company, git], no [company] target is inserted',
-    [state([companyGit]), 'https://company.com/', 'company', '.set'],
-    [state([[['company', 'git'], 'https://company.com/']])],
-  ],
-  [
-    '§4.1 a subset query with two superset targets is ambiguous_set: [company] cannot be created beside [company, git] and [company, docs]',
-    [state([companyGit, companyDocs]), 'https://company.com/', 'company', '.set'],
-    [state([companyGit, companyDocs]), error('ambiguous_set')],
-  ],
-
-  // focus joins the query
-  [
-    '§3 focus is prepended to the explicit dimensions when matching',
-    [state(three, ['company']), 'https://gitlab.com/company/{}', 'git', '.set'],
-    [state([companyGitLab, companyDocs, personalGit], ['company'])],
-  ],
-  [
-    '§4.1 an inserted target carries the combined focus and explicit dimensions',
-    [state([companyDocs], ['personal']), 'https://docs.me.com/{}', 'docs', '.set'],
-    [state([companyDocs, [['docs', 'personal'], 'https://docs.me.com/{}']], ['personal'])],
-  ],
-  [
-    '§3 query order is irrelevant: git company selects the same target as company git',
+    '§4.1 the key is normalized, so query order is irrelevant: git company hits company git',
     [state(three), 'https://gitlab.com/company/{}', 'git', 'company', '.set'],
     [state([companyGitLab, companyDocs, personalGit])],
   ],
   [
-    '§3 the query is one sorted pattern: comp git updates [company, git]',
-    [state([companyGit]), 'https://gitlab.com/company/{}', 'comp', 'git', '.set'],
-    [state([companyGitLab])],
+    '§4.1 Git normalizes to git and hits the same key rather than duplicating it',
+    [state([[['git'], 'https://a/']]), 'https://b/', 'Git', '.set'],
+    [state([[['git'], 'https://b/']])],
   ],
   [
-    '§3 matching is diacritic-insensitive: cafe matches café',
-    [state([[['café'], 'https://cafe.example/']]), 'https://cafe.example/menu', 'cafe', '.set'],
-    [state([[['café'], 'https://cafe.example/menu']])],
+    '§4.1 exact key, not fuzzy: comp git is a different key and inserts a new target',
+    [state([companyGit]), 'https://gitlab.com/company/{}', 'comp', 'git', '.set'],
+    [state([companyGit, [['comp', 'git'], 'https://gitlab.com/company/{}']])],
+  ],
+  [
+    '§4.1 a subset key is its own target: company beside company git, not a rewrite',
+    [state([companyGit]), 'https://company.com/', 'company', '.set'],
+    [state([companyGit, [['company'], 'https://company.com/']])],
+  ],
+
+  // variants keyed by arity
+  [
+    '§4.1 a second .set of a new arity adds a variant, kept in arity-ascending order',
+    [state([jira0]), 'https://jira.example.com/browse/{}', 'jira', '.set'],
+    [state([jira01])],
+  ],
+  [
+    '§4.1 setting a variant of an existing arity replaces just that variant',
+    [
+      state([[['jira'], 'https://jira.example.com', 'https://old/browse/{}']]),
+      'https://jira.example.com/browse/{}',
+      'jira',
+      '.set',
+    ],
+    [state([jira01])],
+  ],
+  [
+    '§4.1 jira and company jira are different targets even though a search selects both',
+    [state([[['company', 'jira'], 'https://x/']]), 'https://jira.example.com', 'jira', '.set'],
+    [state([[['company', 'jira'], 'https://x/'], jira0])],
+  ],
+
+  // focus plays no part
+  [
+    '§4.1 focus is not consulted: with focus [company], jira .set stores the key jira alone',
+    [state([], ['company']), 'https://jira.example.com', 'jira', '.set'],
+    [state([jira0], ['company'])],
   ],
 
   // missing_operand
@@ -132,7 +137,7 @@ const cases: readonly Case[] = [
     [error('missing_operand')],
   ],
 
-  // invalid_dimension — what .set stores must be plain dimensions, never fzf operator syntax
+  // invalid_dimension — what .set stores is a key, so fzf operator syntax is never a dimension
   [
     '§4.1 an explicit NOT term is invalid_dimension: !personal https://x/ .set stores nothing',
     [state(three), 'https://x/', '!personal', '.set'],
@@ -158,11 +163,6 @@ const cases: readonly Case[] = [
     [state([]), 'https://example.com/', 'home', '.', '!ignored', '.set'],
     [state([[['home'], 'https://example.com/']])],
   ],
-  [
-    '§4.1 .set matches on the normalized query, so Git https://x/ .set updates the stored git target rather than duplicating it',
-    [state([[['git'], 'https://a/']]), 'https://b/', 'Git', '.set'],
-    [state([[['git'], 'https://b/']])],
-  ],
 
   // invalid_destination
   [
@@ -184,8 +184,8 @@ const cases: readonly Case[] = [
   // state preservation
   [
     '§6 failure retains the nearest state: [S0, L0, S1, L1] .set -> [S0, L0, S1, E]',
-    [state([]), 'stray', state(three), 'https://gitlab.com/{}', 'git', '.set'],
-    [state([]), ['L', ['stray']], state(three), error('ambiguous_set')],
+    [state([]), 'stray', state(three), 'notaurl', 'git', '.set'],
+    [state([]), ['L', ['stray']], state(three), error('invalid_destination')],
   ],
   [
     '§1 on a sealed stack .set produces nothing that survives',

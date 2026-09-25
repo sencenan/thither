@@ -1,14 +1,7 @@
 // dsl.md §4.3 — .@: replace or clear focus
 
 import type { Dim, OpFn, State } from '../types.ts';
-import {
-  isOperatorTerm,
-  normalizeDimensions,
-  push,
-  resolveEscape,
-  splitAtSeparator,
-  thitherError,
-} from '../utils.ts';
+import { push, splitAtSeparator, thitherError } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.@ expects [.., S, L] or [.., S]');
 
@@ -30,22 +23,12 @@ export const at: OpFn = (_interp, stack) => {
     return push(stack, unexpectedStackError);
   }
 
+  // §4.3/§3 — focus is the matching portion exactly as accumulated: no normalization, escapes
+  // resolved only on use, and operators are legal because focus is only ever a search prefix.
   const [matching] = splitAtSeparator(ls[1]);
-  const explicit = matching.map(resolveEscape);
-
-  // §4.3 — focus is a stored dimension list, so fzf operator syntax has no place in it.
-  const operator = explicit.find(isOperatorTerm);
-  if (operator !== undefined) {
-    return push(
-      stack,
-      thitherError('invalid_dimension', `${operator} is search syntax, not a dimension`),
-    );
-  }
-
-  const focus = normalizeDimensions(explicit);
 
   stack.pop();
-  return push(stack, withFocus(state, focus));
+  return push(stack, withFocus(state, [...matching]));
 };
 
 const withFocus = (state: State, focus: readonly Dim[]): State => [

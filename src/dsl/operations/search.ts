@@ -10,9 +10,10 @@ import {
   type Result,
   SEP,
   type State,
-  type Target,
+  type TargetSet,
+  type Template,
 } from '../types.ts';
-import { push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts';
+import { arityOf, push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts';
 
 const missingOperand = thitherError('missing_operand', '.$ expects [.., S, L] or [.., S]');
 
@@ -51,9 +52,14 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
 
   // §3 — focus then the explicit terms, in typed order: the query is fzf's, operators and all.
   const query = [...focus, ...matching.map(resolveEscape)];
-  const matches = orderMatches(
-    searchTargets(targets, query).map((selection) => toMatch(selection, args)),
-  );
+
+  // §5 — each selected target becomes a contiguous group of variant rows; groups are ordered by
+  // score descending, ties falling to target-set order (a stable sort over the selection order).
+  const groups = searchTargets(targets, query).map((selection) => ({
+    score: selection.score,
+    rows: orderVariants(matchesFor(selection, args)),
+  }));
+  const matches = [...groups].sort((a, b) => b.score - a.score).flatMap((group) => group.rows);
 
   return ['R', { matches, inputs: matching }];
 };
@@ -68,7 +74,7 @@ interface Boundary {
 // dsl.md §4.4 — split L into matching inputs and arguments.
 const inferBoundary = (
   literals: readonly Literal[],
-  targets: readonly Target[],
+  targets: TargetSet,
   focus: readonly Dim[],
 ): Boundary => {
   // With a separator: the matching portion is matched in full, the suffix is arguments.
@@ -90,12 +96,25 @@ const inferBoundary = (
   return { matching: literals, args: [] };
 };
 
-// dsl.md §5 — render the template and record the argument balance for one selected target.
+// dsl.md §4.4 — for one selected target: its best fit (a variant whose arity equals the argument
+// count) yields exactly one match; without one, every variant yields a row (the fallback page).
+const matchesFor = (selection: Selection, args: readonly Literal[]): Match[] => {
+  const [key, variants] = selection.target;
+  const bestFit = variants.find((variant) => arityOf(variant) === args.length);
+  const chosen = bestFit !== undefined ? [bestFit] : variants;
+  return chosen.map((template) => toMatch(selection, key, template, args));
+};
+
+// dsl.md §5 — render the template and record the argument balance for one variant.
 // §2 — an escaped argument is *used* here, so one leading dot is removed before substitution;
 // `m.args` reports the same resolved spelling, while `R.inputs` keeps the accumulated form.
-const toMatch = (selection: Selection, args: readonly Literal[]): Match => {
-  const [dims, template] = selection.target;
-  const placeholders = template.split('{}').length - 1;
+const toMatch = (
+  selection: Selection,
+  key: string,
+  template: Template,
+  args: readonly Literal[],
+): Match => {
+  const placeholders = arityOf(template);
   const applied = args.slice(0, Math.min(args.length, placeholders)).map(resolveEscape);
 
   const hint: Hint = {
@@ -104,7 +123,7 @@ const toMatch = (selection: Selection, args: readonly Literal[]): Match => {
     score: selection.score,
   };
 
-  return [render(template, applied), dims, applied, hint];
+  return [render(template, applied), key, applied, hint];
 };
 
 // dsl.md §5 — fill {} left-to-right with literal argument text, never re-parsed as template.
@@ -117,25 +136,18 @@ const render = (template: string, applied: readonly Literal[]): string => {
   return out;
 };
 
-// dsl.md §5 — the one total order clients render top-to-bottom without sorting. The
-// input arrives in target-set order and Array.prototype.sort is stable, so ties on
-// every key below fall to target-set order without tracking indices.
-const orderMatches = (matches: readonly Match[]): Match[] =>
-  [...matches].sort((a, b) => {
-    const ah = a[3];
-    const bh = b[3];
-
-    const aNonneg = ah.argDelta >= 0 ? 0 : 1;
-    const bNonneg = bh.argDelta >= 0 ? 0 : 1;
-    if (aNonneg !== bNonneg) {
-      return aNonneg - bNonneg;
+// dsl.md §5 — within one target, order variant rows by argument balance: zero first (the best
+// fit is the only row), then positive ascending, then negative by magnitude ascending.
+const orderVariants = (rows: readonly Match[]): Match[] =>
+  [...rows].sort((a, b) => {
+    const da = a[3].argDelta;
+    const db = b[3].argDelta;
+    const ba = bucket(da);
+    const bb = bucket(db);
+    if (ba !== bb) {
+      return ba - bb;
     }
-
-    const aAbs = Math.abs(ah.argDelta);
-    const bAbs = Math.abs(bh.argDelta);
-    if (aAbs !== bAbs) {
-      return aAbs - bAbs;
-    }
-
-    return bh.score - ah.score;
+    return Math.abs(da) - Math.abs(db);
   });
+
+const bucket = (argDelta: number): number => (argDelta === 0 ? 0 : argDelta > 0 ? 1 : 2);

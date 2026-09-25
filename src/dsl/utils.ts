@@ -11,7 +11,7 @@ import {
   type ThitherError,
 } from './types.ts';
 
-export const emptyState = (): State => ['S', { targets: [], focus: [] }];
+export const emptyState = (): State => ['S', { targets: {}, focus: [] }];
 
 export const thitherError = (
   type: ErrorType,
@@ -65,6 +65,12 @@ export const isTemplate = (value: string): value is Template => {
 export const normalizeDimensions = (dims: readonly Dim[]): Dim[] => {
   return [...new Set(dims.map((it) => it.trim().toLowerCase()))].sort();
 };
+
+// dsl.md §3 — a target's key is its normalized dimensions joined with single spaces.
+export const keyOf = (dims: readonly Dim[]): string => normalizeDimensions(dims).join(' ');
+
+// dsl.md §1 — a variant's arity is its count of anonymous `{}` placeholders.
+export const arityOf = (template: Template): number => template.split('{}').length - 1;
 
 // dsl.md §2 — the first standalone separator divides the matching portion from the suffix
 export const splitAtSeparator = (

@@ -1,10 +1,10 @@
-// dsl.md §4.4, §5 — .$: boundary inference, rendering, and match ordering
+// dsl.md §4.4, §5 — .$: boundary inference, rendering, variant fan-out, and match ordering
 
 import { describe, expect, it } from 'vitest';
 import { createInterpreter } from '../../interpreter.ts';
-import type { OpFn, Program, Stack, Target } from '../../types.ts';
+import type { OpFn, Program, Stack } from '../../types.ts';
 import { search } from '../search.ts';
-import { companyDocs, companyGit, personalGit, state } from './harness.ts';
+import { companyDocs, companyGit, personalGit, state, type TargetSpec } from './harness.ts';
 
 // Binds the real `.$` and closes each program with it, as a host does (ADR 0007):
 // the interpreter appends nothing, so the terminal search must be explicit.
@@ -23,31 +23,32 @@ const hint = (argDelta: number, positions?: readonly number[]) =>
     ? expect.objectContaining({ argDelta })
     : expect.objectContaining({ argDelta, positions });
 
+// m carries the target's key (a string) in its second slot (dsl.md §1).
 const m = (
   dest: string,
-  dims: readonly string[],
+  key: string,
   args: readonly string[],
   argDelta: number,
   positions?: readonly number[],
-) => [dest, dims, args, hint(argDelta, positions)];
+) => [dest, key, args, hint(argDelta, positions)];
 
 const result = (matches: readonly unknown[], inputs: readonly string[]) => [
   'R',
   { matches, inputs },
 ];
 
-// rendering-table targets (one target per state, so ordering is trivial)
-const one = [['x'], 'https://example.com/{}'] as const;
-const two = [['x'], 'https://example.com/{}/tree/{}'] as const;
-const zero = [['x'], 'https://example.com/'] as const;
+// rendering-table targets (one target, one variant, so ordering is trivial)
+const one: TargetSpec = [['x'], 'https://example.com/{}'];
+const two: TargetSpec = [['x'], 'https://example.com/{}/tree/{}'];
+const zero: TargetSpec = [['x'], 'https://example.com/'];
 
-// ordering targets: all share `shared`, so `shared` selects every one
-const oA: Target = [['alpha', 'shared'], 'https://a/{}']; // P1
-const oB: Target = [['beta', 'shared'], 'https://b/{}/{}']; // P2
-const oC: Target = [['gamma', 'shared'], 'https://c/']; // P0
+// variant targets — one target, several arities
+const gap: TargetSpec = [['gap'], 'https://gap/', 'https://gap/{}/{}']; // arities {0, 2}
+const ladder: TargetSpec = [['ladder'], 'https://l/', 'https://l/{}', 'https://l/{}/{}']; // {0,1,2}
+const neg: TargetSpec = [['neg'], 'https://n/{}', 'https://n/{}/{}', 'https://n/{}/{}/{}']; // {1,2,3}
 
 // per-dimension matching target
-const apple: Target = [['apple', 'mango'], 'https://fruit.example/{}'];
+const apple: TargetSpec = [['apple', 'mango'], 'https://fruit.example/{}'];
 
 type Case = readonly [name: string, program: readonly unknown[], stack: readonly unknown[]];
 
@@ -59,7 +60,7 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [0, 1, 2, 3, 4, 5, 6])],
+        [m('https://github.com/company/{}', 'company git', [], -1, [0, 1, 2, 3, 4, 5, 6])],
         ['company'],
       ),
     ],
@@ -73,7 +74,7 @@ const cases: readonly Case[] = [
         [
           m(
             'https://github.com/company/{}',
-            ['company', 'git'],
+            'company git',
             [],
             -1,
             [0, 1, 2, 3, 4, 5, 6, 8, 9, 10], // the joining space (7) is never evidence
@@ -89,7 +90,7 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/thither', ['company', 'git'], ['thither'], 0)],
+        [m('https://github.com/company/thither', 'company git', ['thither'], 0)],
         ['company', 'git'],
       ),
     ],
@@ -103,21 +104,21 @@ const cases: readonly Case[] = [
   // §4.4 focus-only and select-all
   [
     '§4.4 [K, S] .$ searches on focus alone; inputs is empty',
-    [state([companyGit, [['git', 'personal'], 'https://github.com/me/{}']], ['company'])],
+    [state([companyGit, personalGit], ['company'])],
     [
-      state([companyGit, [['git', 'personal'], 'https://github.com/me/{}']], ['company']),
-      result([m('https://github.com/company/{}', ['company', 'git'], [], -1)], []),
+      state([companyGit, personalGit], ['company']),
+      result([m('https://github.com/company/{}', 'company git', [], -1)], []),
     ],
   ],
   [
-    '§7 an empty query selects every target with empty evidence; argument balance orders them',
+    '§7 an empty query selects every target; ties on score fall to target-set order',
     [state([companyGit, [['docs'], 'https://docs.example.com/']])],
     [
       state([companyGit, [['docs'], 'https://docs.example.com/']]),
       result(
         [
-          m('https://docs.example.com/', ['docs'], [], 0, []),
-          m('https://github.com/company/{}', ['company', 'git'], [], -1, []),
+          m('https://github.com/company/{}', 'company git', [], -1, []),
+          m('https://docs.example.com/', 'docs', [], 0, []),
         ],
         [],
       ),
@@ -131,17 +132,17 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/MyRepo', ['company', 'git'], ['MyRepo'], 0)],
+        [m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)],
         ['company', 'git'],
       ),
     ],
   ],
   [
-    '§3 smart-case: an uppercase term is case-sensitive and matches no lowercase dimension, so it is taken as an argument',
+    '§3 smart-case: an uppercase term is case-sensitive and matches no key, so it is taken as an argument',
     [state([companyGit]), 'company', 'Git'],
     [
       state([companyGit]),
-      result([m('https://github.com/company/Git', ['company', 'git'], ['Git'], 0)], ['company']),
+      result([m('https://github.com/company/Git', 'company git', ['Git'], 0)], ['company']),
     ],
   ],
 
@@ -153,9 +154,9 @@ const cases: readonly Case[] = [
       state([companyGit, companyDocs, personalGit]),
       result(
         [
-          m('https://docs.company.com/{}', ['company', 'docs'], [], -1), // docs outscores git (4 chars vs 3)
-          m('https://github.com/company/{}', ['company', 'git'], [], -1),
-          m('https://github.com/me/{}', ['git', 'personal'], [], -1),
+          m('https://docs.company.com/{}', 'company docs', [], -1), // docs outscores git (4 chars vs 3)
+          m('https://github.com/company/{}', 'company git', [], -1),
+          m('https://github.com/me/{}', 'git personal', [], -1),
         ],
         ['git', '|', 'docs'],
       ),
@@ -167,7 +168,7 @@ const cases: readonly Case[] = [
     [
       state([companyGit, companyDocs, personalGit]),
       result(
-        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [8, 9, 10])],
+        [m('https://github.com/company/{}', 'company git', [], -1, [8, 9, 10])],
         ['git', '!personal'],
       ),
     ],
@@ -178,28 +179,25 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [1, 2, 3, 4, 5, 6])],
+        [m('https://github.com/company/{}', 'company git', [], -1, [1, 2, 3, 4, 5, 6])],
         ["'ompany"],
       ),
     ],
   ],
   [
-    '§3 prefix anchor: ^git selects only the target whose searchable string starts with git',
+    '§3 prefix anchor: ^git selects only the target whose key starts with git',
     [state([companyGit, personalGit]), '^git', '.'],
     [
       state([companyGit, personalGit]),
-      result([m('https://github.com/me/{}', ['git', 'personal'], [], -1, [0, 1, 2])], ['^git']),
+      result([m('https://github.com/me/{}', 'git personal', [], -1, [0, 1, 2])], ['^git']),
     ],
   ],
   [
-    '§3 suffix anchor: git$ selects only the target whose searchable string ends with git',
+    '§3 suffix anchor: git$ selects only the target whose key ends with git',
     [state([companyGit, personalGit]), 'git$', '.'],
     [
       state([companyGit, personalGit]),
-      result(
-        [m('https://github.com/company/{}', ['company', 'git'], [], -1, [8, 9, 10])],
-        ['git$'],
-      ),
+      result([m('https://github.com/company/{}', 'company git', [], -1, [8, 9, 10])], ['git$']),
     ],
   ],
   [
@@ -208,7 +206,7 @@ const cases: readonly Case[] = [
     [
       state([companyGit, personalGit]),
       result(
-        [m('https://github.com/company/MyRepo', ['company', 'git'], ['MyRepo'], 0)],
+        [m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)],
         ['git', '!personal'],
       ),
     ],
@@ -220,25 +218,22 @@ const cases: readonly Case[] = [
       state([companyGit, companyDocs, personalGit], ['company']),
       result(
         [
-          m('https://docs.company.com/{}', ['company', 'docs'], [], -1),
-          m('https://github.com/company/{}', ['company', 'git'], [], -1),
+          m('https://docs.company.com/{}', 'company docs', [], -1),
+          m('https://github.com/company/{}', 'company git', [], -1),
         ],
         ['git', '|', 'docs'],
       ),
     ],
   ],
 
-  // §3 each query dimension is matched independently (fzf extended search): every dimension must
-  // match, in any order, so how an abbreviation sorts never affects selection.
+  // §3 each query term is matched independently (fzf extended search): every term must match, in
+  // any order, so how an abbreviation sorts never affects selection.
   [
-    '§3 each query dimension matches independently: m ppl selects [apple, mango] with no argument',
+    '§3 each query term matches independently: m ppl selects apple mango with no argument',
     [state([apple]), 'm', 'ppl'],
     [
       state([apple]),
-      result(
-        [m('https://fruit.example/{}', ['apple', 'mango'], [], -1, [1, 2, 3, 6])],
-        ['m', 'ppl'],
-      ),
+      result([m('https://fruit.example/{}', 'apple mango', [], -1, [1, 2, 3, 6])], ['m', 'ppl']),
     ],
   ],
 
@@ -249,7 +244,7 @@ const cases: readonly Case[] = [
     [
       state([companyGit]),
       result(
-        [m('https://github.com/company/.git', ['company', 'git'], ['.git'], 0)],
+        [m('https://github.com/company/.git', 'company git', ['.git'], 0)],
         ['company', 'git'],
       ),
     ],
@@ -257,17 +252,14 @@ const cases: readonly Case[] = [
   [
     '§2 an escaped separator argument renders as a single dot',
     [state([one]), 'x', '.', '..'],
-    [state([one]), result([m('https://example.com/.', ['x'], ['.'], 0)], ['x'])],
+    [state([one]), result([m('https://example.com/.', 'x', ['.'], 0)], ['x'])],
   ],
   [
     '§2 an escaped matching literal is resolved when matched but kept verbatim in inputs',
     [state([[['.git', 'hooks'], 'https://hooks.example/{}']]), '..git', 'pre-commit'],
     [
       state([[['.git', 'hooks'], 'https://hooks.example/{}']]),
-      result(
-        [m('https://hooks.example/pre-commit', ['.git', 'hooks'], ['pre-commit'], 0)],
-        ['..git'],
-      ),
+      result([m('https://hooks.example/pre-commit', '.git hooks', ['pre-commit'], 0)], ['..git']),
     ],
   ],
 
@@ -275,35 +267,32 @@ const cases: readonly Case[] = [
   [
     '§5 one placeholder, one argument: rendered exactly, argDelta 0',
     [state([one]), 'x', 'MyRepo'],
-    [state([one]), result([m('https://example.com/MyRepo', ['x'], ['MyRepo'], 0)], ['x'])],
+    [state([one]), result([m('https://example.com/MyRepo', 'x', ['MyRepo'], 0)], ['x'])],
   ],
   [
     '§5 an extra argument is ignored during substitution but counted in argDelta',
     [state([one]), 'x', 'thither', 'extra'],
-    [state([one]), result([m('https://example.com/thither', ['x'], ['thither'], 1)], ['x'])],
+    [state([one]), result([m('https://example.com/thither', 'x', ['thither'], 1)], ['x'])],
   ],
   [
     '§5 a slash in an argument produces a path segment, not new template syntax',
     [state([one]), 'x', 'a/b'],
-    [state([one]), result([m('https://example.com/a/b', ['x'], ['a/b'], 0)], ['x'])],
+    [state([one]), result([m('https://example.com/a/b', 'x', ['a/b'], 0)], ['x'])],
   ],
   [
     '§5 a missing argument leaves its placeholder intact in a later slot',
     [state([two]), 'x', 'thither'],
-    [
-      state([two]),
-      result([m('https://example.com/thither/tree/{}', ['x'], ['thither'], -1)], ['x']),
-    ],
+    [state([two]), result([m('https://example.com/thither/tree/{}', 'x', ['thither'], -1)], ['x'])],
   ],
   [
     '§5 no argument leaves the whole template intact with argDelta -1',
     [state([one]), 'x'],
-    [state([one]), result([m('https://example.com/{}', ['x'], [], -1)], ['x'])],
+    [state([one]), result([m('https://example.com/{}', 'x', [], -1)], ['x'])],
   ],
   [
     '§5 a zero-placeholder template ignores its argument, argDelta +1',
     [state([zero]), 'x', 'ignored'],
-    [state([zero]), result([m('https://example.com/', ['x'], [], 1)], ['x'])],
+    [state([zero]), result([m('https://example.com/', 'x', [], 1)], ['x'])],
   ],
 
   // §4.4 the separator: matching portion matched in full, suffix taken as arguments
@@ -313,7 +302,7 @@ const cases: readonly Case[] = [
     [
       state([[['lookup'], 'https://example.com/{}']]),
       result(
-        [m('https://example.com/https://example.com', ['lookup'], ['https://example.com'], 0)],
+        [m('https://example.com/https://example.com', 'lookup', ['https://example.com'], 0)],
         ['lookup'],
       ),
     ],
@@ -323,99 +312,116 @@ const cases: readonly Case[] = [
     [state([companyGit], ['company']), '.', 'MyRepo'],
     [
       state([companyGit], ['company']),
-      result([m('https://github.com/company/MyRepo', ['company', 'git'], ['MyRepo'], 0)], []),
+      result([m('https://github.com/company/MyRepo', 'company git', ['MyRepo'], 0)], []),
     ],
   ],
 
-  // §5 match ordering — each key isolated
+  // §4.4 best fit vs one-per-variant, within one target
   [
-    '§5 nonnegative argDelta leads, negative trails (one argument over the shared targets)',
-    [state([oA, oB, oC]), 'shared', 'q'],
+    '§4.4 a best fit yields exactly one match: ladder with one argument uses the arity-1 variant',
+    [state([ladder]), 'ladder', '.', 'q'],
+    [state([ladder]), result([m('https://l/q', 'ladder', ['q'], 0)], ['ladder'])],
+  ],
+  [
+    '§4.4 no best fit fans out one row per variant: gap with one argument lists both',
+    [state([gap]), 'gap', '.', 'q'],
     [
-      state([oA, oB, oC]),
+      state([gap]),
+      result([m('https://gap/', 'gap', [], 1), m('https://gap/q/{}', 'gap', ['q'], -1)], ['gap']),
+    ],
+  ],
+
+  // §5 variant ordering within a target
+  [
+    '§5 within a target, the nonnegative group ascends by |argDelta|: +1 before +2 before +3',
+    [state([ladder]), 'ladder', '.', 'q', 'w', 'z'],
+    [
+      state([ladder]),
       result(
         [
-          m('https://a/q', ['alpha', 'shared'], ['q'], 0),
-          m('https://c/', ['gamma', 'shared'], [], 1),
-          m('https://b/q/{}', ['beta', 'shared'], ['q'], -1),
+          m('https://l/q/w', 'ladder', ['q', 'w'], 1),
+          m('https://l/q', 'ladder', ['q'], 2),
+          m('https://l/', 'ladder', [], 3),
         ],
-        ['shared'],
+        ['ladder'],
       ),
     ],
   ],
   [
-    '§5 within the nonnegative group |argDelta| ascends: 0, then +1, then +2',
-    [state([oA, oB, oC]), 'shared', 'q', 'w'],
+    '§5 within a target, the negative group ascends by |argDelta|: -1 before -2 before -3',
+    [state([neg]), 'neg'],
     [
-      state([oA, oB, oC]),
+      state([neg]),
       result(
         [
-          m('https://b/q/w', ['beta', 'shared'], ['q', 'w'], 0),
-          m('https://a/q', ['alpha', 'shared'], ['q'], 1),
-          m('https://c/', ['gamma', 'shared'], [], 2),
+          m('https://n/{}', 'neg', [], -1),
+          m('https://n/{}/{}', 'neg', [], -2),
+          m('https://n/{}/{}/{}', 'neg', [], -3),
         ],
-        ['shared'],
+        ['neg'],
       ),
     ],
   ],
+
+  // §5 match ordering across targets
   [
-    '§5 a weakly-scored +1 still precedes a strongly-scored +2, against target-set order',
+    '§5 targets are ordered by score descending, overriding target-set order',
     [
       state([
-        [['shared'], 'https://p2/'],
-        [['ashared'], 'https://p1/{}'],
+        [['ashared'], 'https://lo/{}'],
+        [['shared'], 'https://hi/{}'],
+      ]),
+      'shared',
+    ],
+    [
+      state([
+        [['ashared'], 'https://lo/{}'],
+        [['shared'], 'https://hi/{}'],
+      ]),
+      result(
+        [m('https://hi/{}', 'shared', [], -1), m('https://lo/{}', 'ashared', [], -1)],
+        ['shared'],
+      ),
+    ],
+  ],
+  [
+    '§5 equal score falls to target-set order, not key order',
+    [
+      state([
+        [['bbb'], 'https://b1/{}'],
+        [['aaa'], 'https://a2/{}'],
+      ]),
+    ],
+    [
+      state([
+        [['bbb'], 'https://b1/{}'],
+        [['aaa'], 'https://a2/{}'],
+      ]),
+      result([m('https://b1/{}', 'bbb', [], -1, []), m('https://a2/{}', 'aaa', [], -1, [])], []),
+    ],
+  ],
+  [
+    '§5 a multi-variant target keeps its rows contiguous while ordered among other targets by score',
+    [
+      state([
+        [['shared'], 'https://a/', 'https://a/{}/{}'],
+        [['ashared'], 'https://b/{}'],
       ]),
       'shared',
       'q',
-      'w',
     ],
     [
       state([
-        [['shared'], 'https://p2/'],
-        [['ashared'], 'https://p1/{}'],
+        [['shared'], 'https://a/', 'https://a/{}/{}'],
+        [['ashared'], 'https://b/{}'],
       ]),
       result(
-        [m('https://p1/q', ['ashared'], ['q'], 1), m('https://p2/', ['shared'], [], 2)],
+        [
+          m('https://a/', 'shared', [], 1),
+          m('https://a/q/{}', 'shared', ['q'], -1),
+          m('https://b/q', 'ashared', ['q'], 0),
+        ],
         ['shared'],
-      ),
-    ],
-  ],
-  [
-    '§5 equal argDelta falls to score descending, overriding target-set order',
-    [
-      state([
-        [['ashared'], 'https://lo/{}'],
-        [['shared'], 'https://hi/{}'],
-      ]),
-      'shared',
-    ],
-    [
-      state([
-        [['ashared'], 'https://lo/{}'],
-        [['shared'], 'https://hi/{}'],
-      ]),
-      result(
-        [m('https://hi/{}', ['shared'], [], -1), m('https://lo/{}', ['ashared'], [], -1)],
-        ['shared'],
-      ),
-    ],
-  ],
-  [
-    '§5 tied score and argDelta fall to target-set order, not dimension order',
-    [
-      state([
-        [['bbb'], 'https://b1/{}'],
-        [['aaa'], 'https://a2/{}'],
-      ]),
-    ],
-    [
-      state([
-        [['bbb'], 'https://b1/{}'],
-        [['aaa'], 'https://a2/{}'],
-      ]),
-      result(
-        [m('https://b1/{}', ['bbb'], [], -1, []), m('https://a2/{}', ['aaa'], [], -1, [])],
-        [],
       ),
     ],
   ],

@@ -13,7 +13,7 @@ export type {
   Stack,
   StackValue,
   State,
-  Target,
+  TargetSet,
   Template,
   ThitherError,
 } from './types.ts';

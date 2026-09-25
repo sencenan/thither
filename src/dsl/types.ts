@@ -12,7 +12,12 @@ export type Op = string;
 // composite values
 
 export type Literal = Dim | Separator;
-export type Target = readonly [dims: readonly Dim[], destination: Template];
+
+// dsl.md §1 — a target is its key paired with its variants: destination templates of pairwise
+// distinct arity, kept in arity-ascending order. A `TargetSet` is keyed by that key, so
+// equivalent dimension sets collapse to one entry, and iteration order is target-set order.
+export type Target = readonly [key: string, variants: readonly Template[]];
+export type TargetSet = { readonly [key: string]: readonly Template[] };
 
 export interface Hint {
   readonly argDelta: number;
@@ -20,12 +25,7 @@ export interface Hint {
   readonly score: number;
 }
 
-export type Match = readonly [
-  destination: Template,
-  dims: readonly Dim[],
-  args: readonly Dim[],
-  hint: Hint,
-];
+export type Match = readonly [destination: Template, key: string, args: readonly Dim[], hint: Hint];
 
 export const ErrorTypes = [
   'parse_error',
@@ -33,7 +33,6 @@ export const ErrorTypes = [
   'invalid_dimension',
   'missing_operand',
   'missing_operation',
-  'ambiguous_set',
   'unknown_error',
 ] as const;
 export type ErrorType = (typeof ErrorTypes)[number];
@@ -41,7 +40,7 @@ export type ErrorType = (typeof ErrorTypes)[number];
 // top level parsed types
 
 export type LiteralArray = ['L', Literal[]];
-export type State = readonly ['S', { readonly targets: Target[]; readonly focus: readonly Dim[] }];
+export type State = readonly ['S', { readonly targets: TargetSet; readonly focus: readonly Dim[] }];
 
 export type Result = readonly [
   'R',
