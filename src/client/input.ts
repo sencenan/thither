@@ -1,5 +1,6 @@
 // Reads program input from a URL, per browser-client.md "Reading input", and strips it again
-// once the fallback page is shown, so a reload does not re-execute a consumed mutation.
+// once the fallback page is shown, so a reload does not re-execute a consumed mutation. The
+// fallback page's text field is split by the same `tokenize`.
 //
 // Selection has explicit precedence, decided by *presence* of `q`, not its value:
 //   1. the query string's `q`  (an empty `?q=` still counts, and wins);
@@ -9,7 +10,8 @@
 // which decodes exactly once (`+` → space, `%2B` → literal plus). The first `q` of a
 // source is taken, and its value is split on whitespace into ordered tokens.
 
-const tokenize = (value: string): string[] => value.split(/\s+/).filter((token) => token !== '');
+export const tokenize = (value: string): readonly string[] =>
+  value.split(/\s+/).filter((token) => token !== '');
 
 // URL.hash carries a leading '#'; the rest is URLSearchParams-encoded parameter text.
 const fragmentParams = (hash: string): URLSearchParams =>

@@ -6,7 +6,7 @@ Status: agreed. Language semantics are defined in [dsl.md](dsl.md), and domain t
 
 Thither is a static web application containing a JavaScript browser client and a JavaScript-compatible language core. The supported entry point is the browser address or search bar through a configured search shortcut.
 
-This browser client is one possible client, not the only intended one. Decisions here bind this client; the language core stays client-agnostic and performs no persistence, rendering, or navigation. Browser targeting is capability-based: any browser supporting shortcut-based search is a valid target, with no brand allowlist. The platform floor is **Baseline 2024**: the core validates destinations with the static `URL.parse()` (Chrome 126, Firefox 126, Safari 18) and the client serializes on the Web Locks API, and neither is polyfilled.
+This browser client is one possible client, not the only intended one. Decisions here bind this client; the language core stays client-agnostic and performs no persistence, rendering, or navigation. Browser targeting is capability-based: any browser supporting shortcut-based search is a valid target, with no brand allowlist. The platform floor is **Baseline 2024**: the core validates destinations with the static `URL.parse()` (Chrome 126, Firefox 126, Safari 18), not polyfilled.
 
 localStorage is the sole source of persisted state, per [ADR 0001](adr/0001-localstorage-only-browser-client.md). This version has no command-line application, local-file adapter, remote state storage, authentication, sharing, or synchronization, and no server-side interpreter.
 
@@ -74,7 +74,7 @@ Every run is one program, **prologue + user tokens + epilogue**:
 
 1. Split the user's input on whitespace. Search-bar users are not expected to type structured state, so input tokens are never treated as JSON.
 2. Build the program: `['.load', ...tokens, '.$', '.out', '.save'].reduce(interp.pushToken, [])`.
-3. Execute it inside the Web Lock (below). `.load` supplies the world, `.$` searches, `.out` captures the terminal, `.save` persists — so the save necessarily precedes anything the client does next.
+3. Execute it. `.load` supplies the world, `.$` searches, `.out` captures the terminal, `.save` persists — so the save necessarily precedes anything the client does next.
 4. Read the register. For an `R` on initial URL-driven execution, navigate when the result holds exactly one match with a nonnegative argument balance (one selected target with a best fit, or with a single variant) **and `R.inputs` is non-empty** — the user typed a query ([ADR 0009](adr/0009-auto-navigate-on-a-non-empty-query.md)); otherwise show the fallback UI. There is no special case forcing a bare URL to the fallback UI, and no check on whether the run mutated state. For an `E`, display its `type` and `description` without interpreting the type value; when `loaded` is `false`, add that recovery happens through the Settings reset.
 
 `R.inputs` is the query the trailing `.$` consumed, so it decides every edge case without a second rule. `https://example.com/ a b .set a b` sets the target and navigates to it in one keystroke, because the program ends in a search. `https://example.com/ home .set` sets and then shows the fallback UI, because it does not. **An empty query never auto-navigates**: a blank open searches on focus alone and matches every target, so a one-target state would otherwise redirect and never be reachable — opening the launcher with no input always shows the page, keeping targets addable and Settings reachable. Focus is not part of `inputs`, so `home .@` and a blank open under stored focus show the page too. Automatic navigation uses `location.replace`, so the Thither page does not remain in history as a redirect loop behind the destination; links in the fallback UI are ordinary anchors.
@@ -85,7 +85,7 @@ Recoverable failures are `E` values in the language's existing vocabulary; unrec
 
 Execute the supplied program as-is. Do not add confirmation gates for `.set`, `.rm`, or `.@`, including when input arrives through a URL. This deliberately accepts that an externally supplied link can change state; history provides recovery, not authorization.
 
-Serialize the complete read → execute → save sequence across tabs using the Web Locks API. Because `.load` and `.save` run inside `execute`, and both `execute` and `localStorage` are synchronous, holding the lock around the single `interp.execute(program)` call encloses the whole sequence, and the read necessarily happens after the lock is acquired. When the API is unavailable, execute without the lock rather than blocking, accepting a small lost-update risk for a single-user, short-running operation.
+A run is synchronous end to end: `.load` and `.save` run inside `execute`, and both `execute` and `localStorage` are synchronous, so within one page nothing can interleave with the read → execute → save sequence, and two runs in the same page can never overlap. Runs are **not serialized across tabs**: two tabs executing at the same instant could lose one update. That is accepted for a single-user tool whose runs take microseconds — the Web Locks API was considered and dropped as complexity out of proportion to the risk.
 
 ## Persistence
 

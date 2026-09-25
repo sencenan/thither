@@ -5,7 +5,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { OutputRegister } from '../browser-env.ts';
-import { renderView } from '../view.ts';
+import { renderBareError, renderView } from '../view.ts';
 
 let root: HTMLElement;
 
@@ -85,6 +85,20 @@ describe('renderView', () => {
     renderView(root, register);
 
     expect(root.textContent).toContain('Settings reset');
+  });
+
+  it('renderBareError replaces the whole root with the failure message ("rendered as a bare error page")', () => {
+    renderView(root, { loaded: true, terminal: ['R', { matches: [], inputs: [] }] });
+    renderBareError(root, new Error('localStorage is unavailable'));
+
+    expect(root.textContent).toBe('localStorage is unavailable');
+    expect(root.querySelector('a')).toBeNull();
+  });
+
+  it('renderBareError shows a non-Error throw as text', () => {
+    renderBareError(root, 'gone');
+
+    expect(root.textContent).toBe('gone');
   });
 
   it('replaces prior content on each render', () => {

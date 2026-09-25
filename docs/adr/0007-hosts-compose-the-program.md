@@ -26,7 +26,7 @@ The client reads only the register afterwards; it never inspects the returned st
 ## Consequences
 
 - Malformed stored data is an `E` at the head of the program: the stack is sealed, the user's tokens are absorbed, and the client renders the error — `browser-client.md`'s "skip execution, render the error" costs no client code.
-- The Web Lock has nothing to coordinate inside the client: `OpFn` is synchronous, `localStorage` is synchronous, so `locks.request(name, () => interp.execute(program))` encloses read, execute, and save.
+- Nothing needs coordinating inside the client: `OpFn` is synchronous, `localStorage` is synchronous, so the single `interp.execute(program)` call encloses read, execute, and save. (A Web Lock around that call was specified for cross-tab serialization and later dropped as complexity out of proportion to the risk; see `browser-client.md` "Execution flow".)
 - Persistence is tested through the interpreter: `execute(['.load', ...])` against a `Map`-backed `localStorage` fake, in plain Node.
 - The settings actions are *not* programs. Revert and clear act on the stored record directly; import pushes the pasted values through the interpreter and writes whatever stack results as the last entry, unvalidated. (This ADR originally made reset and restore programs — `[...values, '.$', '.out', '.save']` with a `.$ .out` dry run; that design was built and dropped: a reset restores a stack, it does not search, and `.$` consumes a literal on top, so it could alter the stack being restored.)
 - Host operations are ordinary symbols, so a user can type `.load` or `.out` mid-program. The epilogue always runs last, so a stray host operation cannot corrupt the final write; the behaviour is documented, not defended against.
