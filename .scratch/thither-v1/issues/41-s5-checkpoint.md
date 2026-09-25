@@ -8,7 +8,7 @@ Blocked by: 37, 38, 39, 40
 
 Human review of the full fallback UI, running locally and on a fresh profile.
 
-Drive: open blank on an empty profile and follow the setup instructions to create the first target from the page itself; type queries and watch live execution re-render without navigating; confirm a mutation typed live persists and appears in Settings' history; read highlights against known targets; use `1`–`9`/`0` with focus in and out of the field, on navigable and non-navigable rows; open Settings and revert, clear, import (including a deliberately bad import that surfaces as `.load`'s `E`), and change the limit; confirm nothing on the page auto-navigates once shown.
+Drive: open blank on an empty profile and follow the setup instructions to create the first target from the page itself; type queries and watch live execution re-render without navigating; confirm a mutation typed live persists and appears in Settings' history; read highlights against known targets; use `Ctrl+1`–`Ctrl+9`/`Ctrl+0` with focus in and out of the field, on complete and incomplete rows (both open; note whether Ctrl+digit reaches the page at all on a non-macOS browser); open Settings (newest first, click a row to view its JSON) and revert, clear, import (including a deliberately bad import that surfaces as `.load`'s `E`), and change the limit; confirm nothing on the page auto-navigates once shown.
 
 Confirm `main.ts` is still the only composition root and the register is still the only thing the client reads.
 
