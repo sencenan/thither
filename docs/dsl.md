@@ -36,7 +36,7 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
 | `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
 | `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
-| `m` | Match | `[u_or_p, k, [args], hint]`, where `hint` carries at least `argDelta`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
+| `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
@@ -354,7 +354,9 @@ appliedArgs   = first min(A, P) supplied arguments
 
 Extra arguments are ignored during substitution; missing ones leave their placeholders intact. The `[args]` field in `m` contains the **applied** arguments only, but `argDelta` counts every supplied argument. An escaped argument is resolved on use (section 2): `..git` substitutes as `.git`, and `[args]` reports that resolved spelling, while `R.inputs` keeps the accumulated `..git`.
 
-Substitution is literal, not percent-encoding, and fills the original template; replacement text is argument content, not a new round of template syntax.
+Substitution is literal, not percent-encoding, and fills the original template; replacement text is argument content, not a new round of template syntax. An argument that is itself `{}` fills its slot and is never re-read as a placeholder.
+
+The variant's template travels with its rendering: `m` carries the template in its second slot beside the destination in its first. Filling the template's `{}` left to right with the applied arguments, an unfilled slot keeping its placeholder, reproduces the destination exactly, so a presentation layer can show which `{}` each argument filled and which stayed open by walking the template slot by slot, without searching the rendered destination for argument text (which is ambiguous when that text also occurs in the template).
 
 | Template | Supplied arguments | Rendered destination | `argDelta` | Applied arguments |
 | --- | --- | --- | --- | --- |
@@ -362,6 +364,7 @@ Substitution is literal, not percent-encoding, and fills the original template; 
 | `https://example.com/{}` | `thither extra` | `https://example.com/thither` | `1` | `[thither]` |
 | `https://example.com/{}` | `a/b` | `https://example.com/a/b` | `0` | `[a/b]` |
 | `https://example.com/{}/tree/{}` | `thither` | `https://example.com/thither/tree/{}` | `-1` | `[thither]` |
+| `https://example.com/{}/tree/{}` | `{} y` | `https://example.com/{}/tree/y` | `0` | `[{}, y]` |
 | `https://example.com/{}` | none | `https://example.com/{}` | `-1` | `[]` |
 | `https://example.com/` | `ignored` | `https://example.com/` | `1` | `[]` |
 
@@ -474,7 +477,8 @@ company git MyRepo .$
 ```json
 ["R", {
   "matches": [
-    ["https://github.com/company/MyRepo", "company git", ["MyRepo"], {"argDelta": 0}]
+    ["https://github.com/company/MyRepo", "https://github.com/company/{}", "company git",
+      ["MyRepo"], {"argDelta": 0}]
   ],
   "inputs": ["company", "git"]
 }]
@@ -514,7 +518,7 @@ The first `.set` creates `jira` with an arity-0 variant; the second adds an arit
 ```json
 ["R", {
   "matches": [
-    ["https://jira.example.com", "jira", [], {"argDelta": 0}]
+    ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 0}]
   ],
   "inputs": ["jira"]
 }]
@@ -525,8 +529,9 @@ Against the same resulting state, `jira PROJ .$` yields one match for `https://j
 ```json
 ["R", {
   "matches": [
-    ["https://jira.example.com/browse/PROJ", "jira", ["PROJ"], {"argDelta": 1}],
-    ["https://jira.example.com", "jira", [], {"argDelta": 2}]
+    ["https://jira.example.com/browse/PROJ", "https://jira.example.com/browse/{}", "jira",
+      ["PROJ"], {"argDelta": 1}],
+    ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 2}]
   ],
   "inputs": ["jira"]
 }]
@@ -552,9 +557,9 @@ Both rows are complete, but two matches are not a direct-navigation candidate. `
 ```json
 ["R", {
   "matches": [
-    ["https://github.com/company/{}", "company git", [],
+    ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
       {"argDelta": -1, "positions": [], "score": 0}],
-    ["https://docs.example.com/", "docs", [],
+    ["https://docs.example.com/", "https://docs.example.com/", "docs", [],
       {"argDelta": 0, "positions": [], "score": 0}]
   ],
   "inputs": []

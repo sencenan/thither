@@ -234,11 +234,12 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
 });
 
 describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
-  it('§4.4 keeps R.inputs in their original spelling and m carries the key', () => {
+  it('§4.4 keeps R.inputs in their original spelling and m carries the template and the key', () => {
     const body = {
       matches: [
         [
           'https://github.com/company/MyRepo',
+          'https://github.com/company/{}',
           'company git',
           ['MyRepo'],
           { argDelta: 0, positions: [], score: 0 },
@@ -247,6 +248,20 @@ describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
       inputs: ['Company', 'Git'],
     };
     expect(parse(env, frozen(['R', body]))).toEqual(['R', body]);
+  });
+
+  it('§1 rejects a match without the template slot, or whose template is not a destination', () => {
+    const hint = { argDelta: 0, positions: [], score: 0 };
+    const fourSlots = ['https://github.com/company/MyRepo', 'company git', ['MyRepo'], hint];
+    const badTemplate = [
+      'https://github.com/company/MyRepo',
+      'company/{}',
+      'company git',
+      ['MyRepo'],
+      hint,
+    ];
+    expect(parse(env, frozen(['R', { matches: [fourSlots], inputs: [] }]))[0]).toBe('E');
+    expect(parse(env, frozen(['R', { matches: [badTemplate], inputs: [] }]))[0]).toBe('E');
   });
 
   it('§2 drops unknown fields on the R envelope', () => {

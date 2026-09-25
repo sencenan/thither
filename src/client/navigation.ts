@@ -15,7 +15,7 @@ export const resolveNavigationDestination = (register: OutputRegister): Promise<
 
   const { matches, inputs } = terminal[1];
   const match = matches[0];
-  return matches.length === 1 && match !== undefined && match[3].argDelta >= 0 && inputs.length > 0
+  return matches.length === 1 && match !== undefined && match[4].argDelta >= 0 && inputs.length > 0
     ? Promise.resolve(match[0])
     : Promise.reject();
 };

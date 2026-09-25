@@ -123,25 +123,28 @@ const toMatch = (
     score: selection.score,
   };
 
-  return [render(template, applied), key, applied, hint];
+  return [render(template, applied), template, key, applied, hint];
 };
 
-// dsl.md §5 — fill {} left-to-right with literal argument text, never re-parsed as template.
+// dsl.md §5 — fill {} left-to-right with literal argument text, never re-parsed as template: the
+// scan resumes after the inserted argument, so an argument containing `{}` is not a new slot.
 const render = (template: string, applied: readonly Literal[]): string => {
-  let out = template;
+  let out = '';
+  let rest = template;
   for (const arg of applied) {
-    const at = out.indexOf('{}');
-    out = out.slice(0, at) + arg + out.slice(at + 2);
+    const at = rest.indexOf('{}');
+    out += rest.slice(0, at) + arg;
+    rest = rest.slice(at + 2);
   }
-  return out;
+  return out + rest;
 };
 
 // dsl.md §5 — within one target, order variant rows by argument balance: zero first (the best
 // fit is the only row), then positive ascending, then negative by magnitude ascending.
 const orderVariants = (rows: readonly Match[]): Match[] =>
   [...rows].sort((a, b) => {
-    const da = a[3].argDelta;
-    const db = b[3].argDelta;
+    const da = a[4].argDelta;
+    const db = b[4].argDelta;
     const ba = bucket(da);
     const bb = bucket(db);
     if (ba !== bb) {

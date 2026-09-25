@@ -81,7 +81,7 @@ const evidence = (key: string, positions: readonly number[]): string => {
 };
 
 const showMatch = (match: Match, i: number, unique: boolean): string => {
-  const [dest, key, args, hint] = match;
+  const [dest, template, key, args, hint] = match;
   const complete = hint.argDelta >= 0;
   const marker = complete ? green('●') : yellow('○');
   const nav = unique && complete ? green('  ← navigate') : '';
@@ -90,7 +90,7 @@ const showMatch = (match: Match, i: number, unique: boolean): string => {
   return [
     `  ${dim(String(i + 1))} ${marker} ${complete ? dest : yellow(dest)}${nav}`,
     `      ${evidence(key, hint.positions)}${dim(`  score ${hint.score}`)}${balance}${
-      args.length ? dim(`  args ${JSON.stringify(args)}`) : ''
+      args.length ? dim(`  args ${JSON.stringify(args)} into ${template}`) : ''
     }`,
   ].join('\n');
 };
