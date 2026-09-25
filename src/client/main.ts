@@ -1,14 +1,14 @@
 // browser-client.md "Execution flow" — the composition root and the whole run: wire the real
 // browser world (localStorage, navigator.locks, location, document) into the interpreter,
 // compose `.load <tokens> .$ .out .save` from the URL, execute it under the Web Lock, then
-// navigate or render from the register. This is the client's one try/catch: an unavailable
+// navigate, or strip the consumed input from the URL and render from the register. This is the client's one try/catch: an unavailable
 // localStorage throws out of `.load`, and there is no execution or navigation without it, so it
 // renders a bare error. Untested by design; the operations it composes are covered through
 // `browser-env.ts` and the navigation rule through `navigation.ts`.
 
 import { createInterpreter, type Program } from '../dsl/index.ts';
 import { createBrowserEnv } from './browser-env.ts';
-import { readInput } from './input.ts';
+import { readInput, stripInput } from './input.ts';
 import { resolveNavigationDestination } from './navigation.ts';
 import { renderView } from './view.ts';
 
@@ -30,9 +30,9 @@ if (root !== null) {
   };
 
   const main = async (): Promise<void> => {
-    const env = createBrowserEnv(localStorage);
+    const env = createBrowserEnv(localStorage, readInput(location.href));
     const interp = createInterpreter(env);
-    const program = ['.load', ...readInput(location.href), '.$', '.out', '.save'].reduce<Program>(
+    const program = ['.load', ...env.input, '.$', '.out', '.save'].reduce<Program>(
       (acc, token) => interp.pushToken(acc, token),
       [],
     );
@@ -40,7 +40,10 @@ if (root !== null) {
     return runWithLock(() => interp.execute(program)).then(() =>
       resolveNavigationDestination(env)
         .then((destination) => location.replace(destination))
-        .catch(() => renderView(root, env)),
+        .catch(() => {
+          history.replaceState(null, '', stripInput(location.href));
+          renderView(root, env);
+        }),
     );
   };
 

@@ -71,6 +71,8 @@ Done when: the language core passes conformance tests traceable to every normati
 
 - [Bounded history and eviction inside `.save`](issues/30-bounded-history-and-eviction.md): `.save` now writes the oldest-first `thither.stacks.v1` record with structural-difference dedup and front eviction to `N + 1`, `N` from ticket 29's `readSettings`; callers untouched. **Review refactor: the record formats split out of `browser-env.ts` into a new root file `src/client/persistence.ts`** (ticket 16's name), now the sole namer of both keys and home of `StorageArea` + the settings functions. Its seam: `type StackHistory` (oldest-first, current last, values unvalidated), `readHistory(storage)` 
 
+- [Strip the consumed input from the URL when the fallback page is shown](issues/35-strip-consumed-input.md): reverses `browser-client.md`'s keep-and-replay policy after dogfooding — an accidental refresh after `<u> home .set` re-ran the mutation. `stripInput(url)` in `src/client/input.ts` deletes `q` from **both** the query and the fragment (so a reload cannot fall through to the fragment), keeps every other parameter/path/`q`-less fragment verbatim, and `main.ts` applies it via `history.replaceState` on the render path only — navigation leaves the page, and the bare error page executed nothing. The tokens survive as `createBrowserEnv(storage, input)`'s `readonly input` field, so S5's text field seeds from the env, not the address bar. Reload is now a blank open; "Reading input", "Fallback UI", and ADR 0005 amended.
+
 ## Not yet specified
 
 These are in scope and documented in `browser-client.md`, but not yet sharp enough to ticket: each depends on interfaces designed by an earlier stage's design ticket. They graduate into tickets when the preceding checkpoint resolves.

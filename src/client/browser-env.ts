@@ -2,7 +2,9 @@
 // four language operations plus the three host operations (`.load`, `.out`, `.save`) that are
 // the whole of the client's persistence (ADR 0005, ADR 0007). Mirrors the core's `defaultEnv`;
 // the caller builds an interpreter from it and reads the env's output register fields
-// (`terminal`/`loaded`) after each run. The stored records themselves live in `persistence.ts`.
+// (`terminal`/`loaded`) after each run. It also carries the program input the run was opened
+// with, since the URL it came from is stripped once the fallback page is shown. The stored
+// records themselves live in `persistence.ts`.
 
 import type {
   InterpreterEnv,
@@ -26,7 +28,10 @@ export interface OutputRegister {
 // An interpreter environment (ADR 0005) that is *also* the client's output register: the fields
 // of OutputRegister are splatted onto the env, so the browser world is one value. Build an
 // interpreter from it, then read `terminal`/`loaded` off the same object after each run.
-export interface BrowserEnv extends InterpreterEnv, OutputRegister {}
+// `input` is the initial program input, read from the URL before the client strips it.
+export interface BrowserEnv extends InterpreterEnv, OutputRegister {
+  readonly input: readonly string[];
+}
 
 const parseError = (description: string): ThitherError => [
   'E',
@@ -37,11 +42,14 @@ const parseError = (description: string): ThitherError => [
 const isStackValue = (token: Program[number] | undefined): token is State | Result | ThitherError =>
   token !== undefined && (token[0] === 'S' || token[0] === 'R' || token[0] === 'E');
 
-export const createBrowserEnv = (storage: StorageArea): BrowserEnv => {
+export const createBrowserEnv = (
+  storage: StorageArea,
+  input: readonly string[] = [],
+): BrowserEnv => {
   // The env is also the output register (its fields are splatted in), so the host operations
   // mutate it directly and the client reads terminal/loaded off the same object.
   const { symbols } = defaultEnv();
-  const env: BrowserEnv = { symbols, loaded: true };
+  const env: BrowserEnv = { symbols, input, loaded: true };
 
   // browser-client.md "Host operations" — open a run: clear the register and push the stored
   // current stack. A malformed record or a value that fails validation seals the stack with the

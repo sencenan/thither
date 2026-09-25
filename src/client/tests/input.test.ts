@@ -1,8 +1,8 @@
 // browser-client.md "Reading input" — input selection precedence, single-pass
-// URLSearchParams decoding, and whitespace tokenization.
+// URLSearchParams decoding, whitespace tokenization, and stripping consumed input.
 
 import { describe, expect, it } from 'vitest';
-import { readInput } from '../input.ts';
+import { readInput, stripInput } from '../input.ts';
 
 const base = 'https://thither.app/';
 
@@ -58,5 +58,30 @@ describe('readInput — repeated `q` parameters', () => {
 describe('readInput — whitespace tokenization', () => {
   it.each(tokenization)('%s', (_name, url, tokens) => {
     expect(readInput(url)).toEqual(tokens);
+  });
+});
+
+type StripCase = readonly [name: string, url: string, stripped: string];
+
+const stripping: readonly StripCase[] = [
+  ['query `q` is removed with its `?`', `${base}?q=company+git`, base],
+  ['an empty `?q=` is removed', `${base}?q=`, base],
+  ['other query params survive', `${base}?other=1&q=docs`, `${base}?other=1`],
+  ['every repeated query `q` is removed', `${base}?q=first&q=second`, base],
+  ['fragment `q` is removed with its `#`', `${base}#q=company+git`, base],
+  ['other fragment params survive', `${base}#other=1&q=docs`, `${base}#other=1`],
+  ['both sources are stripped', `${base}?q=fromquery#q=fromfragment`, base],
+  ['a fragment without `q` is kept verbatim', `${base}?q=docs#section`, `${base}#section`],
+  ['a URL without `q` is unchanged', `${base}?other=1#foo=bar`, `${base}?other=1#foo=bar`],
+  ['the path is kept', `${base}launcher/?q=docs`, `${base}launcher/`],
+];
+
+describe('stripInput — consumed input leaves the URL', () => {
+  it.each(stripping)('%s', (_name, url, stripped) => {
+    expect(stripInput(url)).toBe(stripped);
+  });
+
+  it('strips what readInput reads', () => {
+    expect(readInput(stripInput(`${base}?other=1&q=docs#q=more`))).toEqual([]);
   });
 });
