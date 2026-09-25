@@ -19,7 +19,7 @@ In scope:
 
 ## Answer
 
-Landed in `src/client/browser-env.ts`, which is now the sole namer of both `thither.stacks.v1` and `thither.settings.v1`. Three exports, all free functions over the injected `StorageArea` (so they test against the same `Map`-backed fake as the host operations, in plain Node):
+Landed in `src/client/browser-env.ts`, then the sole namer of both `thither.stacks.v1` and `thither.settings.v1` (ticket 30 moved the record formats, these functions included, into `src/client/persistence.ts`). Three exports, all free functions over the injected `StorageArea` (so they test against the same `Map`-backed fake as the host operations, in plain Node):
 
 - `interface Settings { readonly historyLimit: number }` 
 - `isHistoryLimit(value: unknown): value is number` 

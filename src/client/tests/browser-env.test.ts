@@ -4,13 +4,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { createInterpreter, emptyState, type Program } from '../../dsl/index.ts';
-import {
-  createBrowserEnv,
-  isHistoryLimit,
-  readSettings,
-  type StorageArea,
-  writeSettings,
-} from '../browser-env.ts';
+import { createBrowserEnv } from '../browser-env.ts';
+import { isHistoryLimit, readSettings, type StorageArea, writeSettings } from '../persistence.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 const SETTINGS_KEY = 'thither.settings.v1';
@@ -164,6 +159,107 @@ describe('browser env host operations', () => {
   it('lets an unavailable localStorage throw', () => {
     const storage = fakeStorage({}, true);
     expect(() => runClient(storage, [])).toThrow('localStorage unavailable');
+  });
+});
+
+// browser-client.md "Persistence" / "Bounded history" — `thither.stacks.v1` is oldest-first with the
+// current stack last; `.save` maintains it with structural-difference dedup and front eviction.
+describe('bounded history', () => {
+  const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
+  const stateWith = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];
+  const A = stateWith({});
+  const B = stateWith({ home: ['https://example.com/'] });
+  const stacks = (storage: StorageArea & { map: Map<string, string> }): readonly unknown[] => {
+    const rec = record(storage);
+    return Array.isArray(rec) ? rec : [];
+  };
+
+  it('"Bounded history": [emptyState()] becomes history after the first stack-changing execution', () => {
+    const storage = fakeStorage();
+    const { stack } = runClient(storage, set('https://example.com/', 'home'));
+
+    expect(record(storage)).toEqual([[emptyState()], stack]);
+  });
+
+  it('"Bounded history": an ordinary search adds no entry', () => {
+    const storage = fakeStorage();
+    runClient(storage, set('https://example.com/', 'home'));
+    const before = record(storage);
+
+    runClient(storage, ['home']);
+    runClient(storage, []);
+    expect(record(storage)).toEqual(before);
+  });
+
+  it('"Persistence": entries are oldest first, the current stack last', () => {
+    const storage = fakeStorage();
+    const first = runClient(storage, set('https://example.com/', 'home')).stack;
+    const second = runClient(storage, set('https://github.com/{}', 'git')).stack;
+
+    expect(record(storage)).toEqual([[emptyState()], first, second]);
+  });
+
+  it('"Bounded history": [A, B] -> [A, B\'] differs structurally and adds an entry', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: JSON.stringify([[A, B]]) });
+    const { stack } = runClient(storage, set('https://github.com/{}', 'git'));
+
+    expect(stack).toHaveLength(2);
+    expect(stack[0]).toEqual(A);
+    expect(record(storage)).toEqual([[A, B], stack]);
+  });
+
+  it('"Bounded history": with limit N the record holds at most N + 1 stacks, evicting the oldest', () => {
+    const storage = fakeStorage();
+    writeSettings(storage, { historyLimit: 1 });
+    runClient(storage, set('https://example.com/', 'home'));
+    const second = runClient(storage, set('https://github.com/{}', 'git')).stack;
+    const third = runClient(storage, set('https://jira.example.com/{}', 'jira')).stack;
+
+    expect(record(storage)).toEqual([second, third]);
+  });
+
+  it('"Bounded history": N = 0 retains only the current stack', () => {
+    const storage = fakeStorage();
+    writeSettings(storage, { historyLimit: 0 });
+    const { stack } = runClient(storage, set('https://example.com/', 'home'));
+
+    expect(record(storage)).toEqual([stack]);
+  });
+
+  it('"Bounded history": lowering the limit evicts the oldest excess on the next save', () => {
+    const storage = fakeStorage();
+    runClient(storage, set('https://example.com/', 'home'));
+    runClient(storage, set('https://github.com/{}', 'git'));
+    const third = runClient(storage, set('https://jira.example.com/{}', 'jira')).stack;
+    expect(stacks(storage)).toHaveLength(4);
+
+    writeSettings(storage, { historyLimit: 1 });
+    runClient(storage, ['home']);
+    expect(stacks(storage)).toHaveLength(2);
+    expect(stacks(storage)[1]).toEqual(third);
+  });
+
+  it('"Fallback UI and settings": an unreadable record has no previous current stack to retain', () => {
+    // A reset-shaped program (`<values> .$ .out .save`, no `.load`) over a malformed record
+    // simply writes the new record; there is nothing valid to push into history.
+    const storage = fakeStorage({ [STACKS_KEY]: '{"not":"a stack record"}' });
+    const { interp } = wire(storage);
+    const program = [B, '.$', '.out', '.save'].reduce<Program>(
+      (acc, t) => interp.pushToken(acc, t),
+      [],
+    );
+    interp.execute(program);
+
+    expect(record(storage)).toEqual([[B]]);
+  });
+
+  it('"Bounded history": snapshots are not mutated by later executions', () => {
+    const storage = fakeStorage();
+    runClient(storage, set('https://example.com/', 'home'));
+    const snapshot = JSON.stringify(stacks(storage)[1]);
+
+    runClient(storage, set('https://github.com/{}', 'git'));
+    expect(JSON.stringify(stacks(storage)[1])).toBe(snapshot);
   });
 });
 

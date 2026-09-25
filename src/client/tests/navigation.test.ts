@@ -5,8 +5,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { createInterpreter, type Match, type Program } from '../../dsl/index.ts';
-import { createBrowserEnv, type OutputRegister, type StorageArea } from '../browser-env.ts';
+import { createBrowserEnv, type OutputRegister } from '../browser-env.ts';
 import { resolveNavigationDestination } from '../navigation.ts';
+import type { StorageArea } from '../persistence.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 
