@@ -1,7 +1,7 @@
 # Amend `dsl.md` for arity-keyed variants and exact-key `.set`
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 
 ## Question
 
@@ -24,3 +24,18 @@ Sections and what changes:
 - `docs/browser-client.md`: the step-4 navigation rule is unchanged in wording; check any `.set`/state examples for the new shape.
 
 **Done when** every rule in ADR 0008 has a normative sentence in `dsl.md`, no `_Avoid_` term from CONTEXT.md appears in it, and `pnpm check` (prettier/biome on markdown, if configured) is clean. Ticket 28 implements against this text.
+
+## Answer
+
+`docs/dsl.md` now specifies [ADR 0008](../../../docs/adr/0008-arity-keyed-variants-and-exact-key-set.md) end to end, in the glossary's vocabulary (key, variant, arity, best fit; "searchable string" is gone):
+
+- **§1** `k` added; `t` is one `k: [p]` entry, `T` is `{ k: [p] }`, `m` is `[u_or_p, k, [args], hint]`; a match is one variant of a selected target. Transition rows for `.set`/`.rm` reworded.
+- **§2** Separator: `.$` takes the suffix, `.rm` reads its length, `.set`/`.@` ignore it. Operators legal in `.$`, `.rm`, and focus; refused by `.set`. Supplied `S`: keys split/normalized/rejoined, empty or operator-bearing keys and duplicate normalized keys are `parse_error`; variants validated, duplicate arity is `parse_error`, list sorted by arity on parse.
+- **§3** Key defined as identity + match text. **Focus is no longer normalized at all** (a gap the ADR left open, settled with the human): stored verbatim like any literal array — typed order, original case, accumulated escape form, resolved when the query is built — because `|` binds by position and smart-case should behave as it does in a typed search; each term must still be a valid single literal. Target-set order = object iteration order, promised only as a tiebreak. `.set` described as exact-key, no search, no focus.
+- **§4.1** Exact-key algorithm and three-row table (none → insert; same arity → replace; new arity → add). `company jira` vs `jira` example; two-`.set` jira example. **§4.2** Whole-target vs arity-by-suffix-length removal, emptied targets removed, four examples. **§4.3** Operator refusal removed. **§4.4** Best fit → one match, else one per variant; `jira` / `jira PROJ` / `jira PROJ extra` walkthrough.
+- **§5** Rendering per variant; `positions`/`score` shared by a target's rows; ordering rewritten as score → target-set order across targets, then `0` / `+` asc / `−` by magnitude within a target, rows contiguous; direct navigation = exactly one match with Δ ≥ 0.
+- **§6** `ambiguous_set` dropped; `invalid_dimension` is `.set`-only; `parse_error` lists the key/variant invariants; the unwinding example now fails on `invalid_destination`.
+- **§7** All goldens moved to the `{ key: [variants] }` and `m.key` shapes; "Preserve ambiguity" reordered per the new rule; new **Variants of one target** golden (two `.set`, `jira`, `jira PROJ`, `jira PROJ extra`, `jira . x .rm`); the empty-query golden's order flipped to target-set order.
+- `docs/browser-client.md`: reset example uses `"targets": {}`; step 4 navigation rule says "exactly one match".
+
+`pnpm verify` green (no code touched). Unblocks [Implement arity-keyed variants](28-variants-implementation.md).

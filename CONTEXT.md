@@ -84,7 +84,7 @@ The matches produced by a search together with the user-supplied dimensions used
 The collection of available targets together with the current focus.
 
 **Focus**:
-Stored search terms implicitly prepended to the query of search and removal operations; target-setting never consults it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators.
+Search terms stored exactly as typed and implicitly prepended to the query of search and removal operations; target-setting never consults it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
 
 ### Navigation
 

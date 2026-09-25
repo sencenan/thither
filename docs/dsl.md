@@ -30,12 +30,13 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | --- | --- | --- |
 | `u` | URL | A valid URL with an explicit scheme and without template placeholders. Any scheme is supported. |
 | `p` | Destination template | A URL with an explicit scheme and additional anonymous `{}` placeholders. A plain `u` is accepted wherever a destination template is required. |
-| `d` | Dimension literal | A space-free literal. Preserve source spelling during evaluation; normalize when used as a stored dimension. In a search query a literal may also carry a **search operator** (section 3); a stored dimension never does. |
+| `d` | Dimension literal | A space-free literal. Preserve source spelling during evaluation; normalize when used as a stored dimension. In a search query or in focus a literal may also carry a **search operator** (section 3); a target's dimension never does. |
 | `L` | Literal array | An ordered array of ordinary literals: dimensions, URLs, or templates. Created by accumulation during evaluation. |
-| `t` | Target | `[[d], p]`, also permitting a plain URL in the destination slot. |
-| `T` | Target set | `[t]`. |
+| `k` | Key | A target's normalized dimensions joined with single spaces (section 3). A target's identity and the text matching runs against. |
+| `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
+| `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
 | `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
-| `m` | Match | `[u_or_p, [d], [args], hint]`, where `hint` carries at least `argDelta`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
+| `m` | Match | `[u_or_p, k, [args], hint]`, where `hint` carries at least `argDelta`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
@@ -44,7 +45,7 @@ The `[d]` and `[args]` notation means an array, not necessarily a single element
 
 `t` and `T` occur inside `S`; `m` and `M` occur inside `R`. They cannot appear as standalone program values; such input parses to `E`. `S`, `R`, and `E` are permitted top-level JSON values.
 
-A match is a **selected target**, not necessarily a fully rendered destination. Producing an `R` does not itself mean navigation can proceed.
+A match is **one variant of a selected target**, not necessarily a fully rendered destination. Producing an `R` does not itself mean navigation can proceed.
 
 ### Transitions
 
@@ -59,8 +60,8 @@ Terminal rules take priority over the rest.
 | `[K]` | `S` | `[K, S]` | Push state separately. |
 | `[K]` | `R` | `[K, R]` | Push result and stop. |
 | `[K]` | `E` | `[K, E]` | Push an explicit error and stop without unwinding. |
-| `[K, S, L]` | `.set` | `[K, S']` | 0 matches appends a target, 1 replaces its destination, more than 1 errors. |
-| `[K, S, L]` | `.rm` | `[K, S']` | Remove all complete-query matches; no explicit dimensions or 0 matches is a no-op. |
+| `[K, S, L]` | `.set` | `[K, S']` | No target with the resulting key appends one; an existing target replaces or gains the variant of the destination's arity. |
+| `[K, S, L]` | `.rm` | `[K, S']` | Remove all complete-query matches, or with a separator only their variant of the arity the suffix length names; no explicit dimensions or 0 matches is a no-op. |
 | `[K, S]` | `.rm` | `[K, S]` | No explicit dimensions: leave state unchanged. |
 | `[K, S, L]` | `.@` | `[K, S']` | Replace focus with the dimensions before `.`. |
 | `[K, S]` | `.@` | `[K, S']` | Clear focus. |
@@ -123,7 +124,7 @@ A leading double dot escapes a dot-prefixed token: parsing keeps the token verba
 
 Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
-The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them; only `.$` uses the suffix.
+The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them: `.$` takes the suffix as arguments, `.rm` reads only its length, and `.set` and `.@` ignore it.
 
 ### Search operators
 
@@ -134,12 +135,12 @@ git docs      both terms must match                (AND, the default)
 git | docs    either term may match                (OR; `|` is its own token)
 !personal     the term must not match              (NOT, exact substring)
 'ompany       exact substring, not fuzzy
-^git          the searchable string starts with git
-git$          the searchable string ends with git
-^git$         the searchable string is exactly git
+^git          the key starts with git
+git$          the key ends with git
+^git$         the key is exactly git
 ```
 
-A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in stored dimensions alike. Operator-carrying terms are legal in the matching portion of `.$` and `.rm` only; sections 4.1 and 4.3 say what `.set` and `.@` do with them.
+A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in a target's dimensions alike. Operator-carrying terms are legal wherever a literal is search input — the matching portion of `.$` and `.rm`, and focus set by `.@` — and refused by `.set`, whose dimensions are stored as a key (section 4.1).
 
 ### URL and template validation
 
@@ -158,7 +159,7 @@ rejected:  example.com/path          /path/{}                    //example.com/{
 
 Placeholders may appear in any position, including the scheme. Merely containing a colon is not sufficient. Substituting actual arguments can still produce a different, possibly invalid, URL at navigation time; template acceptance is not a promise about every rendered result, nor permission for a host to execute every accepted scheme.
 
-This rule applies wherever a destination is accepted, including `.set` operands and destinations inside supplied state.
+This rule applies wherever a destination is accepted, including `.set` operands and every variant inside supplied state.
 
 ### Parse failures are values
 
@@ -172,9 +173,11 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
 
-Normalize each supplied `S`'s target dimensions and focus by the rules of section 3. Reject dimension strings containing internal whitespace after trimming. Normalization does not change target order, destination text, argument spelling, or `R.inputs`.
+Normalize each supplied `S`'s target keys by the rules of section 3: a key is split on whitespace into dimensions, each dimension normalized, and the result rejoined. A key that is empty after normalization, or that carries a search operator, is invalid. Focus is kept verbatim; a focus term that is empty, contains whitespace, or is operator-only is invalid. Normalization does not change target order, variant text, focus, argument spelling, or `R.inputs`.
 
-Within each target set, every normalized dimension set must be unique. Two targets with identical normalized dimensions make the value invalid, so it parses to `E`, whether their destinations differ or are identical. Detect duplicates after normalization; do not merge targets or choose one. Different `S` values in a program may independently contain the same dimension sets. For example, dimensions `["Git", " company ", "git"]` normalize to `["company", "git"]`, so a second target with `["git", "company"]` in that same target set makes the state invalid.
+Within each target set, every normalized key must be unique. Two targets whose keys normalize to the same text make the value invalid, so it parses to `E`, whether their variants differ or are identical. Detect duplicates after normalization; do not merge targets or choose one. Different `S` values in a program may independently contain the same keys. For example, the key `"Git  company git"` normalizes to `"company git"`, so a second target keyed `"git company"` in that same target set makes the state invalid.
+
+Within each target, every variant must be a valid destination template and no two variants may share an arity: `["https://a/{}", "https://b/{}"]` is invalid. Variants are stored in arity-ascending order; a supplied list in another order is sorted on parse, since the order carries no information.
 
 Validation happens when an item is parsed, not when it is reached. An invalid value placed after a terminal result therefore still parses to `E`, but evaluation stops before reaching it.
 
@@ -182,30 +185,32 @@ Hosts reuse this parse step to validate data they hold, such as manually supplie
 
 ## 3. Dimensions, focus, and matching
 
-Stored dimensions are trimmed, lowercase, whitespace-free, deduplicated, and deterministically sorted. Use JavaScript's standard `trim()` and locale-independent `toLowerCase()`, followed by default string sorting (lexicographic UTF-16 code-unit order). Do not use locale-sensitive lowercasing or collation. Internal whitespace is invalid, not a request to split one supplied dimension into several.
+A target's dimensions are trimmed, lowercase, whitespace-free, deduplicated, and deterministically sorted. Use JavaScript's standard `trim()` and locale-independent `toLowerCase()`, followed by default string sorting (lexicographic UTF-16 code-unit order). Do not use locale-sensitive lowercasing or collation. Internal whitespace is invalid, not a request to split one supplied dimension into several.
 
-This gives equivalent dimension sets a consistent searchable representation. Focus is also a stored dimension list, not an argument list, and setting it replaces it rather than extending it. Focus is implicit fuzzy-search input, not an exact namespace or an access-control boundary.
+Focus is **not normalized at all**: it is stored exactly as accumulated, in typed order with its original case, like any literal array. It is a query fragment, so `|` binds the terms on either side of it by position, and an uppercase focus term is a case-sensitive term under smart-case just as it would be typed into a search. Each focus term must still be a valid single literal: non-empty, whitespace-free, and not operator-only (section 2).
 
-**Target-set order** is the order targets occupy in the state. A supplied `S` keeps the order it was given; `.set` appends a newly inserted target to the end; updating an existing target leaves it in place; `.rm` removes targets without reordering the rest. That order is the final tiebreak wherever matches are ranked.
+A target's **key** is its normalized dimensions joined with single spaces. Equivalent dimension sets therefore share one key, and the key is both the target's identity (what `.set` compares) and the text the matcher runs against (what `.$` and `.rm` search). Focus is a stored list of search terms, not a key and not an argument list, and setting it replaces it rather than extending it. Focus is implicit fuzzy-search input for `.$` and `.rm` only, never part of what `.set` stores, and not an exact namespace or an access-control boundary.
+
+**Target-set order** is the order targets occupy in the state's target map. A supplied `S` keeps the order it was given, as far as the host language's object iteration preserves it; `.set` appends a newly inserted target to the end; changing an existing target's variants leaves it in place; `.rm` removes targets without reordering the rest. That order is the final tiebreak between equally scored targets, and nothing more is promised of it.
 
 To construct a matching query for `.$` and `.rm`:
 
 1. Select the operation's explicit matching literals, resolving escapes (section 2).
-2. Prepend the current focus.
+2. Prepend the current focus, resolving its escapes likewise (focus is stored in accumulated form).
 3. Keep the result as given: typed order, original case, no deduplication. It is an fzf query, and fzf owns its interpretation.
 
-Each target's canonically sorted dimensions are joined with spaces into **one searchable string**. The query terms are joined with spaces into **one fzf extended-search query** and matched against that searchable string: every term must match (an OR group counts as one term), and a target is selected when they all do. Its score is the sum of the per-term scores; a NOT term contributes nothing. A single term is fuzzy-matched against the whole searchable string, so it may span dimension boundaries: `am` selects `[apple, mango]`. Terms are independent of one another, so `m ppl` and `pple m` both select `[apple, mango]` too.
+The query terms are joined with spaces into **one fzf extended-search query** and matched against each target's key: every term must match (an OR group counts as one term), and a target is selected when they all do. Its score is the sum of the per-term scores; a NOT term contributes nothing. A single term is fuzzy-matched against the whole key, so it may span dimension boundaries: `am` selects `apple mango`. Terms are independent of one another, so `m ppl` and `pple m` both select `apple mango` too.
 
 Term order does not affect selection or score except around `|`, which binds the terms on either side of it: with focus `[company]`, the query `git | docs` is `company AND (git OR docs)`. Only `.$`'s prefix inference otherwise cares about the user's original token order.
 
-Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Stored dimensions are lowercase, so an uppercase term matches no stored dimension: `Git` finds nothing where `git` finds every git target. An uppercase letter is read as a deliberate request for case-sensitive matching, and the language does not second-guess it — so under `.$`'s prefix inference (section 4.4), `company Git MyRepo` stops matching at `company` and takes `Git` as the first argument. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
+Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Keys are lowercase, so an uppercase term matches no key: `Git` finds nothing where `git` finds every git target. An uppercase letter is read as a deliberate request for case-sensitive matching, and the language does not second-guess it — so under `.$`'s prefix inference (section 4.4), `company Git MyRepo` stops matching at `company` and takes `Git` as the first argument. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
 
 Operations differ only in how they choose query inputs:
 
 - `.rm` matches the **entire explicit matching portion**, combined with focus, operators included. It never retries shorter prefixes.
-- `.set` also matches the entire explicit matching portion combined with focus, but on the **normalized** dimensions it would store (section 4.1), and it refuses operator terms.
+- `.set` does not search. It normalizes its explicit dimensions into the key it would store and looks for that exact key (section 4.1); focus plays no part, and operator terms are refused.
 - `.$` infers the boundary between matching literals and arguments by finding the longest matching prefix; operator terms take part in that inference like any other term.
-- `.@` sets focus directly; it does not search for targets, and it refuses operator terms.
+- `.@` sets focus directly; it does not search for targets.
 
 An empty explicit query searches on focus alone; empty focus with no explicit input selects all targets.
 
@@ -223,24 +228,31 @@ Interpret `L` in this order:
 
 1. Remove its first literal as the destination and require it to be a valid URL or destination template; a first literal that fails validation is `invalid_destination`, whatever it looks like. Do not search forward for a URL. A plain URL is a valid destination with zero placeholders.
 2. From the remaining literals, keep the matching portion.
-3. Require **at least one explicit dimension** there. Focus cannot satisfy this requirement.
-4. Combine those dimensions with focus and match the complete combined query.
+3. Require **at least one explicit dimension** there. Focus is not consulted and cannot satisfy this requirement.
+4. Normalize those dimensions into a key (section 3) and look for a target with **exactly that key**. This is string equality, not a search: no fuzzy matching, no prefix, no focus.
 
-| Matching targets | Effect |
+| Target with that key | Effect |
 | --- | --- |
-| Zero | Append a target with the normalized combined dimensions and the supplied destination to the end of the target set. |
-| Exactly one | Replace only that target's destination. Preserve its existing dimensions and its position. |
-| More than one | Emit an error; leave the operation's input state unchanged. |
+| None | Append a target with that key and the supplied destination as its only variant to the end of the target set. |
+| Exists, and has a variant of the destination's arity | Replace that variant with the supplied destination. Preserve the target's key, other variants, and position. |
+| Exists, without a variant of that arity | Add the destination as a new variant, keeping the list in arity-ascending order. Preserve the target's position. |
 
-Fuzzy updating does not rename dimensions: if `comp git` uniquely matches `[company, git]`, `.set` updates the URL and retains `[company, git]`.
+Because `.set` compares keys rather than searching, `jira` and `company jira` are different targets even though a search for `jira` selects both: given an existing `company jira`, `https://jira.example.com jira .set` creates a second target keyed `jira` rather than touching the first. A variant is addressed by arity alone, so setting a second template with the same number of `{}` replaces the earlier one, and there is no way to hold two arity-1 templates under one key.
 
-`.set` matches on the **normalized** combined dimensions, the exact set it would store, rather than on the raw typed query: under smart-case a raw `Git` would be case-sensitive, miss the stored `git`, and insert a duplicate dimension set. Matching lowercase against lowercase guarantees an identical existing target is always found. For the same reason an explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` matches on is what it stores, and a stored dimension is plain text.
+An explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` stores is a key, and a key is plain text. Uppercase is not an error; `Git` normalizes to `git` and finds the same key.
 
 ```text
 S https://github.com/company/{} company git . ignored .set
 ```
 
 The URL leads and is extracted first, so the explicit dimensions are `company git` and `. ignored` plays no part.
+
+```text
+S https://jira.example.com jira .set
+S https://jira.example.com/browse/{} jira .set
+```
+
+The first program creates a target keyed `jira` with one arity-0 variant; the second adds an arity-1 variant to it. The target's variants are now `[https://jira.example.com, https://jira.example.com/browse/{}]`.
 
 These are errors, even when focus is nonempty, because no explicit dimension remains:
 
@@ -260,12 +272,24 @@ With no literal array, or a matching portion that is empty, leave state unchange
 
 ```text
 S .rm
-S . ignored .rm
+S . x .rm
 ```
 
-Otherwise combine the explicit dimensions with focus, match that complete dimension list, and remove every matching target. Zero matches is a successful no-op and multiple matches are allowed; never shorten the query to obtain a match. So `S company nonexistent .rm` removes nothing and does not retry `company`.
+Otherwise combine the explicit dimensions with focus and match that complete query, operators included. Zero matches is a successful no-op and multiple matches are allowed; never shorten the query to obtain a match. So `S company nonexistent .rm` removes nothing and does not retry `company`.
 
-A host that appends `.$` makes these programs go on to search the unchanged state.
+What is removed depends on the separator:
+
+- **Without a separator**, remove every matching target whole, with all its variants.
+- **With a separator**, the suffix is not arguments: its **length is an arity**. Remove from every matching target the variant of that arity, if it has one; a target with no such variant is left as it is. A target whose last variant is removed is removed itself. The suffix tokens' text is irrelevant; only their count is read.
+
+```text
+S jira .rm            remove the whole jira target
+S jira . x .rm        remove its arity-1 variant
+S jira . .rm          remove its arity-0 variant
+S jira . a b .rm      remove its arity-2 variant, if any; otherwise no change
+```
+
+A host that appends `.$` makes the no-op programs go on to search the unchanged state.
 
 ### 4.3 `.@`
 
@@ -274,9 +298,9 @@ A host that appends `.$` makes these programs go on to search the unchanged stat
 [K, S]    | .@ -> [K, S']
 ```
 
-Normalize the matching portion and replace focus with it, without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
+Replace focus with the matching portion exactly as accumulated (section 3: no normalization), without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
 
-Focus is a stored dimension list, so a matching portion containing a search operator (section 2) is `invalid_dimension` and leaves focus unchanged. `!personal .@` is refused; type `!personal` in the search itself.
+Focus is only ever prepended to a search query (section 3), so it may carry search operators: `!personal .@` makes every later `.$` and `.rm` exclude personal targets until focus changes.
 
 ### 4.4 `.$`
 
@@ -301,15 +325,27 @@ company git          -> matches
 company git thither  -> no matches
 ```
 
-For a target whose dimensions are `[company, git]`, the selected prefix is `company git` and `thither` is the argument. If `company git thither` itself matched a target, the longest-prefix rule would consume `thither` as matching input; use `.` when an explicit boundary is needed.
+For a target keyed `company git`, the selected prefix is `company git` and `thither` is the argument. If `company git thither` itself matched a target, the longest-prefix rule would consume `thither` as matching input; use `.` when an explicit boundary is needed.
 
 If the user supplied matching literals but **no nonempty prefix matches**, return no matches. Do not discard all supplied literals and fall back to focus; focus itself is never shortened.
 
-Return one `m` for every selected target, including targets missing arguments, ordered as section 5 defines; clients render that order rather than re-sorting. `R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
+For every selected target, look for its **best fit**: the variant whose arity equals the number of arguments. A target with a best fit yields **exactly one match**, for that variant. A target without one yields **one match per variant**, each rendered as far as the arguments allow (section 5), so that the fallback page can show every page the target could have meant. Order the matches as section 5 defines; clients render that order rather than re-sorting.
+
+With a target keyed `jira` whose variants are `[https://jira.example.com, https://jira.example.com/browse/{}]`:
+
+```text
+jira               one match: https://jira.example.com          (arity 0 fits 0 arguments)
+jira PROJ          one match: https://jira.example.com/browse/PROJ
+jira PROJ extra    two matches: no variant has arity 2, so both are listed
+```
+
+The third program cannot navigate directly even though one of its rows is complete: two arguments do not say which page was meant.
+
+`R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
 
 ## 5. Arguments, rendering, and match ordering
 
-Each anonymous `{}` in the destination template requires one argument, in left-to-right order. Each supplied argument is one literal, preserving its original spelling and case. For a target with `P` placeholders and `A` supplied arguments:
+Rendering is per variant. Each anonymous `{}` in a variant requires one argument, in left-to-right order. Each supplied argument is one literal, preserving its original spelling and case. For a variant of arity `P` and `A` supplied arguments:
 
 ```text
 hint.argDelta = A - P
@@ -333,38 +369,45 @@ Substitution is literal, not percent-encoding, and fills the original template; 
 
 Each match reports why it matched, so a presentation layer can highlight without re-running the matcher:
 
-- `hint.positions`: the ascending, deduplicated character indices matched within that target's searchable string, the union over every term of the query; NOT terms contribute none, and the joining spaces are never among them. Because a term may span dimension boundaries, these are string indices, not dimension indices.
+- `hint.positions`: the ascending, deduplicated character indices matched within that target's key, the union over every term of the query; NOT terms contribute none, and the joining spaces are never among them. Because a term may span dimension boundaries, these are string indices, not dimension indices.
 - `hint.score`: the match's ranking score, the sum of the matcher's score for each term.
+
+Every match of one target carries the same `positions` and `score`: they describe the target, and the variants share them.
 
 These fields are evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
-A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because an empty pattern matches every target with no evidence. Every target then ties on score, so ordering falls to argument balance and target-set order.
+A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because an empty pattern matches every target with no evidence. Every target then ties on score, so ordering falls to target-set order.
 
 ### Match ordering
 
-`R.matches` is emitted in one total order, so a client renders it top to bottom without sorting. Compare two matches by these keys in turn:
+`R.matches` is emitted in one total order, so a client renders it top to bottom without sorting. The rows of one target are **contiguous**: targets are ordered first, then each target's rows within its run. Compare two targets by:
 
-1. **Nonnegative `argDelta` first.** This is the split between matches whose destination is fully rendered and matches still showing a `{}`.
-2. **`|argDelta|` ascending.** Exact counts (`0`) therefore lead the nonnegative group, `+1` precedes `+2`, and `-1` precedes `-2`.
-3. **`hint.score` descending.** Closeness to a balanced argument count outranks match quality: a weakly scored `+1` still precedes a strongly scored `+2`.
-4. **Target-set order.** The final tiebreak, leaving no pair undetermined.
+1. **`hint.score` descending.**
+2. **Target-set order.** Ties between equal scores fall to the order the matcher returns them, which is the order targets occupy in the state.
 
-A direct-navigation candidate requires exactly one selected target and a nonnegative argument balance. Missing-argument matches remain in `R.matches` and count toward ambiguity. Ordering never turns multiple selected targets into a unique match: a client must check the match count, not take the first row.
+Within a target, compare two variants by `argDelta`:
+
+3. **Zero first.** The best fit, when there is one, is the target's only row.
+4. **Positive ascending.** Complete destinations with arguments to spare: `+1` before `+2`.
+5. **Negative by `|argDelta|` ascending.** Destinations still showing a `{}`: `-1` before `-2`.
+
+So for a target keyed `jira` with arities `{0, 2}` and one argument, the rows are its arity-0 variant (`+1`) then its arity-2 variant (`-1`).
+
+A direct-navigation candidate requires **exactly one match** in `R` with a nonnegative argument balance. That is one selected target with a best fit, or one selected target with a single variant. Missing-argument matches remain in `R.matches` and count toward ambiguity, and so do the sibling variants of a target without a best fit. Ordering never turns several matches into a unique one: a client must check the match count, not take the first row.
 
 ## 6. Errors and state preservation
 
-An operation with no matching stack rule, a failed operand validation, or an ambiguous `.set` emits an evaluation error. An explicit `E` value is not such a failure: push it and stop without unwinding, so `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
+An operation with no matching stack rule or a failed operand validation emits an evaluation error. An explicit `E` value is not such a failure: push it and stop without unwinding, so `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
 
 Every error carries a machine-readable `type` from this closed vocabulary, plus a human-readable `description`. The vocabulary is discriminated by **phase**: failures raised while parsing one item are `parse_error` or `missing_operation`, and the remaining types name failures raised while evaluating an operation.
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized dimension sets, a stored dimension carrying operator syntax, or an `E` whose `type` is outside this vocabulary. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
-| `invalid_dimension` | Evaluation | A dimension about to be stored by `.set` or `.@` carries search-operator syntax (section 2). |
+| `invalid_dimension` | Evaluation | A dimension about to be stored in a key by `.set` carries search-operator syntax (section 2). |
 | `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, or no state to operate on. |
-| `ambiguous_set` | Evaluation | `.set` matches more than one target. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.
@@ -389,15 +432,15 @@ On a generated evaluation error, pop stack elements until the nearest valid `S` 
 [L]              -> [E]
 ```
 
-Operations must preserve their input state until they have succeeded: an ambiguous `.set` must not consume or partially modify `S` before emitting its error.
+Operations must preserve their input state until they have succeeded: a `.set` whose destination fails validation must not consume or partially modify `S` before emitting its error.
 
-Earlier successful operations are **not rolled back**. The retained state is the nearest working state at the point of failure, not the initial state. Suppose the original focus is `[personal]` and `git` matches more than one target when focus is empty:
+Earlier successful operations are **not rolled back**. The retained state is the nearest working state at the point of failure, not the initial state. Suppose the original focus is `[personal]`:
 
 ```text
-S company .@ .@ https://example.com/{} git .set
+S company .@ .@ example.com/{} git .set
 ```
 
-The first `.@` sets focus, the second clears it, and `.set` then fails as ambiguous. The error stack retains the state with cleared focus.
+The first `.@` sets focus, the second clears it, and `.set` then fails with `invalid_destination` because `example.com/{}` has no scheme. The error stack retains the state with cleared focus.
 
 A parse failure behaves like any other `E` in the stream: items before it have already executed, and pushing it stops evaluation without unwinding. A program whose first item is unparsable evaluates to `[E]`.
 
@@ -410,61 +453,95 @@ The worked programs end in an explicit `.$`. The interpreter appends nothing; a 
 ### Create and search
 
 ```text
-["S", {"targets": [], "focus": []}]
+["S", {"targets": {}, "focus": []}]
 https://github.com/company/{} company git .set .$
 ```
 
-`.set` appends `[company, git]`, and the search selects all targets because focus and explicit input are empty. The final shape is `[S', R]`, whose single match keeps its `{}` intact with `argDelta: -1`.
+`.set` appends a target keyed `company git` with one arity-1 variant, and the search selects all targets because focus and explicit input are empty. The final shape is `[S', R]`, whose single match keeps its `{}` intact with `argDelta: -1`.
 
 ### Navigate with inferred arguments
 
 ```text
 ["S", {
-  "targets": [[["company", "git"], "https://github.com/company/{}"]],
+  "targets": {"company git": ["https://github.com/company/{}"]},
   "focus": []
 }]
 company git MyRepo .$
 ```
 
-`.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and stored dimensions are lowercase.)
+`.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and keys are lowercase.)
 
 ```json
 ["R", {
   "matches": [
-    ["https://github.com/company/MyRepo", ["company", "git"], ["MyRepo"], {"argDelta": 0}]
+    ["https://github.com/company/MyRepo", "company git", ["MyRepo"], {"argDelta": 0}]
   ],
   "inputs": ["company", "git"]
 }]
 ```
 
-### Preserve ambiguity when arguments are missing
+### Preserve ambiguity across targets
 
 ```text
 ["S", {
-  "targets": [
-    [["company", "git"], "https://github.com/company/{}"],
-    [["git", "personal"], "https://github.com/personal/{}/tree/{}"]
-  ],
+  "targets": {
+    "company git": ["https://github.com/company/{}"],
+    "git personal": ["https://github.com/personal/{}/tree/{}"]
+  },
   "focus": []
 }]
 git . thither .$
 ```
 
-Both targets are selected, so the result is ambiguous even though only one URL is complete. The complete destination leads because its `argDelta` is `0`, whatever the two scores are:
+Both targets are selected, so the result is ambiguous even though only one URL is complete. Each target yields one row: the arity-1 variant is `company git`'s best fit, and the arity-2 variant is `git personal`'s only variant. Targets are ordered by score, then target-set order; argument balance does not reorder rows across targets:
 
 ```text
 https://github.com/company/thither          argDelta:  0
 https://github.com/personal/thither/tree/{} argDelta: -1
 ```
 
+### Variants of one target
+
+```text
+["S", {"targets": {}, "focus": []}]
+https://jira.example.com jira .set
+https://jira.example.com/browse/{} jira .set
+jira .$
+```
+
+The first `.set` creates `jira` with an arity-0 variant; the second adds an arity-1 variant to the same target. `jira` has no arguments, so the arity-0 variant is the best fit and the target yields one match: a direct-navigation candidate.
+
+```json
+["R", {
+  "matches": [
+    ["https://jira.example.com", "jira", [], {"argDelta": 0}]
+  ],
+  "inputs": ["jira"]
+}]
+```
+
+Against the same resulting state, `jira PROJ .$` yields one match for `https://jira.example.com/browse/PROJ`, and `jira PROJ extra .$` yields two rows because neither variant has arity 2:
+
+```json
+["R", {
+  "matches": [
+    ["https://jira.example.com/browse/PROJ", "jira", ["PROJ"], {"argDelta": 1}],
+    ["https://jira.example.com", "jira", [], {"argDelta": 2}]
+  ],
+  "inputs": ["jira"]
+}]
+```
+
+Both rows are complete, but two matches are not a direct-navigation candidate. `jira . x .rm` then removes the arity-1 variant, leaving `jira` with the arity-0 variant alone, so `jira PROJ .$` afterwards yields one match with `argDelta: 1` and navigates.
+
 ### Select every target with an empty query
 
 ```text
 ["S", {
-  "targets": [
-    [["company", "git"], "https://github.com/company/{}"],
-    [["docs"], "https://docs.example.com/"]
-  ],
+  "targets": {
+    "company git": ["https://github.com/company/{}"],
+    "docs": ["https://docs.example.com/"]
+  },
   "focus": []
 }]
 .$
@@ -475,16 +552,16 @@ https://github.com/personal/thither/tree/{} argDelta: -1
 ```json
 ["R", {
   "matches": [
-    ["https://docs.example.com/", ["docs"], [],
-      {"argDelta": 0, "positions": [], "score": 0}],
-    ["https://github.com/company/{}", ["company", "git"], [],
-      {"argDelta": -1, "positions": [], "score": 0}]
+    ["https://github.com/company/{}", "company git", [],
+      {"argDelta": -1, "positions": [], "score": 0}],
+    ["https://docs.example.com/", "docs", [],
+      {"argDelta": 0, "positions": [], "score": 0}]
   ],
   "inputs": []
 }]
 ```
 
-Both scores are `0`, so argument balance decides: the complete `docs` destination leads despite being second in the target set. Two matches remain, so this is not a direct-navigation candidate.
+Both scores are `0`, so target-set order decides: `company git` leads because it comes first in the state, even though its destination is incomplete and `docs` is not. Two matches remain, so this is not a direct-navigation candidate.
 
 ### Stop at the first result
 
