@@ -4,9 +4,16 @@
 
 import { describe, expect, it } from 'vitest';
 import { createInterpreter, emptyState, type Program } from '../../dsl/index.ts';
-import { createBrowserEnv, type StorageArea } from '../browser-env.ts';
+import {
+  createBrowserEnv,
+  isHistoryLimit,
+  readSettings,
+  type StorageArea,
+  writeSettings,
+} from '../browser-env.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
+const SETTINGS_KEY = 'thither.settings.v1';
 
 // A Map-backed localStorage fake. `throwOnRead` models an unavailable localStorage.
 const fakeStorage = (
@@ -157,5 +164,67 @@ describe('browser env host operations', () => {
   it('lets an unavailable localStorage throw', () => {
     const storage = fakeStorage({}, true);
     expect(() => runClient(storage, [])).toThrow('localStorage unavailable');
+  });
+});
+
+// browser-client.md "Persistence" / "Bounded history" — `thither.settings.v1` holds configuration
+// only; `historyLimit` is a nonnegative integer defaulting to 10.
+describe('settings record', () => {
+  it('"Bounded history": historyLimit defaults to 10 when the key is absent', () => {
+    expect(readSettings(fakeStorage())).toEqual({ historyLimit: 10 });
+  });
+
+  it('"Persistence": a stored { historyLimit } round-trips', () => {
+    const storage = fakeStorage();
+    writeSettings(storage, { historyLimit: 3 });
+
+    expect(readSettings(storage)).toEqual({ historyLimit: 3 });
+    expect(JSON.parse(storage.map.get(SETTINGS_KEY) ?? 'null')).toEqual({ historyLimit: 3 });
+  });
+
+  it('"Bounded history": 0 is legal (retain only the current stack)', () => {
+    const storage = fakeStorage();
+    writeSettings(storage, { historyLimit: 0 });
+    expect(readSettings(storage)).toEqual({ historyLimit: 0 });
+  });
+
+  it.each([
+    ['not JSON', 'nonsense'],
+    ['a JSON array', '[10]'],
+    ['a JSON null', 'null'],
+    ['an object missing historyLimit', '{}'],
+    ['a string historyLimit', '{"historyLimit":"10"}'],
+    ['a negative historyLimit', '{"historyLimit":-1}'],
+    ['a fractional historyLimit', '{"historyLimit":2.5}'],
+  ])('"Bounded history": a malformed record (%s) reads as the default', (_label, raw) => {
+    const storage = fakeStorage({ [SETTINGS_KEY]: raw });
+    expect(readSettings(storage)).toEqual({ historyLimit: 10 });
+    // Reading never repairs: the malformed record stays as it was.
+    expect(storage.map.get(SETTINGS_KEY)).toBe(raw);
+  });
+
+  it('"Persistence": settings never hold language stack values', () => {
+    const storage = fakeStorage();
+    writeSettings(storage, { historyLimit: 5 });
+    runClient(storage, ['https://example.com/{}', 'home', '.set']);
+
+    expect(JSON.parse(storage.map.get(SETTINGS_KEY) ?? 'null')).toEqual({ historyLimit: 5 });
+  });
+
+  it.each([
+    [0, true],
+    [10, true],
+    [-1, false],
+    [1.5, false],
+    [Number.NaN, false],
+    [Number.POSITIVE_INFINITY, false],
+    ['10', false],
+    [null, false],
+  ])('"Bounded history": isHistoryLimit(%p) is %p', (value, expected) => {
+    expect(isHistoryLimit(value)).toBe(expected);
+  });
+
+  it('lets an unavailable localStorage throw on read', () => {
+    expect(() => readSettings(fakeStorage({}, true))).toThrow('localStorage unavailable');
   });
 });
