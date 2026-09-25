@@ -1,4 +1,5 @@
-// Reads program input from a URL, per browser-client.md "Reading input".
+// Reads program input from a URL, per browser-client.md "Reading input", and strips it again
+// once the fallback page is shown, so a reload does not re-execute a consumed mutation.
 //
 // Selection has explicit precedence, decided by *presence* of `q`, not its value:
 //   1. the query string's `q`  (an empty `?q=` still counts, and wins);
@@ -28,4 +29,24 @@ export const readInput = (url: string): readonly string[] => {
   }
 
   return [];
+};
+
+// Both sources are stripped, not just the one that ran: a reload would otherwise fall through
+// to the fragment's `q`. Sources without `q` are left byte-for-byte as they were.
+export const stripInput = (url: string): string => {
+  const stripped = new URL(url);
+
+  const query = new URLSearchParams(stripped.search);
+  if (query.has('q')) {
+    query.delete('q');
+    stripped.search = query.toString();
+  }
+
+  const fragment = fragmentParams(stripped.hash);
+  if (fragment.has('q')) {
+    fragment.delete('q');
+    stripped.hash = fragment.toString();
+  }
+
+  return stripped.href;
 };

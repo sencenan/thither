@@ -160,6 +160,20 @@ describe('browser env host operations', () => {
     const storage = fakeStorage({}, true);
     expect(() => runClient(storage, [])).toThrow('localStorage unavailable');
   });
+
+  it('keeps the initial input it was opened with, untouched by a run', () => {
+    const env = createBrowserEnv(fakeStorage(), ['https://example.com/', 'home', '.set']);
+    const interp = createInterpreter(env);
+    interp.execute(
+      ['.load', ...env.input, '.$', '.out', '.save'].reduce<Program>(
+        (acc, token) => interp.pushToken(acc, token),
+        [],
+      ),
+    );
+
+    expect(env.input).toEqual(['https://example.com/', 'home', '.set']);
+    expect(createBrowserEnv(fakeStorage()).input).toEqual([]);
+  });
 });
 
 // browser-client.md "Persistence" / "Bounded history" — `thither.stacks.v1` is oldest-first with the

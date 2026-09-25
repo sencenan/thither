@@ -37,7 +37,7 @@ Presence, not truthiness, decides: an explicitly empty `?q=` takes priority over
 
 Parse both the query and the fragment's parameter text with `URLSearchParams`, using its standard decoding exactly once: `+` represents a space and `%2B` a literal plus. If the selected source holds multiple `q` parameters, use the first. Do not apply an additional `decodeURIComponent` pass.
 
-Keep program input in the URL after execution. Reloading executes it again against the then-current state; the client does not suppress replay or remove consumed input with `history.replaceState`. This is an execution policy, not a claim that every program is idempotent.
+Once the fallback page is shown, remove the consumed input from the URL with `history.replaceState`: delete `q` from both the query and the fragment (both, so a reload cannot fall through to the fragment), and leave every other parameter, the path, and a `q`-less fragment as they were. A reload is then a blank open against the then-current state rather than a replay of a program that may have mutated it — `<u> home .set` sets once, not once per refresh. This is the only URL the client rewrites; automatic navigation leaves the page instead, and the bare error page (no execution happened) keeps its URL. The tokens read from the URL are recorded on the browser environment as `input` before the strip, so the fallback UI still has the program the user typed (its text field is seeded from `input`, not from the address bar).
 
 ## Core interface
 
@@ -115,7 +115,7 @@ Malformed stored data must not trigger an automatic reset or be replaced by gues
 
 The fallback page has a text field at the top containing the current program input. Editing it updates the query and triggers live execution after a **200 ms keystroke debounce**, rather than waiting for Enter; each keystroke restarts the delay. Live execution uses the ordinary interpreter and persistence flow, including mutations and bounded history — it is not a separate read-only search.
 
-Once the UI is shown, automatic navigation is disabled for the remainder of that page load, even when only one complete match exists. Users navigate by clicking a complete result or using its keyboard shortcut. Reloading is a new initial URL-driven execution, so it can redirect automatically.
+Once the UI is shown, automatic navigation is disabled for the remainder of that page load, even when only one complete match exists. Users navigate by clicking a complete result or using its keyboard shortcut. Reloading is a new initial URL-driven execution, but the consumed input has left the URL ("Reading input"), so it opens blank rather than replaying the program.
 
 Below the field, display results in the order `R.matches` already has; the core emits its final display order, so the client does not sort. Indicate which dimensions matched and which arguments were inserted from each match's `hint.positions` and `hint.score`, rendering highlights from that evidence rather than re-running the matcher.
 
