@@ -4,9 +4,9 @@
 // core's `defaultEnv`; the caller builds an interpreter from it and reads the env's output
 // register fields (`terminal`/`loaded`) after each run.
 //
-// This is the naive skeleton: one stored stack, no history, eviction, quota retry, or
-// `thither.settings.v1` — S4 deepens the same three operations without touching their
-// callers. This module is the only place that names `thither.stacks.v1`.
+// This is the naive skeleton: one stored stack, no history, eviction, or quota retry — S4
+// deepens the same three operations without touching their callers. This module is the only
+// place that names `thither.stacks.v1` and `thither.settings.v1`.
 
 import type {
   InterpreterEnv,
@@ -20,6 +20,8 @@ import type {
 import { defaultEnv, emptyState } from '../dsl/index.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
+const SETTINGS_KEY = 'thither.settings.v1';
+const DEFAULT_HISTORY_LIMIT = 10;
 
 // The `getItem`/`setItem`/`removeItem` slice of `localStorage`, injected so tests can back
 // it with a `Map` and run in plain Node with no DOM.
@@ -40,6 +42,42 @@ export interface OutputRegister {
 // of OutputRegister are splatted onto the env, so the browser world is one value. Build an
 // interpreter from it, then read `terminal`/`loaded` off the same object after each run.
 export interface BrowserEnv extends InterpreterEnv, OutputRegister {}
+
+// browser-client.md "Persistence" — `thither.settings.v1` holds configuration only, never
+// language stack values.
+export interface Settings {
+  readonly historyLimit: number;
+}
+
+// browser-client.md "Bounded history" — the history limit `N` is a nonnegative integer; `0`
+// retains only the current stack.
+export const isHistoryLimit = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+// An absent or malformed record reads as the defaults; reading never repairs the record.
+export const readSettings = (storage: StorageArea): Settings => {
+  const raw = storage.getItem(SETTINGS_KEY);
+  if (raw === null) {
+    return { historyLimit: DEFAULT_HISTORY_LIMIT };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_ex) {
+    return { historyLimit: DEFAULT_HISTORY_LIMIT };
+  }
+
+  const historyLimit =
+    typeof parsed === 'object' && parsed !== null && 'historyLimit' in parsed
+      ? parsed.historyLimit
+      : undefined;
+  return { historyLimit: isHistoryLimit(historyLimit) ? historyLimit : DEFAULT_HISTORY_LIMIT };
+};
+
+export const writeSettings = (storage: StorageArea, settings: Settings): void => {
+  storage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+};
 
 const parseError = (description: string): ThitherError => [
   'E',
