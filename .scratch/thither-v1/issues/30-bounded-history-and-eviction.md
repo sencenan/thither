@@ -1,7 +1,7 @@
 # Bounded history and eviction inside `.save`
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 29
 
 ## Question

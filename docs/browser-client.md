@@ -60,7 +60,7 @@ The client registers three **host operations** on `defaultEnv()` before building
 
 - `.load`: clears the register; reads `thither.stacks.v1`; when the record is absent, pushes `[emptyState()]`; otherwise validates every value of the current stack through `interp.pushToken` and pushes the stack. A record that is not a non-empty array of arrays, or whose current stack holds a value that parses to `E`, makes `.load` push that `parse_error` and set `loaded: false` in the register. When `localStorage` itself is unavailable, `.load` throws.
 - `.out`: if the top of the stack is an `R` or `E`, pops it into the register as the run's terminal; otherwise does nothing. It extracts output for the client's next step and is not a general-purpose pop.
-- `.save`: persists the stack as it stands — never an empty one — under the bounded-history rules below. If saving fails even after evicting history, `.save` pushes `E(unknown_error)` and writes that `E` into the register as the run's terminal, replacing the `R` that `.out` captured, so the client renders the failure rather than treating the execution as persisted.
+- `.save`: persists the stack as it stands — never an empty one — under the bounded-history rules below. If the write fails, `.save` pushes `E(unknown_error)` and writes that `E` into the register as the run's terminal, replacing the `R` that `.out` captured, so the client renders the failure rather than treating the execution as persisted.
 
 Host operations are ordinary environment symbols, so a user can type them mid-program. The epilogue always runs last, so a stray `.load`, `.out`, or `.save` cannot corrupt the final write; this is documented behaviour, not a defended-against attack.
 
@@ -107,7 +107,7 @@ Eviction removes elements from the front. With history limit `N`, the array hold
 { "historyLimit": 10 }
 ```
 
-When a save exceeds the storage quota, drop the oldest history entries and retry, always preserving the current stack. If saving still fails, report the failure explicitly rather than treating the execution as persisted.
+When a save exceeds the storage quota, the write simply fails: the stored record is left as it was and the failure is reported explicitly rather than treating the execution as persisted. History is not evicted to make room — exceeding the quota is unlikely at these sizes, and the user can lower the history limit or reset through the settings if it ever happens.
 
 Malformed stored data must not trigger an automatic reset or be replaced by guessed state. `.load` pushes an `E`, which seals the stack: the user's tokens are absorbed, `.out` captures the `E`, and `.save` finds an empty stack and writes nothing. Render the error in place of the result list and state that recovery happens through the settings reset, keeping the Settings control reachable. Only an explicit reset write replaces the stored record. When localStorage is unavailable rather than merely empty, show that as an error too: do not fall back to an in-memory session, execute programs, or navigate, because without persistence the execution loop has no valid starting point.
 

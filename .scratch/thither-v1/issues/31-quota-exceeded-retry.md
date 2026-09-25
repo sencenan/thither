@@ -1,7 +1,7 @@
 # Quota-exceeded retry inside `.save`
 
 Type: task
-Status: open
+Status: resolved
 Blocked by: 30
 
 ## Question
@@ -16,3 +16,18 @@ In scope:
 - This deepens ticket 30's write path only; callers unchanged.
 
 **Done when** a quota-throwing storage fake drives `.save` to evict-and-retry down to the current stack, a persisted write after eviction is observed, and a still-failing write yields `E(unknown_error)` on both the stack and the register's `terminal`. Fixtures cite `browser-client.md` "Persistence".
+
+## Answer
+
+**The ticket's evict-and-retry loop was built, reviewed, and rejected by the human** as heavy-handed for an event this unlikely: at these record sizes (a handful of small JSON stacks) the quota is effectively unreachable, and if it ever is, the user can lower the history limit or reset through the settings. **A save over quota now simply fails**, explicitly. `browser-client.md`'s "Persistence" quota paragraph and `.save` bullet, and ADR 0007's `.save` bullet, were amended in the same commit; the `dsl.md` §6 vocabulary is unchanged (`unknown_error`).
+
+**`writeCurrentStack(storage, stack): void`** (`src/client/persistence.ts`): composes the next record as before (re-read, structural-difference dedup, trim to `N + 1`), then wraps the one `setItem` in a try/catch. On a throw it **pushes `['E', { type: 'unknown_error', description: 'the stack could not be saved: storage is full' }]` onto the stack it was given** and returns; the stored record is left as it was. A `boolean` success return was proposed in review and rejected — the operation-style contract (mutate the stack, fail through a pushed `E`) is the one every other operation in the core uses, so the client's write follows it too.
+
+**`.save`** (`src/client/browser-env.ts`): after the write, peeks the stack top exactly as `.out` does; an `E` there becomes `env.terminal`, over the `R` that `.out` captured. Nothing else changed — `.load`, `.out`, and every caller are untouched.
+
+**Decisions to note:**
+
+1. **The thrown error is not inspected.** Browsers have disagreed on the quota error's name and code, and the only other way `setItem` fails is storage being unavailable — which `readHistory`'s `getItem` has already thrown on *outside* the try, so `main.ts`'s single catch still sees it.
+2. **Navigation needs no new gate.** `resolveNavigationDestination` only navigates on an `R`; the `E` in `terminal` is enough. Pinned end to end in `navigation.test.ts`: a one-target record, query `home` (a single complete match), quota `0` → terminal is `E(unknown_error)`, destination `undefined`. Confirmed to fail against the pre-change `.save`.
+
+**Tests:** the Map-backed fake in both client test files gained a `quota` (longest accepted value; over it, `setItem` throws a `DOMException('QuotaExceededError')`), and `browser-env.test.ts`'s `fakeStorage` second parameter became an options object (`{ throwOnRead, quota }`). Two fixtures citing `browser-client.md` "Persistence": quota `0` → `E(unknown_error)` is both the stack top and `terminal`, and the record equals its pre-run value; and the end-to-end no-navigation case above. 324 → 326 tests, `pnpm verify` green. Unblocks 33 jointly with 32.

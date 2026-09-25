@@ -11,11 +11,19 @@ import type { StorageArea } from '../persistence.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 
-const fakeStorage = (initial: Record<string, string> = {}): StorageArea => {
+// `quota` is the longest value `setItem` accepts before throwing the browser's
+// `QuotaExceededError`.
+const fakeStorage = (
+  initial: Record<string, string> = {},
+  quota = Number.POSITIVE_INFINITY,
+): StorageArea => {
   const map = new Map(Object.entries(initial));
   return {
     getItem: (key) => map.get(key) ?? null,
     setItem: (key, value) => {
+      if (value.length > quota) {
+        throw new DOMException('quota exceeded', 'QuotaExceededError');
+      }
       map.set(key, value);
     },
     removeItem: (key) => {
@@ -160,5 +168,17 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
     } else {
       expect.fail('expected an R');
     }
+  });
+
+  it('a save that fails on quota surfaces the E and never navigates, even on a single complete match ("Persistence")', async () => {
+    const { register, destination } = await run(fakeStorage({ [STACKS_KEY]: oneTargetRecord }, 0), [
+      'home',
+    ]);
+
+    expect(destination).toBeUndefined();
+    expect(register.terminal).toEqual([
+      'E',
+      { type: 'unknown_error', description: expect.any(String) },
+    ]);
   });
 });
