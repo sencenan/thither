@@ -13,7 +13,7 @@ The browser client's three **host operations** are the whole of its persistence:
 
 - `.load` opens a run: clears the output register, reads `thither.stacks.v1`, validates every value of the current stack through `pushToken`, and pushes the stack (or `[emptyState()]` when the record is absent). A malformed record pushes the `parse_error` that `pushToken` produced and flags `loaded: false` in the register; an unavailable `localStorage` throws, because nothing downstream can run.
 - `.out` moves the top of the stack into the **output register** when it is an `R` or `E`, and does nothing otherwise. It extracts the run's output for the host's next step; it is not a general pop.
-- `.save` persists the stack as it stands — never an empty one — applying the bounded-history difference rule, and records `changed` in the register. A save that fails even after evicting history pushes `E(unknown_error)` and records it in the register.
+- `.save` persists the stack as it stands — never an empty one — applying the bounded-history difference rule. A save that fails even after evicting history pushes `E(unknown_error)` and writes it into the register as the run's terminal. (It originally also recorded `changed`, a structural-difference flag the client's navigation rule consulted; [ADR 0009](0009-auto-navigate-on-a-non-empty-query.md) dropped it, along with the register's `saved` field.)
 
 The client reads only the register afterwards; it never inspects the returned stack.
 

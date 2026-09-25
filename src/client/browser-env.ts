@@ -2,7 +2,7 @@
 // `defaultEnv()`'s four language operations plus the three host operations (`.load`, `.out`,
 // `.save`) that are the whole of the client's persistence (ADR 0005, ADR 0007). Mirrors the
 // core's `defaultEnv`; the caller builds an interpreter from it and reads the env's output
-// register fields (`terminal`/`loaded`/`saved`) after each run.
+// register fields (`terminal`/`loaded`) after each run.
 //
 // This is the naive skeleton: one stored stack, no history, eviction, quota retry, or
 // `thither.settings.v1` — S4 deepens the same three operations without touching their
@@ -34,12 +34,11 @@ export interface StorageArea {
 export interface OutputRegister {
   terminal?: Result | ThitherError | undefined;
   loaded: boolean;
-  saved?: { changed: boolean } | ThitherError | undefined;
 }
 
 // An interpreter environment (ADR 0005) that is *also* the client's output register: the fields
 // of OutputRegister are splatted onto the env, so the browser world is one value. Build an
-// interpreter from it, then read `terminal`/`loaded`/`saved` off the same object after each run.
+// interpreter from it, then read `terminal`/`loaded` off the same object after each run.
 export interface BrowserEnv extends InterpreterEnv, OutputRegister {}
 
 const parseError = (description: string): ThitherError => [
@@ -71,7 +70,7 @@ const currentStackOf = (raw: string): readonly unknown[] | null => {
 
 export const createBrowserEnv = (storage: StorageArea): BrowserEnv => {
   // The env is also the output register (its fields are splatted in), so the host operations
-  // mutate it directly and the client reads terminal/loaded/saved off the same object.
+  // mutate it directly and the client reads terminal/loaded off the same object.
   const { symbols } = defaultEnv();
   const env: BrowserEnv = { symbols, loaded: true };
 
@@ -81,7 +80,6 @@ export const createBrowserEnv = (storage: StorageArea): BrowserEnv => {
   // The interpreter is handed in by the evaluator (ADR 0005), so validation reuses pushToken.
   const load: OpFn = (interp, stack) => {
     env.terminal = undefined;
-    env.saved = undefined;
     env.loaded = true;
 
     const raw = storage.getItem(STACKS_KEY); // storage throwing is fatal — let it throw
@@ -128,20 +126,13 @@ export const createBrowserEnv = (storage: StorageArea): BrowserEnv => {
   };
 
   // browser-client.md "Host operations" — persist the stack as it stands, never an empty one.
-  // Naive: the record is the single current stack. `changed` is JSON structural difference from
-  // the previous current stack (an absent record counts as `[emptyState()]`).
+  // Naive: the record is the single current stack.
   const save: OpFn = (_interp, stack) => {
     if (stack.length === 0) {
       return stack;
     }
 
-    const raw = storage.getItem(STACKS_KEY);
-    const previous: readonly unknown[] =
-      raw === null ? [emptyState()] : (currentStackOf(raw) ?? []);
-    const changed = JSON.stringify(previous) !== JSON.stringify(stack);
-
     storage.setItem(STACKS_KEY, JSON.stringify([stack]));
-    env.saved = { changed };
     return stack;
   };
 

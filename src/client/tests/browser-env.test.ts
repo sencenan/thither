@@ -64,29 +64,23 @@ describe('browser env host operations', () => {
     expect(register.loaded).toBe(true);
   });
 
-  it('a plain search leaves changed false', () => {
+  it('a plain search persists the stack it loaded', () => {
     const storage = fakeStorage();
     runClient(storage, []);
 
     const { register } = runClient(storage, ['github']);
-    expect(register.saved).toEqual({ changed: false });
+    expect(record(storage)).toEqual(emptyRecord);
     expect(register.loaded).toBe(true);
   });
 
-  it('a mutation records changed true and resumes from the stored stack', () => {
+  it('a mutation is persisted and a reload resumes from the stored stack', () => {
     const storage = fakeStorage();
-    const { register } = runClient(storage, [
-      'https://github.com/company/{}',
-      'company',
-      'git',
-      '.set',
-    ]);
+    runClient(storage, ['https://github.com/company/{}', 'company', 'git', '.set']);
 
-    expect(register.saved).toEqual({ changed: true });
+    expect(record(storage)).not.toEqual(emptyRecord);
 
     // The stored current stack now carries the target: a reload resumes from it and searches it.
     const reload = runClient(storage, ['company']);
-    expect(reload.register.saved).toEqual({ changed: false });
     expect(reload.register.terminal?.[0]).toBe('R');
     const terminal = reload.register.terminal;
     if (terminal?.[0] === 'R') {
@@ -105,7 +99,6 @@ describe('browser env host operations', () => {
       expect(terminal[1].type).toBe('parse_error');
     }
     // .out drained the E, .save saw an empty stack: the bad record is untouched.
-    expect(register.saved).toBeUndefined();
     expect(record(storage)).toEqual({ not: 'a stack record' });
   });
 
@@ -157,7 +150,7 @@ describe('browser env host operations', () => {
     const program = interp.pushToken([], '.save');
     interp.execute(program);
 
-    expect(register.saved).toBeUndefined();
+    expect(register.terminal).toBeUndefined();
     expect(storage.map.size).toBe(0);
   });
 
