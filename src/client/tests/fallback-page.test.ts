@@ -2,7 +2,9 @@
 
 // browser-client.md "Fallback UI and settings" — the text field and live execution: the field
 // is seeded from the run's input and owns the keyboard; editing re-runs the ordinary program on
-// a 60 ms debounce and re-renders from the register; live runs never navigate.
+// a 60 ms debounce and re-renders from the register; live runs never navigate. Navigation from
+// the page is by click, `Ctrl+digit`, or Enter on a row; navigating in happy-dom only moves
+// `location.href`, which every test starts from `PAGE`.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInterpreter } from '../../dsl/index.ts';
@@ -43,10 +45,31 @@ const oneTargetRecord = JSON.stringify([
   [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
 ]);
 
+// `t01` … `t11`, each to `https://example.com/tNN`, in target-set order.
+const elevenTargetsRecord = JSON.stringify([
+  [
+    [
+      'S',
+      {
+        targets: Object.fromEntries(
+          Array.from({ length: 11 }, (_, i) => {
+            const name = `t${String(i + 1).padStart(2, '0')}`;
+            return [name, [`https://example.com/${name}`]];
+          }),
+        ),
+        focus: [],
+      },
+    ],
+  ],
+]);
+
+const PAGE = location.href;
+
 let root: HTMLElement;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  location.replace(PAGE);
   document.body.innerHTML = '<div id="app"></div>';
   const app = document.querySelector('#app');
   if (!(app instanceof HTMLElement)) {
@@ -331,5 +354,166 @@ describe('an unavailable localStorage ("caught once … rendered as a bare error
 
     expect(root.textContent).toBe('localStorage is unavailable');
     expect(root.querySelector('input')).toBeNull();
+  });
+
+  it('the bare error page releases the keyboard: Ctrl+1 opens nothing', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: elevenTargetsRecord });
+    const { field } = open(storage, []);
+    expect(links()).toHaveLength(11);
+
+    storage.unavailable = true;
+    type(field, 'x');
+    vi.advanceTimersByTime(60);
+    keydown(document.body, { key: '1', code: 'Digit1', ctrlKey: true });
+
+    expect(location.href).toBe(PAGE);
+  });
+});
+
+describe('shortcuts ("navigation shortcuts Ctrl+1 through Ctrl+9, then Ctrl+0 for the tenth, active whether or not the text field has focus")', () => {
+  it('Ctrl+2 with the field focused opens the second row', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+    expect(document.activeElement).toBe(field);
+
+    keydown(field, { key: '2', code: 'Digit2', ctrlKey: true });
+
+    expect(location.href).toBe('https://example.com/t02');
+  });
+
+  it('Ctrl+2 with the field blurred opens the same row', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+    field.blur();
+
+    keydown(document.body, { key: '2', code: 'Digit2', ctrlKey: true });
+
+    expect(location.href).toBe('https://example.com/t02');
+  });
+
+  it('a numpad digit is read by code too', () => {
+    open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+
+    keydown(document.body, { key: '3', code: 'Numpad3', ctrlKey: true });
+
+    expect(location.href).toBe('https://example.com/t03');
+  });
+
+  it('Ctrl+0 opens the tenth row', () => {
+    open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+
+    keydown(document.body, { key: '0', code: 'Digit0', ctrlKey: true });
+
+    expect(location.href).toBe('https://example.com/t10');
+  });
+
+  it('a digit past the last row opens nothing', () => {
+    open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    expect(links()).toHaveLength(1);
+
+    keydown(document.body, { key: '2', code: 'Digit2', ctrlKey: true });
+
+    expect(location.href).toBe(PAGE);
+  });
+
+  it('a plain digit is typing, not a shortcut', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: '2',
+      code: 'Digit2',
+    });
+
+    field.dispatchEvent(event);
+
+    expect(location.href).toBe(PAGE);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('"A shortcut … opens the row\'s destination as rendered, an unfilled {} included"', () => {
+    const record = JSON.stringify([
+      [['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }]],
+    ]);
+    open(fakeStorage({ [STACKS_KEY]: record }), ['company']);
+    expect(links()).toEqual(['https://github.com/company/{}']);
+
+    keydown(document.body, { key: '1', code: 'Digit1', ctrlKey: true });
+
+    expect(location.href).toBe(new URL('https://github.com/company/{}').href);
+  });
+});
+
+describe('Enter ("Enter opens the first row when the run searched a query … a pending debounce is run first, so Enter acts on what was typed")', () => {
+  it('Enter after typing a query runs the pending debounce now and opens its first row', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: elevenTargetsRecord });
+    const { field } = open(storage, []);
+    const before = storage.writes;
+
+    type(field, 't07');
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(storage.writes).toBe(before + 1);
+    expect(location.href).toBe('https://example.com/t07');
+  });
+
+  it('`<url> home .set` then Enter commits and lists rather than opening the first of every target', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, []);
+
+    type(field, 'https://example.com/ home .set');
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(PAGE);
+    expect(links()).toEqual(['https://example.com/']);
+    expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
+      [['S', { targets: {}, focus: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+    ]);
+  });
+
+  it('Enter on a blank open (R.inputs empty) opens nothing, though every target is listed', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+    expect(links()).toHaveLength(11);
+
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(PAGE);
+  });
+
+  it('Enter with no matches opens nothing', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['zzz']);
+    expect(links()).toEqual([]);
+
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(PAGE);
+  });
+
+  it('Enter with the field blurred still opens the first row of the query', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t1']);
+    const [first] = links();
+    expect(first).toBeDefined();
+    field.blur();
+
+    keydown(document.body, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(first);
+  });
+
+  it('Enter pressed in another editable element is left alone', () => {
+    open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t07']);
+    const other = document.createElement('textarea');
+    document.body.appendChild(other);
+    other.focus();
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+      code: 'Enter',
+    });
+
+    other.dispatchEvent(event);
+
+    expect(location.href).toBe(PAGE);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

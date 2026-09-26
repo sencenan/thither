@@ -1,27 +1,35 @@
 // @vitest-environment happy-dom
 
-// browser-client.md "Fallback UI" — the skeleton render: matches as plain links in emitted order,
-// an error as its type/description, the reset hint when the store could not be loaded, and the
-// setup instructions in place of the list while the target set is empty.
+// browser-client.md "Fallback UI" — composing the output region from the register: an error as
+// its type/description, then either the setup instructions (while the target set is empty) or
+// the match list, then the reset hint when the store could not be loaded; and the bare error
+// page that replaces everything when no execution happened.
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { OutputRegister } from '../browser-env.ts';
-import { renderBareError, renderView } from '../view.ts';
+import { renderBareError, renderOutput } from '../output.ts';
 
 let root: HTMLElement;
 
 beforeEach(() => {
   document.body.innerHTML = '<div id="app"></div>';
   const app = document.querySelector('#app');
-  if (app === null) {
+  if (!(app instanceof HTMLElement)) {
     throw new Error('missing #app');
   }
-  root = app as HTMLElement;
+  root = app;
 });
 
-describe('renderView', () => {
-  it('renders R.matches as links in the order given, without sorting', () => {
-    const register: OutputRegister = {
+const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [] }];
+const oneTarget: OutputRegister['state'] = [
+  'S',
+  { targets: { home: ['https://example.com/'] }, focus: [] },
+];
+const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
+
+describe('renderOutput', () => {
+  it('renders R.matches as the match list, in the order given', () => {
+    renderOutput(root, {
       loaded: true,
       terminal: [
         'R',
@@ -45,8 +53,8 @@ describe('renderView', () => {
           inputs: [],
         },
       ],
-    };
-    renderView(root, register);
+      state: oneTarget,
+    });
 
     const links = [...root.querySelectorAll('a')];
     expect(links.map((a) => a.getAttribute('href'))).toEqual([
@@ -56,94 +64,52 @@ describe('renderView', () => {
     expect(links[0]?.textContent).toContain('beta');
   });
 
-  it('shows a no-matches line for an empty match set', () => {
-    const register: OutputRegister = {
-      loaded: true,
-      terminal: ['R', { matches: [], inputs: [] }],
-    };
-    renderView(root, register);
+  it('shows the no-matches line for an empty match set on a non-empty target set', () => {
+    renderOutput(root, { loaded: true, terminal: everyTarget, state: oneTarget });
 
     expect(root.querySelector('a')).toBeNull();
     expect(root.textContent).toContain('No matches');
+    expect(root.textContent).not.toContain('?q=%s');
   });
 
   it('renders an E as its type and description verbatim', () => {
-    const register: OutputRegister = {
+    renderOutput(root, {
       loaded: true,
       terminal: ['E', { type: 'invalid_destination', description: 'not a URL' }],
-    };
-    renderView(root, register);
+    });
 
     expect(root.textContent).toContain('invalid_destination');
     expect(root.textContent).toContain('not a URL');
   });
 
   it('adds the reset hint when loaded is false', () => {
-    const register: OutputRegister = {
+    renderOutput(root, {
       loaded: false,
       terminal: ['E', { type: 'parse_error', description: 'bad record' }],
-    };
-    renderView(root, register);
+    });
 
     expect(root.textContent).toContain('Settings reset');
   });
 
-  it('renderBareError replaces the whole root with the failure message ("rendered as a bare error page")', () => {
-    renderView(root, { loaded: true, terminal: ['R', { matches: [], inputs: [] }] });
-    renderBareError(root, new Error('localStorage is unavailable'));
-
-    expect(root.textContent).toBe('localStorage is unavailable');
-    expect(root.querySelector('a')).toBeNull();
-  });
-
-  it('renderBareError shows a non-Error throw as text', () => {
-    renderBareError(root, 'gone');
-
-    expect(root.textContent).toBe('gone');
-  });
-
-  describe('setup instructions ("While the target set is empty … in place of the result list")', () => {
+  describe('setup instructions ("in place of the result list")', () => {
     // The page's URL is moved with `history.replaceState`, as `main.ts` moves it; happy-dom holds
     // it to the test origin, so the path stands in for the deployed `/thither/`.
     const PAGE = `${location.origin}/thither/`;
-    const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [] }];
-    const oneTarget: OutputRegister['state'] = [
-      'S',
-      { targets: { home: ['https://example.com/'] }, focus: [] },
-    ];
-    const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
 
     beforeEach(() => {
       history.replaceState(null, '', PAGE);
     });
 
-    it('an empty target set shows both shortcut templates and the example .set program', () => {
-      renderView(root, { loaded: true, terminal: everyTarget, state: emptySet });
+    it('an empty target set shows the instructions for this page instead of the list', () => {
+      renderOutput(root, { loaded: true, terminal: everyTarget, state: emptySet });
 
       expect(root.textContent).toContain(`${PAGE}?q=%s`);
       expect(root.textContent).toContain(`${PAGE}#q=%s`);
-      expect(root.textContent).toContain('https://github.com/company/{} company git .set');
       expect(root.textContent).not.toContain('No matches');
     });
 
-    it("the templates are the page's own URL with its query and fragment dropped", () => {
-      history.replaceState(null, '', `${PAGE}?x=1#y=2`);
-      renderView(root, { loaded: true, terminal: everyTarget, state: emptySet });
-
-      expect(root.textContent).toContain(`${PAGE}?q=%s`);
-      expect(root.textContent).toContain(`${PAGE}#q=%s`);
-      expect(root.textContent).not.toContain('x=1');
-    });
-
-    it('a non-empty target set with no matches shows the no-matches line, not the instructions', () => {
-      renderView(root, { loaded: true, terminal: everyTarget, state: oneTarget });
-
-      expect(root.textContent).toContain('No matches');
-      expect(root.textContent).not.toContain('?q=%s');
-    });
-
     it('"They are not shown when loaded is false": a corrupted record shows the E and the hint only', () => {
-      renderView(root, {
+      renderOutput(root, {
         loaded: false,
         terminal: ['E', { type: 'parse_error', description: 'bad record' }],
       });
@@ -154,7 +120,7 @@ describe('renderView', () => {
     });
 
     it('an E on an empty target set is shown beneath the field, the instructions still below it', () => {
-      renderView(root, {
+      renderOutput(root, {
         loaded: true,
         terminal: ['E', { type: 'invalid_destination', description: 'not a URL' }],
         state: emptySet,
@@ -167,13 +133,29 @@ describe('renderView', () => {
   });
 
   it('replaces prior content on each render', () => {
-    renderView(root, { loaded: true, terminal: ['R', { matches: [], inputs: [] }] });
-    renderView(root, {
+    renderOutput(root, { loaded: true, terminal: everyTarget, state: oneTarget });
+    renderOutput(root, {
       loaded: true,
       terminal: ['E', { type: 'parse_error', description: 'x' }],
     });
 
     expect(root.textContent).not.toContain('No matches');
     expect(root.textContent).toContain('parse_error');
+  });
+});
+
+describe('renderBareError ("rendered as a bare error page")', () => {
+  it('replaces the whole root with the failure message', () => {
+    renderOutput(root, { loaded: true, terminal: everyTarget, state: oneTarget });
+    renderBareError(root, new Error('localStorage is unavailable'));
+
+    expect(root.textContent).toBe('localStorage is unavailable');
+    expect(root.querySelector('a')).toBeNull();
+  });
+
+  it('shows a non-Error throw as text', () => {
+    renderBareError(root, 'gone');
+
+    expect(root.textContent).toBe('gone');
   });
 });

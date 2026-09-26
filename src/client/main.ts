@@ -11,8 +11,8 @@ import { createBrowserEnv } from './browser-env.ts';
 import { mountFallbackPage } from './fallback-page.ts';
 import { readInput, stripInput } from './input.ts';
 import { resolveNavigationDestination } from './navigation.ts';
+import { renderBareError } from './output.ts';
 import { run } from './run.ts';
-import { renderBareError } from './view.ts';
 
 const root = document.querySelector('#app');
 

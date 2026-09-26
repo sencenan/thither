@@ -14,7 +14,8 @@ Build the Settings control and modal per `browser-client.md` "Fallback UI and se
 - **History limit** field validated with `isHistoryLimit`, written with `writeSettings`; show the current value from `readSettings`; an invalid value is a modal-level message.
 - **After any action the dialog closes, the page re-runs the field's current contents through ticket 37's path, and a short toast names what happened** (ticket 36, decision 7). No action replays a program, searches, or navigates. (There is no Web Lock to run under: ticket 37 dropped cross-tab serialization; a run is synchronous and so is each action.) The re-run is a call on ticket 37's `FallbackPage`: its `flush()` runs only a *pending* debounce (Enter's need), so add an unconditional `run()` beside it for the after-action re-run.
 - **History depth is not on the register**; the modal reads `readHistory(storage)` itself (ticket 36, decision 2).
-- Reword `RESET_HINT` in `view.ts` now that the control exists ("Recover in Settings").
+- Reword `RESET_HINT` in `output.ts` (ticket 38 renamed `view.ts`) now that the control exists ("Recover in Settings").
+- **Keyboard while the dialog is open** (handed over by ticket 38): the page's one `keydown` listener intercepts `Ctrl+digit` anywhere and Enter in the field or outside any editable, following the row's link via `match-list.ts`'s `shortcutLink`/`rowLink`. Neither may open a row while the dialog is open; Enter in the dialog's textarea and limit field must stay theirs. Escape closes the dialog.
 - No settings URL or `view=settings` parameter.
 
 TDD under `happy-dom`: the actions are already fixture-covered in `persistence.ts`; test the modal's wiring (which function is called with what, ordering of the list, click-to-view, what re-renders after an action) and the limit validation UX.
