@@ -167,6 +167,14 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(root.textContent).toContain('No matches');
   });
 
+  it('marks the list enter-armed only when Enter would open the first row', () => {
+    render(numbered(2));
+    expect(root.querySelector('ol')?.classList.contains('enter-armed')).toBe(false);
+
+    root.replaceChildren(...renderMatchList(document, numbered(2), true));
+    expect(root.querySelector('ol')?.classList.contains('enter-armed')).toBe(true);
+  });
+
   it('the summary bar sits above the list, not after it', () => {
     render(numbered(2));
 

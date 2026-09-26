@@ -76,6 +76,21 @@ export const mountFallbackPage = (
   fieldRow.className = 'field';
   fieldRow.append(field, controls);
 
+  // Lightweight text wordmark in the gap above the field: a terminal prompt chevron in the accent
+  // colour, then the name. No asset, so it stays in the single-file bundle for free.
+  const brand = doc.createElement('header');
+  brand.className = 'brand';
+  const brandMark = doc.createElement('span');
+  brandMark.className = 'brand-mark';
+  brandMark.textContent = '\u276f';
+  const brandName = doc.createElement('span');
+  brandName.className = 'brand-name';
+  brandName.textContent = 'thither';
+  const brandTag = doc.createElement('span');
+  brandTag.className = 'brand-tag';
+  brandTag.textContent = '\u2014 to that place';
+  brand.append(brandMark, brandName, brandTag);
+
   const output = doc.createElement('div');
   output.className = 'output';
 
@@ -166,7 +181,7 @@ export const mountFallbackPage = (
     }
   });
 
-  root.replaceChildren(fieldRow, output, settings.element, help.element);
+  root.replaceChildren(brand, fieldRow, output, settings.element, help.element);
   render();
 
   field.focus();

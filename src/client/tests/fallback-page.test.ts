@@ -410,6 +410,12 @@ describe('the Help control', () => {
     expect(root.querySelector('.field .settings-control svg')).not.toBeNull();
   });
 
+  it('shows the thither wordmark above the field', () => {
+    open(fakeStorage(), []);
+
+    expect(root.querySelector('.brand .brand-name')?.textContent).toBe('thither');
+  });
+
   it('the keyboard bails while Help is open: Ctrl+1 opens nothing', () => {
     open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
     click(root.querySelector('.field .help-control'));

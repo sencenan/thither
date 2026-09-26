@@ -96,6 +96,7 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
 const renderFooter = (doc: Document, count: number): Element => {
   const footer = doc.createElement('footer');
   const summary = doc.createElement('span');
+  summary.className = 'count';
   summary.textContent =
     `${count} ${count === 1 ? 'match' : 'matches'}` +
     (count > SHORTCUT_DIGITS.length ? ' · shortcuts on the first ten' : '');
@@ -105,7 +106,13 @@ const renderFooter = (doc: Document, count: number): Element => {
   return footer;
 };
 
-export const renderMatchList = (doc: Document, matches: readonly Match[]): readonly Node[] => {
+// `enterArmed` is true when Enter would open the first row (the run searched a query). It marks the
+// list so CSS can show the first row as the Enter target while nothing is hovered.
+export const renderMatchList = (
+  doc: Document,
+  matches: readonly Match[],
+  enterArmed = false,
+): readonly Node[] => {
   if (matches.length === 0) {
     const empty = doc.createElement('p');
     empty.textContent = 'No matches.';
@@ -113,7 +120,7 @@ export const renderMatchList = (doc: Document, matches: readonly Match[]): reado
   }
 
   const list = doc.createElement('ol');
-  list.className = 'matches';
+  list.className = enterArmed ? 'matches enter-armed' : 'matches';
   list.append(...matches.map((match, index) => renderRow(doc, match, index)));
   // The summary sits above the list and sticks to the top of the viewport (style.css), so the
   // count and key hints stay visible while a long list scrolls under it.
