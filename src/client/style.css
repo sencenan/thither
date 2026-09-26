@@ -1,5 +1,5 @@
-/* The Launcher: one centred column — the field, then whatever the run produced beneath it.
-   Dialog styling belongs to the ticket that builds it. */
+/* The Launcher: one centred column — the field, then whatever the run produced beneath it — and
+   the Settings dialog centred over it. */
 
 :root {
   color-scheme: light dark;
@@ -42,6 +42,25 @@ body {
     SFMono-Regular,
     Menlo,
     monospace;
+}
+
+.field .settings-control {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.field .settings-control:hover,
+.field .settings-control:focus-visible {
+  background: color-mix(in srgb, Canvas 88%, CanvasText 12%);
+  color: CanvasText;
 }
 
 .output {
@@ -242,4 +261,199 @@ body {
   border-radius: 8px;
   background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
   overflow-x: auto;
+}
+
+/* Settings: a fixed-size dialog in two columns (2:3) — the history list, taking the height its
+   column leaves and scrolling only when it must, over one pinned line of controls; the stack panel
+   filling the other column, with Import beneath. One message line spans both. */
+
+dialog.settings {
+  box-sizing: border-box;
+  width: min(900px, 94vw);
+  height: min(520px, 85vh);
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 14px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 30px 80px color-mix(in srgb, CanvasText 30%, transparent);
+  font-size: 14px;
+}
+
+dialog.settings::backdrop {
+  background: color-mix(in srgb, CanvasText 35%, transparent);
+}
+
+dialog.settings[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.settings header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+dialog.settings h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+dialog.settings h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+dialog.settings button {
+  padding: 3px 9px;
+  border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+  color: inherit;
+  font:
+    12px system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+dialog.settings button:hover,
+dialog.settings button:focus-visible {
+  background: color-mix(in srgb, Canvas 88%, CanvasText 12%);
+}
+
+dialog.settings .columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 22px;
+}
+
+dialog.settings .history-column,
+dialog.settings .stack-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+dialog.settings .entries {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  border-radius: 8px;
+}
+
+dialog.settings .history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+dialog.settings .entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: 13px;
+}
+
+dialog.settings .entry + .entry {
+  border-top: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+}
+
+dialog.settings .entry.current {
+  background: color-mix(in srgb, Canvas 94%, CanvasText 6%);
+}
+
+dialog.settings .entry .view {
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
+dialog.settings .entry .view:hover,
+dialog.settings .entry .view:focus-visible {
+  background: transparent;
+  text-decoration: underline;
+}
+
+dialog.settings .entry .tag {
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+dialog.settings .unreadable {
+  margin: 0;
+  padding: 10px 12px;
+  color: color-mix(in srgb, #c0532e 85%, CanvasText);
+}
+
+dialog.settings .controls {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: color-mix(in srgb, CanvasText 60%, transparent);
+}
+
+dialog.settings .controls input {
+  width: 56px;
+  margin-left: 4px;
+  font: inherit;
+  color: CanvasText;
+}
+
+dialog.settings .controls .clear {
+  margin-left: auto;
+  border-color: color-mix(in srgb, #c0532e 45%, transparent);
+  color: color-mix(in srgb, #c0532e 85%, CanvasText);
+}
+
+dialog.settings textarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 1px solid color-mix(in srgb, CanvasText 15%, transparent);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+  color: inherit;
+  font:
+    12px / 1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+dialog.settings .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+dialog.settings .message {
+  flex: none;
+  min-height: 1.4em;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: color-mix(in srgb, #c0532e 85%, CanvasText);
 }

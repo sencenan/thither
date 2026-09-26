@@ -88,7 +88,7 @@ describe('renderOutput', () => {
       terminal: ['E', { type: 'parse_error', description: 'bad record' }],
     });
 
-    expect(root.textContent).toContain('Settings reset');
+    expect(root.textContent).toContain('Recover in Settings');
   });
 
   describe('setup instructions ("in place of the result list")', () => {
@@ -115,7 +115,7 @@ describe('renderOutput', () => {
       });
 
       expect(root.textContent).toContain('parse_error');
-      expect(root.textContent).toContain('Settings reset');
+      expect(root.textContent).toContain('Recover in Settings');
       expect(root.textContent).not.toContain('?q=%s');
     });
 

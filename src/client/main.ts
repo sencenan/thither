@@ -27,7 +27,7 @@ if (root !== null) {
       .then((destination) => location.replace(destination))
       .catch(() => {
         history.replaceState(null, '', stripInput(location.href));
-        mountFallbackPage(root, interp, env);
+        mountFallbackPage(root, interp, env, localStorage);
       });
   };
 
