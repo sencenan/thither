@@ -161,6 +161,65 @@ describe('live execution ("triggers live execution after a 60 ms keystroke debou
   });
 });
 
+describe('a completed mutation empties the field ("a program ending in `.set` or `.rm` that ran to its search leaves the field empty")', () => {
+  it('a live .set that ran to its search clears the field; the list shows every target', () => {
+    const { field } = open(fakeStorage(), []);
+
+    type(field, 'https://example.com/ home .set');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual(['https://example.com/']);
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('a live .rm that ran to its search clears the field', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'home .rm');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual([]);
+  });
+
+  it('a mutation that errored keeps its text, so it can be corrected', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'git .set');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('git .set');
+    expect(root.textContent).toContain('invalid_destination');
+  });
+
+  it.each([
+    ['a search', 'home'],
+    ['a focus', 'home .@'],
+    ['a mutation followed by a search', 'https://example.com/ home .set home'],
+  ])('%s keeps its text', (_name, program) => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, program);
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe(program);
+  });
+
+  it('the page-load run is treated the same: `?q=<url> home .set` opens with an empty field', () => {
+    const { field } = open(fakeStorage(), ['https://example.com/', 'home', '.set']);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual(['https://example.com/']);
+  });
+
+  it('a page-load mutation that errored seeds the field with the program', () => {
+    const { field } = open(fakeStorage(), ['git', '.set']);
+
+    expect(field.value).toBe('git .set');
+  });
+});
+
 describe('setup instructions ("While the target set is empty … They disappear once the target set is non-empty")', () => {
   it('a fresh profile shows the shortcut templates for this page, and the first .set removes them', () => {
     const page = `${location.origin}/thither/`;
