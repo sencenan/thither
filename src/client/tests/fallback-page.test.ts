@@ -161,6 +161,31 @@ describe('live execution ("triggers live execution after a 60 ms keystroke debou
   });
 });
 
+describe('setup instructions ("While the target set is empty \u2026 They disappear once the target set is non-empty")', () => {
+  it('a fresh profile shows the shortcut templates for this page, and the first .set removes them', () => {
+    const page = `${location.origin}/thither/`;
+    history.replaceState(null, '', `${page}?x=1`);
+    const { field } = open(fakeStorage(), []);
+
+    expect(root.textContent).toContain(`${page}?q=%s`);
+    expect(root.textContent).toContain(`${page}#q=%s`);
+    expect(links()).toEqual([]);
+
+    type(field, 'https://example.com/ home .set');
+    vi.advanceTimersByTime(60);
+
+    expect(root.textContent).not.toContain('?q=%s');
+    expect(links()).toEqual(['https://example.com/']);
+  });
+
+  it('a page opened on a non-empty target set never shows them', () => {
+    open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    expect(root.textContent).not.toContain('?q=%s');
+    expect(links()).toEqual(['https://example.com/']);
+  });
+});
+
 const keydown = (target: EventTarget, init: KeyboardEventInit): void => {
   target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
 };

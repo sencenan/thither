@@ -174,6 +174,54 @@ describe('browser env host operations', () => {
     expect(() => runClient(storage, [])).toThrow('localStorage unavailable');
   });
 
+  it('"Host operations": .out records the S the run left on top, after the user\'s mutation', () => {
+    const storage = fakeStorage();
+    const { register } = runClient(storage, [
+      'https://github.com/company/{}',
+      'company',
+      'git',
+      '.set',
+    ]);
+
+    expect(register.state).toEqual([
+      'S',
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
+    ]);
+  });
+
+  it('"Host operations": the recorded state carries the focus a .@ set in the same run', () => {
+    const storage = fakeStorage();
+    runClient(storage, ['https://example.com/', 'home', '.set']);
+
+    const { register } = runClient(storage, ['home', '.@']);
+
+    expect(register.state?.[1].focus).toEqual(['home']);
+    expect(Object.keys(register.state?.[1].targets ?? {})).toEqual(['home']);
+  });
+
+  it('"Host operations": no state is recorded when .load failed and nothing is left on the stack', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: '{"not":"a stack record"}' });
+    const { register } = runClient(storage, []);
+
+    expect(register.loaded).toBe(false);
+    expect(register.state).toBeUndefined();
+  });
+
+  it('"Host operations": .load clears the previous run\'s state', () => {
+    const storage = fakeStorage();
+    const { interp, register } = wire(storage);
+    const first = ['.load', '.$', '.out', '.save'].reduce<Program>(
+      (acc, t) => interp.pushToken(acc, t),
+      [],
+    );
+    interp.execute(first);
+    expect(register.state).toEqual(emptyState());
+
+    storage.map.set(STACKS_KEY, '{"not":"a stack record"}');
+    interp.execute(first);
+    expect(register.state).toBeUndefined();
+  });
+
   it('keeps the initial input it was opened with, untouched by a run', () => {
     const env = createBrowserEnv(fakeStorage(), ['https://example.com/', 'home', '.set']);
     const interp = createInterpreter(env);

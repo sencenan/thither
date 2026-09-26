@@ -1,5 +1,5 @@
 /* The Launcher: one centred column — the field, then whatever the run produced beneath it.
-   Row, badge, setup, and dialog styling belong to the tickets that build them. */
+   Row, badge, and dialog styling belong to the tickets that build them. */
 
 :root {
   color-scheme: light dark;
@@ -68,4 +68,50 @@ body {
   margin: 0;
   padding: 12px 16px;
   color: color-mix(in srgb, CanvasText 60%, transparent);
+}
+
+.setup {
+  padding: 16px;
+}
+
+.setup h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.setup p {
+  padding: 0;
+  margin: 0 0 10px;
+  color: color-mix(in srgb, CanvasText 70%, transparent);
+}
+
+.setup dl {
+  margin: 0 0 14px;
+}
+
+.setup dt {
+  margin-top: 6px;
+}
+
+.setup dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+.setup code,
+.setup pre {
+  font:
+    14px / 1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.setup pre {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+  overflow-x: auto;
 }
