@@ -19,6 +19,13 @@ export interface FallbackPage {
   flush(): void;
 }
 
+// browser-client.md "Fallback UI and settings" — a program ending in `.set` or `.rm` that ran to its
+// search (an `R` in the register) has done its work; typing on would only re-run the mutation.
+const MUTATIONS: ReadonlySet<string> = new Set(['.set', '.rm']);
+
+const completedMutation = (tokens: readonly string[], env: BrowserEnv): boolean =>
+  MUTATIONS.has(tokens.at(-1) ?? '') && env.terminal?.[0] === 'R';
+
 const isPrintable = (event: KeyboardEvent): boolean =>
   event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
 
@@ -38,7 +45,7 @@ export const mountFallbackPage = (
   field.type = 'text';
   field.autocomplete = 'off';
   field.spellcheck = false;
-  field.value = env.input.join(' ');
+  field.value = completedMutation(env.input, env) ? '' : env.input.join(' ');
 
   const fieldRow = doc.createElement('div');
   fieldRow.className = 'field';
@@ -54,7 +61,11 @@ export const mountFallbackPage = (
   // A run throws only when localStorage itself has gone; that ends the page, as at load.
   const liveRun = debounce(() => {
     try {
-      run(interp, tokenize(field.value));
+      const tokens = tokenize(field.value);
+      run(interp, tokens);
+      if (completedMutation(tokens, env)) {
+        field.value = '';
+      }
       render();
     } catch (error: unknown) {
       renderBareError(root, error);
