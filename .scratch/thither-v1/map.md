@@ -101,6 +101,10 @@ Done when: the language core passes conformance tests traceable to every normati
 
 - [Destination validation probes with both a string and a number](issues/46-probe-port-and-scheme.md): S5-drive bug — `https://localhost:{}` (a `{}` in the **port**) was wrongly rejected. No single probe validates every URL position (port = digits-only, scheme = letter-first), so `isTemplate` now renders with **both** a word probe (`thither`) and a digit probe (`1`) and accepts if **either** parses — keeping `{}` in port *and* scheme, staying consistent with §2's caveat that acceptance never promised every render parses. `dsl.md` §2 amended (two-probe rule + `https://localhost:{}` accepted example); parser test gained the `{}`-port case. 540 tests green. **Blocks the S5 checkpoint (41).**
 
+- [S5-drive UI polish](issues/47-s5-drive-ui-polish.md): three fallback-UI tweaks from hand-driving the checkpoint, as one unit 
+
+  (1) **Escape clears the field**, refocuses it, and re-runs (`keydown` branch after the dialog guard, so a native dialog-Escape still closes Settings); (2) **less top margin** (`body` top padding `10vh` to `6vh`); (3) **each match row shows the applied arguments** after the key behind a leading `.` separator (a `.key-line` flex cell holds the `.key` span plus, when args were applied, an `.args` span of a `.sep` `.` then `mark.argument` chips — the resolved `match[3]`); (4) **the result summary is pinned** — `renderMatchList` returns `[summary, list]` and `.output footer` is `position: sticky; top: 0`, so the count/key-hints stay beneath the field instead of at the list's end. `browser-client.md` amended for all four. Tests: dropped "Escape does not refocus" for a clear-and-refocus case; added row-args, `.`-separator, and summary-above-list cases. `pnpm verify` green.
+
 ## Not yet specified
 
 These are in scope and documented in `browser-client.md`, but not yet sharp enough to ticket: each depends on interfaces designed by an earlier stage's design ticket. They graduate into tickets when the preceding checkpoint resolves.

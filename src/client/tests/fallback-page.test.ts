@@ -396,7 +396,6 @@ describe('the field owns the keyboard ("a printable key pressed while it is not 
   });
 
   const ignored: ReadonlyArray<readonly [name: string, init: KeyboardEventInit]> = [
-    ['a non-printable key', { key: 'Escape', code: 'Escape' }],
     ['an arrow key', { key: 'ArrowDown', code: 'ArrowDown' }],
     ['a Ctrl chord', { key: '1', code: 'Digit1', ctrlKey: true }],
     ['a Meta chord', { key: 'a', code: 'KeyA', metaKey: true }],
@@ -410,6 +409,17 @@ describe('the field owns the keyboard ("a printable key pressed while it is not 
     keydown(document.body, init);
 
     expect(document.activeElement).not.toBe(field);
+  });
+
+  it('Escape clears the field, refocuses it, and re-runs', () => {
+    const { field } = open(fakeStorage(), ['company', 'git']);
+    expect(field.value).toBe('company git');
+    field.blur();
+
+    keydown(document.body, { key: 'Escape', code: 'Escape' });
+
+    expect(field.value).toBe('');
+    expect(document.activeElement).toBe(field);
   });
 
   it('typing in another editable element is left alone', () => {

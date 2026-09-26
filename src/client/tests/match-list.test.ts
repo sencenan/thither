@@ -116,6 +116,33 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(texts('.balance')).toEqual([label]);
   });
 
+  it('shows the applied arguments after the key, one chip each', () => {
+    render([
+      match(
+        'https://example.com/thither/tree/main',
+        'https://example.com/{}/tree/{}',
+        'company git',
+        ['thither', 'main'],
+      ),
+    ]);
+
+    expect(texts('.args .argument')).toEqual(['thither', 'main']);
+  });
+
+  it('prefixes the applied arguments with a `.` separator', () => {
+    render([match('https://example.com/x', 'https://example.com/{}', 'home', ['x'])]);
+
+    expect(texts('.args .sep')).toEqual(['.']);
+    expect(root.querySelector('.args')?.textContent).toBe('.x');
+  });
+
+  it('shows no args block, and so no separator, when nothing was applied', () => {
+    render([match('https://example.com/', 'https://example.com/', 'home', [])]);
+
+    expect(root.querySelector('.args')).toBeNull();
+    expect(root.querySelector('.sep')).toBeNull();
+  });
+
   it('hint.score is shown on the row', () => {
     render([match('https://example.com/', 'https://example.com/', 'home', [], { score: 56 })]);
 
@@ -138,6 +165,14 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(root.querySelector('a')).toBeNull();
     expect(root.querySelector('footer')).toBeNull();
     expect(root.textContent).toContain('No matches');
+  });
+
+  it('the summary bar sits above the list, not after it', () => {
+    render(numbered(2));
+
+    const children = [...root.children];
+    expect(children[0]?.tagName.toLowerCase()).toBe('footer');
+    expect(children[1]?.tagName.toLowerCase()).toBe('ol');
   });
 
   it('the footer states the match count and the key hints', () => {

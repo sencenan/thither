@@ -1,9 +1,9 @@
 // browser-client.md "Fallback UI and settings" — the match list: one row per match in the order
 // the core emits (the client never sorts), each row a link to its rendered destination carrying
 // the shortcut digit, the key with its matched characters, the destination as the template
-// filled slot by slot, the argument balance, and the score; then a footer with the count and the
-// key hints. The list also answers which row a shortcut names, so the digit ↔ row mapping lives
-// in one place.
+// filled slot by slot, the argument balance, and the score; above the list a summary bar with the
+// count and the key hints, sticky so it stays in view while a long list scrolls. The list also
+// answers which row a shortcut names, so the digit ↔ row mapping lives in one place.
 
 import type { Match } from '../dsl/index.ts';
 import { type KeySpan, keySpans, type TemplateSpan, templateSpans } from './match-spans.ts';
@@ -54,11 +54,34 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
   score.className = 'score';
   score.textContent = `score ${hint.score}`;
 
+  // The key cell holds the key with its matched characters, then the arguments applied to this
+  // variant (dsl.md §5) so the row states what was filled in, not only how the URL reads.
+  const keyLine = doc.createElement('span');
+  keyLine.className = 'key-line';
+  keyLine.append(renderSpans(doc, 'key', keySpans(key, hint.positions)));
+  if (args.length > 0) {
+    const applied = doc.createElement('span');
+    applied.className = 'args';
+    // A leading `.` echoes dsl.md's separator between the matching portion and the arguments,
+    // shown only when arguments were actually applied.
+    const sep = doc.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = '.';
+    applied.appendChild(sep);
+    for (const arg of args) {
+      const chip = doc.createElement('mark');
+      chip.className = 'argument';
+      chip.textContent = arg;
+      applied.appendChild(chip);
+    }
+    keyLine.appendChild(applied);
+  }
+
   const link = doc.createElement('a');
   link.href = destination;
   link.append(
     badge,
-    renderSpans(doc, 'key', keySpans(key, hint.positions)),
+    keyLine,
     renderSpans(doc, 'destination', templateSpans(template, args)),
     balance,
     score,
@@ -92,7 +115,9 @@ export const renderMatchList = (doc: Document, matches: readonly Match[]): reado
   const list = doc.createElement('ol');
   list.className = 'matches';
   list.append(...matches.map((match, index) => renderRow(doc, match, index)));
-  return [list, renderFooter(doc, matches.length)];
+  // The summary sits above the list and sticks to the top of the viewport (style.css), so the
+  // count and key hints stay visible while a long list scrolls under it.
+  return [renderFooter(doc, matches.length), list];
 };
 
 // The link the nth row opens when clicked; a shortcut or Enter follows the same link.

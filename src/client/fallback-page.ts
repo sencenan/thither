@@ -121,6 +121,16 @@ export const mountFallbackPage = (
       return;
     }
 
+    // Escape resets the query: clear the field, refocus it, and re-run. The dialog guard above
+    // means a native Escape still closes the Settings dialog rather than clearing the field.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      field.value = '';
+      field.focus();
+      runField();
+      return;
+    }
+
     if (event.key === 'Enter' && (event.target === field || !isEditable(event.target))) {
       event.preventDefault();
       liveRun.flush();

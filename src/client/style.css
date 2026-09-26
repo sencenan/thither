@@ -10,7 +10,7 @@
 
 body {
   margin: 0;
-  padding: 10vh 16px 4vh;
+  padding: 6vh 16px 4vh;
   background: Canvas;
   color: CanvasText;
 }
@@ -64,7 +64,7 @@ body {
 }
 
 .output {
-  margin-top: 16px;
+  margin-top: 6px;
 }
 
 /* One row per match: badge | key over destination | balance over score, the whole row a link. */
@@ -111,11 +111,48 @@ body {
     sans-serif;
 }
 
-.match .key {
+.match .key-line {
   grid-area: key;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.match .key {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.match .args {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.match .args .sep {
+  color: color-mix(in srgb, CanvasText 45%, transparent);
+  font:
+    12px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.match .args .argument {
+  padding: 0 5px;
+  border-radius: 3px;
+  font:
+    12px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: CanvasText;
+  background: color-mix(in srgb, LinkText 14%, Canvas);
 }
 
 .match .destination {
@@ -199,12 +236,18 @@ body {
   color: color-mix(in srgb, #c0532e 85%, CanvasText);
 }
 
+/* The result summary sits above the list and sticks to the top of the viewport, so the count and
+   key hints stay visible while a long list scrolls under it. */
 .output footer {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   padding: 8px 16px;
-  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  margin-bottom: 14px;
+  background: Canvas;
   font:
     12px system-ui,
     sans-serif;
