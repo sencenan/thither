@@ -384,6 +384,52 @@ const keydown = (target: EventTarget, init: KeyboardEventInit): void => {
   target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
 };
 
+const helpDialog = (): HTMLDialogElement => {
+  const dialog = root.querySelector('dialog.help');
+  if (!(dialog instanceof HTMLDialogElement)) {
+    throw new Error('the page has no help dialog');
+  }
+  return dialog;
+};
+
+describe('the Help control', () => {
+  it('the ? button beside the field opens the Help dialog', () => {
+    open(fakeStorage(), []);
+    expect(helpDialog().open).toBe(false);
+
+    click(root.querySelector('.field .help-control'));
+
+    expect(helpDialog().open).toBe(true);
+    expect(helpDialog().textContent).toContain('Usage');
+  });
+
+  it('both field controls render an SVG icon, so they match in size', () => {
+    open(fakeStorage(), []);
+
+    expect(root.querySelector('.field .help-control svg')).not.toBeNull();
+    expect(root.querySelector('.field .settings-control svg')).not.toBeNull();
+  });
+
+  it('the keyboard bails while Help is open: Ctrl+1 opens nothing', () => {
+    open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    click(root.querySelector('.field .help-control'));
+
+    keydown(helpDialog(), { key: '1', code: 'Digit1', ctrlKey: true });
+
+    expect(location.href).toBe(PAGE);
+  });
+
+  it('closing Help refocuses the field', () => {
+    const { field } = open(fakeStorage(), []);
+    click(root.querySelector('.field .help-control'));
+    field.blur();
+
+    helpDialog().close();
+
+    expect(document.activeElement).toBe(field);
+  });
+});
+
 describe('the field owns the keyboard ("a printable key pressed while it is not focused returns focus to it")', () => {
   it('a printable key pressed elsewhere refocuses the field', () => {
     const { field } = open(fakeStorage(), []);
