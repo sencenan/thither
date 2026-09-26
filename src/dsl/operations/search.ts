@@ -83,17 +83,41 @@ const inferBoundary = (
     return { matching, args };
   }
 
-  // Without a separator: the longest nonempty prefix yielding at least one match wins.
-  for (let length = literals.length; length > 0; length--) {
-    const prefix = literals.slice(0, length);
-    const query = [...focus, ...prefix.map(resolveEscape)];
-    if (searchTargets(targets, query).length > 0) {
-      return { matching: prefix, args: literals.slice(length) };
-    }
+  // Without a separator: start from the longest nonempty prefix yielding at least one match, then
+  // give back trailing literals that added no matching evidence. The first literal is never given
+  // back, so the matching portion stays nonempty.
+  const selectionAt = (length: number): Selection[] =>
+    searchTargets(targets, [...focus, ...literals.slice(0, length).map(resolveEscape)]);
+
+  let length = literals.length;
+  while (length > 0 && selectionAt(length).length === 0) {
+    length--;
   }
 
   // No prefix matched anything: report the whole attempt as inputs, with no arguments.
-  return { matching: literals, args: [] };
+  if (length === 0) {
+    return { matching: literals, args: [] };
+  }
+
+  while (length > 1 && !addsEvidence(selectionAt(length - 1), selectionAt(length))) {
+    length--;
+  }
+
+  return { matching: literals.slice(0, length), args: literals.slice(length) };
+};
+
+// dsl.md §4.4 — a literal is matching input when it changes which targets are selected, or
+// matches a character of a selected key that no earlier term matched. A literal that only
+// re-hits already-matched characters (`a` after `api`) is an argument that happened to fuzzy-match.
+const addsEvidence = (before: readonly Selection[], after: readonly Selection[]): boolean => {
+  if (before.length !== after.length) {
+    return true;
+  }
+  const priorPositions = new Map(before.map((s) => [s.target[0], new Set(s.positions)]));
+  return after.some((s) => {
+    const prior = priorPositions.get(s.target[0]);
+    return prior === undefined || s.positions.some((p) => !prior.has(p));
+  });
 };
 
 // dsl.md §4.4 — for one selected target: its best fit (a variant whose arity equals the argument

@@ -209,7 +209,7 @@ Operations differ only in how they choose query inputs:
 
 - `.rm` matches the **entire explicit matching portion**, combined with focus, operators included. It never retries shorter prefixes.
 - `.set` does not search. It normalizes its explicit dimensions into the key it would store and looks for that exact key (section 4.1); focus plays no part, and operator terms are refused.
-- `.$` infers the boundary between matching literals and arguments by finding the longest matching prefix; operator terms take part in that inference like any other term.
+- `.$` infers the boundary between matching literals and arguments: the longest matching prefix, trimmed of trailing literals that add no matching evidence (section 4.4); operator terms take part in that inference like any other term.
 - `.@` sets focus directly; it does not search for targets.
 
 An empty explicit query searches on focus alone; empty focus with no explicit input selects all targets.
@@ -317,7 +317,7 @@ Search does not change state. Producing `R` ends evaluation.
 S lookup . https://example.com .$
 ```
 
-**Without a separator**, examine nonempty leading prefixes of `L` and select the **longest prefix yielding at least one matching target** when combined with focus. That prefix supplies the matching inputs; the remaining literals are arguments. Do not stop at the first unique match: a longer prefix may still match the same target and must be consumed.
+**Without a separator**, examine nonempty leading prefixes of `L` and select the **longest prefix yielding at least one matching target** when combined with focus. Do not stop at the first unique match: a longer prefix may still match the same target and must be consumed.
 
 ```text
 company              -> matches
@@ -325,7 +325,20 @@ company git          -> matches
 company git thither  -> no matches
 ```
 
-For a target keyed `company git`, the selected prefix is `company git` and `thither` is the argument. If `company git thither` itself matched a target, the longest-prefix rule would consume `thither` as matching input; use `.` when an explicit boundary is needed.
+For a target keyed `company git`, the selected prefix is `company git` and `thither` is the argument.
+
+Then **trim** that prefix: a trailing literal that added no matching evidence is not matching input. A literal adds evidence when appending it to the query **changes which targets are selected**, or **matches a character of a selected key that no earlier term matched**. Drop such literals from the end of the prefix, one at a time, until the last literal adds evidence or only the first literal remains — the first literal is always matching input. What remains supplies the matching inputs; the rest of `L` are arguments.
+
+Fuzzy matching is why this step exists: a one-letter argument matches almost any key, so without it the longest-prefix rule would swallow it. Against a single target keyed `api docs` with the variant `https://docs.example.com/api/{}/{}`:
+
+```text
+api a        -> `a` re-hits the a of api: no new evidence, so it is the first argument
+api a b      -> https://docs.example.com/api/a/b
+api docs a b -> `docs` matches four new characters and is consumed; a and b are the arguments
+api a docs   -> `docs` adds evidence, so everything before it is matching input too
+```
+
+The boundary sits after the **last** literal that adds evidence, not the first that does not: an OR group `git | docs` is informative as a whole even though the standalone `|` changes nothing by itself. Conversely a NOT term that excludes no target, or a key word typed twice, adds nothing and becomes an argument. Use `.` when an explicit boundary is needed.
 
 If the user supplied matching literals but **no nonempty prefix matches**, return no matches. Do not discard all supplied literals and fall back to focus; focus itself is never shortened.
 
