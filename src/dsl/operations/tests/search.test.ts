@@ -53,6 +53,15 @@ const neg: TargetSpec = [['neg'], 'https://n/{}', 'https://n/{}/{}', 'https://n/
 // per-dimension matching target
 const apple: TargetSpec = [['apple', 'mango'], 'https://fruit.example/{}'];
 
+// arity-2 target whose key contains the letter a short argument would fuzzy-hit
+const apiDocs: TargetSpec = [['api', 'docs'], 'https://docs.example.com/api/{}/{}'];
+// arities {0, 1}
+const jira: TargetSpec = [
+  ['jira'],
+  'https://jira.example.com',
+  'https://jira.example.com/browse/{}',
+];
+
 type Case = readonly [name: string, program: readonly unknown[], stack: readonly unknown[]];
 
 const cases: readonly Case[] = [
@@ -120,6 +129,188 @@ const cases: readonly Case[] = [
     '§4.4 when no prefix matches, the result is empty and inputs still report the attempt',
     [state([companyGit]), 'zzz'],
     [state([companyGit]), result([], ['zzz'])],
+  ],
+
+  // §4.4 trailing literals that add no matching evidence are arguments
+  [
+    '§4.4 a literal that only re-hits matched characters is an argument: api a fills the first slot',
+    [state([apiDocs]), 'api', 'a'],
+    [
+      state([apiDocs]),
+      result(
+        [
+          m(
+            'https://docs.example.com/api/a/{}',
+            'https://docs.example.com/api/{}/{}',
+            'api docs',
+            ['a'],
+            -1,
+            [0, 1, 2],
+          ),
+        ],
+        ['api'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 two re-hitting literals are both arguments: api a b is the best fit',
+    [state([apiDocs]), 'api', 'a', 'b'],
+    [
+      state([apiDocs]),
+      result(
+        [
+          m(
+            'https://docs.example.com/api/a/b',
+            'https://docs.example.com/api/{}/{}',
+            'api docs',
+            ['a', 'b'],
+            0,
+          ),
+        ],
+        ['api'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 a literal that matches new key characters is matching input: api docs a b',
+    [state([apiDocs]), 'api', 'docs', 'a', 'b'],
+    [
+      state([apiDocs]),
+      result(
+        [
+          m(
+            'https://docs.example.com/api/a/b',
+            'https://docs.example.com/api/{}/{}',
+            'api docs',
+            ['a', 'b'],
+            0,
+            [0, 1, 2, 4, 5, 6, 7],
+          ),
+        ],
+        ['api', 'docs'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 a repeated key word adds no evidence: company git git passes the second git as the argument',
+    [state([companyGit]), 'company', 'git', 'git'],
+    [
+      state([companyGit]),
+      result(
+        [
+          m(
+            'https://github.com/company/git',
+            'https://github.com/company/{}',
+            'company git',
+            ['git'],
+            0,
+          ),
+        ],
+        ['company', 'git'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 the first literal is always matching input, even when focus already matched its characters',
+    [state([jira], ['jira']), 'a'],
+    [
+      state([jira], ['jira']),
+      result(
+        [m('https://jira.example.com', 'https://jira.example.com', 'jira', [], 0, [0, 1, 2, 3])],
+        ['a'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 with a best fit at both boundaries, the evidence rule decides: jira a is browse/a',
+    [state([jira]), 'jira', 'a'],
+    [
+      state([jira]),
+      result(
+        [
+          m(
+            'https://jira.example.com/browse/a',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            ['a'],
+            0,
+            [0, 1, 2, 3],
+          ),
+        ],
+        ['jira'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 the boundary sits after the last informative literal: api a docs consumes the a between',
+    [state([apiDocs]), 'api', 'a', 'docs'],
+    [
+      state([apiDocs]),
+      result(
+        [
+          m(
+            'https://docs.example.com/api/{}/{}',
+            'https://docs.example.com/api/{}/{}',
+            'api docs',
+            [],
+            -2,
+          ),
+        ],
+        ['api', 'a', 'docs'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 an OR group is informative as a whole: git | docs thither keeps the | and passes thither',
+    [state([companyGit, companyDocs, personalGit]), 'git', '|', 'docs', 'thither'],
+    [
+      state([companyGit, companyDocs, personalGit]),
+      result(
+        [
+          m(
+            'https://docs.company.com/thither',
+            'https://docs.company.com/{}',
+            'company docs',
+            ['thither'],
+            0,
+          ),
+          m(
+            'https://github.com/company/thither',
+            'https://github.com/company/{}',
+            'company git',
+            ['thither'],
+            0,
+          ),
+          m(
+            'https://github.com/me/thither',
+            'https://github.com/me/{}',
+            'git personal',
+            ['thither'],
+            0,
+          ),
+        ],
+        ['git', '|', 'docs'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 a NOT term that excludes nothing adds no evidence and is an argument',
+    [state([companyGit]), 'company', '!zzz'],
+    [
+      state([companyGit]),
+      result(
+        [
+          m(
+            'https://github.com/company/!zzz',
+            'https://github.com/company/{}',
+            'company git',
+            ['!zzz'],
+            0,
+          ),
+        ],
+        ['company'],
+      ),
+    ],
   ],
 
   // §4.4 focus-only and select-all
