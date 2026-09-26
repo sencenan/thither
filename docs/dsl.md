@@ -146,12 +146,13 @@ A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`,
 
 Accept any valid URL with an **explicit scheme**, allowing anonymous `{}` placeholders as additional template syntax. There is no scheme allowlist, and a scheme does not require `//`. Do not infer a scheme or resolve a relative reference against a base URL.
 
-Validate by rendering, not by parsing the raw template: replace every `{}` with the probe token `thither`, then validate that rendered string with the standard WHATWG `URL` parser. Accept the destination when the rendered form parses and has an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of the probe.
+Validate by rendering, not by parsing the raw template: replace every `{}` with a probe token, then validate that rendered string with the standard WHATWG `URL` parser. No single probe is valid in every position — a port must be all digits, a scheme must begin with a letter — so render with **both** a word probe (`thither`) and a digit probe (`1`), and accept the destination when **either** rendering parses with an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of a probe.
 
 ```text
 accepted:  https://example.com/{}    https://{}.example.com/{}   file:///tmp/{}
            mailto:{}                 data:text/plain,{}          myapp:open/{}
-           {}://example.com          (renders as thither://example.com)
+           {}://example.com          (renders as thither://example.com, word probe)
+           https://localhost:{}      (renders as https://localhost:1, digit probe)
 
 rejected:  example.com/path          /path/{}                    //example.com/{}
            https://exa mple.com/{}

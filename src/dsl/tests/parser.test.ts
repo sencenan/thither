@@ -210,6 +210,8 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
       'file:///tmp/{}',
       'mailto:{}',
       '{}://example.com',
+      'https://localhost:{}',
+      'https://localhost:{}/path',
       'https://example.com/',
     ];
     for (const dest of accepted) {

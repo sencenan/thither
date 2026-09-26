@@ -51,15 +51,18 @@ export const push = (stack: Stack, value: StackValue): Stack => {
 // docs/code-standards.md "Layout" on universal platform globals.
 declare const URL: { parse(url: string): unknown | null };
 
-// dsl.md §2 — render every {} to a probe, then require the WHATWG parser to accept it
-export const isTemplate = (value: string): value is Template => {
-  try {
-    const parsed = URL.parse(value.split('{}').join('thither'));
-    return parsed !== null;
-  } catch (_ex) {
-    return false;
-  }
-};
+// dsl.md §2 — render every {} to a probe, then require the WHATWG parser to accept it. No
+// single probe is valid in every position (a port is digits-only, a scheme is letter-first),
+// so try a word and a digit probe and accept the template if either rendering parses.
+const PROBES = ['thither', '1'];
+export const isTemplate = (value: string): value is Template =>
+  PROBES.some((probe) => {
+    try {
+      return URL.parse(value.split('{}').join(probe)) !== null;
+    } catch (_ex) {
+      return false;
+    }
+  });
 
 // dsl.md §3 — stored dimensions: trimmed, lowercase, deduplicated, UTF-16 sorted
 export const normalizeDimensions = (dims: readonly Dim[]): Dim[] => {

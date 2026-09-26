@@ -1,7 +1,7 @@
 # S5 checkpoint: the page is usable
 
 Type: grilling
-Status: open
+Status: claimed
 Blocked by: 37, 38, 39, 40, 45
 
 ## Question
