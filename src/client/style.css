@@ -383,6 +383,15 @@ body {
   color: color-mix(in srgb, var(--fg) 55%, transparent);
 }
 
+.setup .fzf {
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg);
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
 .setup code,
 .setup pre {
   font:

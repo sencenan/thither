@@ -356,13 +356,13 @@ describe('a completed mutation empties the field ("a program ending in `.set` or
 });
 
 describe('setup instructions ("While the target set is empty … They disappear once the target set is non-empty")', () => {
-  it('a fresh profile shows the shortcut templates for this page, and the first .set removes them', () => {
+  it('a fresh profile shows the shortcut template for this page, and the first .set removes them', () => {
     const page = `${location.origin}/thither/`;
     history.replaceState(null, '', `${page}?x=1`);
     const { field } = open(fakeStorage(), []);
 
     expect(root.textContent).toContain(`${page}?q=%s`);
-    expect(root.textContent).toContain(`${page}#q=%s`);
+    expect(root.textContent).not.toContain(`${page}#q=%s`);
     expect(links()).toEqual([]);
 
     type(field, 'https://example.com/ home .set');

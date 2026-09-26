@@ -1,11 +1,13 @@
 // browser-client.md "Fallback UI and settings" — the setup instructions shown in place of the
-// match list while the target set is empty: both search-shortcut URL templates for this page
-// and one example `.set` program. Display only; they disappear once a target exists, and are not
-// shown when the stored data could not be loaded.
+// match list while the target set is empty: the default search-shortcut URL template for this
+// page, one example `.set` program, and one example fuzzy (fzf) search. Display only; they disappear once a
+// target exists, and are not shown when the stored data could not be loaded. Help carries the
+// fuller reference, including the `#q=` template.
 
 import type { OutputRegister } from './browser-env.ts';
 
 const EXAMPLE_SET_PROGRAM = 'https://github.com/company/{} company git .set';
+const EXAMPLE_SEARCH = 'cmpny gt . my-repo';
 
 export const showsSetupInstructions = (register: OutputRegister): boolean =>
   register.loaded &&
@@ -30,22 +32,13 @@ export const renderSetupInstructions = (doc: Document, pageUrl: string): Element
 
   const shortcuts = doc.createElement('p');
   shortcuts.textContent =
-    'Add Thither as a search shortcut in your browser, using either of these URL templates:';
+    'Add Thither as a search shortcut in your browser, using this URL template:';
 
-  const [query, fragment] = shortcutTemplates(pageUrl);
-  const templates = doc.createElement('dl');
-  for (const [template, note] of [
-    [query, 'default'],
-    [fragment, 'keeps the input out of request logs'],
-  ] as const) {
-    const term = doc.createElement('dt');
-    const code = doc.createElement('code');
-    code.textContent = template;
-    term.appendChild(code);
-    const detail = doc.createElement('dd');
-    detail.textContent = note;
-    templates.append(term, detail);
-  }
+  const [query] = shortcutTemplates(pageUrl);
+  const shortcut = doc.createElement('pre');
+  const shortcutCode = doc.createElement('code');
+  shortcutCode.textContent = query;
+  shortcut.appendChild(shortcutCode);
 
   const program = doc.createElement('p');
   program.textContent =
@@ -56,6 +49,23 @@ export const renderSetupInstructions = (doc: Document, pageUrl: string): Element
   exampleCode.textContent = EXAMPLE_SET_PROGRAM;
   example.appendChild(exampleCode);
 
-  section.append(heading, shortcuts, templates, program, example);
+  const search = doc.createElement('p');
+  const fzf = doc.createElement('span');
+  fzf.className = 'fzf';
+  fzf.textContent = 'fzf';
+  search.append(
+    doc.createTextNode('To go there, fuzzy-match the target with '),
+    fzf,
+    doc.createTextNode(
+      ' \u2014 letters in order, no need to spell it out \u2014 then any argument values after a . separator:',
+    ),
+  );
+
+  const searchExample = doc.createElement('pre');
+  const searchExampleCode = doc.createElement('code');
+  searchExampleCode.textContent = EXAMPLE_SEARCH;
+  searchExample.appendChild(searchExampleCode);
+
+  section.append(heading, shortcuts, shortcut, program, example, search, searchExample);
   return section;
 };

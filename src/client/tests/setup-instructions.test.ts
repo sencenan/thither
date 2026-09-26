@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 
 // browser-client.md "Fallback UI and settings" — the setup instructions: when they apply (an
-// empty target set on a loaded record) and what they show (both shortcut templates for this
-// page and the example `.set` program).
+// empty target set on a loaded record) and what they show (the default shortcut template for this
+// page, the example `.set` program, and an example fuzzy (fzf) search).
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { OutputRegister } from '../browser-env.ts';
@@ -59,21 +59,28 @@ describe('renderSetupInstructions', () => {
     root = app;
   });
 
-  it('shows both shortcut templates for the page and the example .set program', () => {
+  it('shows the default shortcut template, the example .set program, and an example fuzzy search', () => {
     root.replaceChildren(renderSetupInstructions(document, 'https://host.example/thither/'));
 
     expect(root.textContent).toContain('https://host.example/thither/?q=%s');
-    expect(root.textContent).toContain('https://host.example/thither/#q=%s');
     expect(root.textContent).toContain('https://github.com/company/{} company git .set');
+    expect(root.textContent).toContain('cmpny gt . my-repo');
+    expect(root.textContent).toContain('fzf');
   });
 
-  it("the templates are the page's own URL with its query and fragment dropped", () => {
+  it('shows only the ?q= template, not the #q= one, to save space', () => {
+    root.replaceChildren(renderSetupInstructions(document, 'https://host.example/thither/'));
+
+    expect(root.textContent).toContain('https://host.example/thither/?q=%s');
+    expect(root.textContent).not.toContain('#q=%s');
+  });
+
+  it("the template is the page's own URL with its query and fragment dropped", () => {
     root.replaceChildren(
       renderSetupInstructions(document, 'https://host.example/thither/?x=1#y=2'),
     );
 
     expect(root.textContent).toContain('https://host.example/thither/?q=%s');
-    expect(root.textContent).toContain('https://host.example/thither/#q=%s');
     expect(root.textContent).not.toContain('x=1');
   });
 

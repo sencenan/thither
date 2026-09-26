@@ -104,7 +104,7 @@ describe('renderOutput', () => {
       renderOutput(root, { loaded: true, terminal: everyTarget, state: emptySet });
 
       expect(root.textContent).toContain(`${PAGE}?q=%s`);
-      expect(root.textContent).toContain(`${PAGE}#q=%s`);
+      expect(root.textContent).not.toContain(`${PAGE}#q=%s`);
       expect(root.textContent).not.toContain('No matches');
     });
 
