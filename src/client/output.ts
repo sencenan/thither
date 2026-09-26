@@ -24,9 +24,27 @@ const renderError = (doc: Document, error: ThitherError): Node => {
   return line;
 };
 
+// browser-client.md "Fallback UI" — the current focus, the dimensions added to every search until
+// changed by `.@`, shown above the results so the user sees what every search is prefixed with.
+// Absent when focus is empty, so an unfocused world stays uncluttered.
+const renderFocus = (doc: Document, focus: readonly string[]): Node => {
+  const bar = doc.createElement('p');
+  bar.className = 'focus';
+  const label = doc.createElement('span');
+  label.className = 'focus-label';
+  label.textContent = 'Focus';
+  bar.append(label, ` ${focus.join(' ')}`);
+  return bar;
+};
+
 export const renderOutput = (region: Element, register: OutputRegister): void => {
   const doc = region.ownerDocument;
   const nodes: Node[] = [];
+
+  const focus = register.state?.[1].focus ?? [];
+  if (focus.length > 0) {
+    nodes.push(renderFocus(doc, focus));
+  }
 
   const { terminal } = register;
   if (terminal?.[0] === 'E') {

@@ -353,6 +353,20 @@ body {
   color: color-mix(in srgb, var(--fg) 60%, transparent);
 }
 
+.output p.focus {
+  padding: 8px 16px;
+  font:
+    12px system-ui,
+    sans-serif;
+  color: var(--count);
+}
+
+.output p.focus .focus-label {
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+  font-weight: 600;
+  margin-right: 6px;
+}
+
 .setup {
   padding: 16px;
 }
