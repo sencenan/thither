@@ -64,6 +64,28 @@ describe('renderOutput', () => {
     expect(links[0]?.textContent).toContain('beta');
   });
 
+  describe('the focus bar ("the current focus, the dimensions added to every search")', () => {
+    const focused: OutputRegister['state'] = [
+      'S',
+      { targets: { home: ['https://example.com/'] }, focus: ['company', '!archived'] },
+    ];
+
+    it('shows the current focus above the results when focus is non-empty', () => {
+      renderOutput(root, { loaded: true, terminal: everyTarget, state: focused });
+
+      const bar = root.querySelector('.focus');
+      expect(bar?.textContent).toContain('company !archived');
+      const text = root.textContent ?? '';
+      expect(text.indexOf('company')).toBeLessThan(text.indexOf('No matches'));
+    });
+
+    it('shows nothing when focus is empty', () => {
+      renderOutput(root, { loaded: true, terminal: everyTarget, state: oneTarget });
+
+      expect(root.querySelector('.focus')).toBeNull();
+    });
+  });
+
   it('shows the no-matches line for an empty match set on a non-empty target set', () => {
     renderOutput(root, { loaded: true, terminal: everyTarget, state: oneTarget });
 

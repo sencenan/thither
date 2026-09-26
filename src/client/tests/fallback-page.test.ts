@@ -328,9 +328,17 @@ describe('a completed mutation empties the field ("a program ending in `.set` or
     expect(root.textContent).toContain('invalid_destination');
   });
 
+  it('a live .@ that ran to its search clears the field, like .set and .rm', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'home .@');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('');
+  });
+
   it.each([
     ['a search', 'home'],
-    ['a focus', 'home .@'],
     ['a mutation followed by a search', 'https://example.com/ home .set home'],
   ])('%s keeps its text', (_name, program) => {
     const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);

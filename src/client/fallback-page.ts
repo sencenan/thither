@@ -25,9 +25,10 @@ export interface FallbackPage {
   flush(): void;
 }
 
-// browser-client.md "Fallback UI and settings" — a program ending in `.set` or `.rm` that ran to its
-// search (an `R` in the register) has done its work; typing on would only re-run the mutation.
-const MUTATIONS: ReadonlySet<string> = new Set(['.set', '.rm']);
+// browser-client.md "Fallback UI and settings" — a program ending in `.set`, `.rm`, or `.@` that
+// ran to its search (an `R` in the register) has done its work; typing on would only re-run the
+// mutation. `.@` sets the focus, which the results bar now shows, so the field need not keep it.
+const MUTATIONS: ReadonlySet<string> = new Set(['.set', '.rm', '.@']);
 
 const completedMutation = (tokens: readonly string[], env: BrowserEnv): boolean =>
   MUTATIONS.has(tokens.at(-1) ?? '') && env.terminal?.[0] === 'R';
