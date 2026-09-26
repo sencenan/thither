@@ -8,6 +8,8 @@
 import type { Interpreter } from '../dsl/index.ts';
 import { debounce } from '../lib/debounce.ts';
 import type { BrowserEnv } from './browser-env.ts';
+import { createHelpDialog } from './help.ts';
+import { iconMarkup } from './icons.ts';
 import { tokenize } from './input.ts';
 import { rowLink, shortcutLink } from './match-list.ts';
 import { renderBareError, renderOutput } from './output.ts';
@@ -52,16 +54,42 @@ export const mountFallbackPage = (
   field.spellcheck = false;
   field.value = completedMutation(env.input, env) ? '' : env.input.join(' ');
 
+  const helpControl = doc.createElement('button');
+  helpControl.type = 'button';
+  helpControl.className = 'field-control help-control';
+  helpControl.title = 'Help';
+  helpControl.setAttribute('aria-label', 'Help');
+  helpControl.innerHTML = iconMarkup('help');
+
   const settingsControl = doc.createElement('button');
   settingsControl.type = 'button';
-  settingsControl.className = 'settings-control';
+  settingsControl.className = 'field-control settings-control';
   settingsControl.title = 'Settings';
   settingsControl.setAttribute('aria-label', 'Settings');
-  settingsControl.textContent = '\u2699';
+  settingsControl.innerHTML = iconMarkup('settings');
+
+  const controls = doc.createElement('div');
+  controls.className = 'controls';
+  controls.append(helpControl, settingsControl);
 
   const fieldRow = doc.createElement('div');
   fieldRow.className = 'field';
-  fieldRow.append(field, settingsControl);
+  fieldRow.append(field, controls);
+
+  // Lightweight text wordmark in the gap above the field: a terminal prompt chevron in the accent
+  // colour, then the name. No asset, so it stays in the single-file bundle for free.
+  const brand = doc.createElement('header');
+  brand.className = 'brand';
+  const brandMark = doc.createElement('span');
+  brandMark.className = 'brand-mark';
+  brandMark.textContent = '\u276f';
+  const brandName = doc.createElement('span');
+  brandName.className = 'brand-name';
+  brandName.textContent = 'thither';
+  const brandTag = doc.createElement('span');
+  brandTag.className = 'brand-tag';
+  brandTag.textContent = '\u2014 to that place';
+  brand.append(brandMark, brandName, brandTag);
 
   const output = doc.createElement('div');
   output.className = 'output';
@@ -100,6 +128,14 @@ export const mountFallbackPage = (
     field.focus();
   });
 
+  const help = createHelpDialog(doc);
+  helpControl.addEventListener('click', () => {
+    help.open(location.href);
+  });
+  help.element.addEventListener('close', () => {
+    field.focus();
+  });
+
   // A query was searched (ADR 0009's test) when `R.inputs` is non-empty: then Enter opens the
   // first row; after a bare `<url> home .set` it only commits and lists.
   const searchedQuery = (): boolean =>
@@ -110,7 +146,7 @@ export const mountFallbackPage = (
   // keyboard; while the settings dialog is open the keyboard is the dialog's. Focus moves during
   // keydown, so the browser inserts the character into the field.
   doc.addEventListener('keydown', (event) => {
-    if (!field.isConnected || settings.element.open) {
+    if (!field.isConnected || settings.element.open || help.element.open) {
       return;
     }
 
@@ -118,6 +154,16 @@ export const mountFallbackPage = (
     if (shortcut !== undefined) {
       event.preventDefault();
       shortcut.click();
+      return;
+    }
+
+    // Escape resets the query: clear the field, refocus it, and re-run. The dialog guard above
+    // means a native Escape still closes the Settings dialog rather than clearing the field.
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      field.value = '';
+      field.focus();
+      runField();
       return;
     }
 
@@ -135,7 +181,7 @@ export const mountFallbackPage = (
     }
   });
 
-  root.replaceChildren(fieldRow, output, settings.element);
+  root.replaceChildren(brand, fieldRow, output, settings.element, help.element);
   render();
 
   field.focus();

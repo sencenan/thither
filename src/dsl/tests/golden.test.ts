@@ -171,7 +171,8 @@ describe('dsl.md §7 worked programs', () => {
     ];
     expect(created).toEqual([state]);
 
-    // jira with no arguments: the arity-0 variant is the best fit — one match, a nav candidate.
+    // jira with no arguments: every variant is a row (ADR 0011), the arity-0 best fit (argDelta 0)
+    // leading its arity-1 sibling. The best-fit row is the nav candidate.
     expect(run([state, 'jira', '.$'])).toEqual([
       state,
       [
@@ -185,13 +186,20 @@ describe('dsl.md §7 worked programs', () => {
               [],
               expect.objectContaining({ argDelta: 0 }),
             ],
+            [
+              'https://jira.example.com/browse/{}',
+              'https://jira.example.com/browse/{}',
+              'jira',
+              [],
+              expect.objectContaining({ argDelta: -1 }),
+            ],
           ],
           inputs: ['jira'],
         },
       ],
     ]);
 
-    // jira PROJ: the arity-1 variant is the best fit — one match.
+    // jira PROJ: the arity-1 variant is the best fit, leading its arity-0 sibling.
     expect(run([state, 'jira', 'PROJ', '.$'])[1]).toEqual([
       'R',
       {
@@ -202,6 +210,13 @@ describe('dsl.md §7 worked programs', () => {
             'jira',
             ['PROJ'],
             expect.objectContaining({ argDelta: 0 }),
+          ],
+          [
+            'https://jira.example.com',
+            'https://jira.example.com',
+            'jira',
+            [],
+            expect.objectContaining({ argDelta: 1 }),
           ],
         ],
         inputs: ['jira'],

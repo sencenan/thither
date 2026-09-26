@@ -36,7 +36,8 @@ export const renderOutput = (region: Element, register: OutputRegister): void =>
   if (showsSetupInstructions(register)) {
     nodes.push(renderSetupInstructions(doc, location.href));
   } else if (terminal?.[0] === 'R') {
-    nodes.push(...renderMatchList(doc, terminal[1].matches));
+    // Enter opens the first row only when a query was searched (R.inputs non-empty, ADR 0009).
+    nodes.push(...renderMatchList(doc, terminal[1].matches, terminal[1].inputs.length > 0));
   }
 
   if (!register.loaded) {

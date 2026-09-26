@@ -216,13 +216,22 @@ const cases: readonly Case[] = [
     [
       state([jira], ['jira']),
       result(
-        [m('https://jira.example.com', 'https://jira.example.com', 'jira', [], 0, [0, 1, 2, 3])],
+        [
+          m('https://jira.example.com', 'https://jira.example.com', 'jira', [], 0, [0, 1, 2, 3]),
+          m(
+            'https://jira.example.com/browse/{}',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            [],
+            -1,
+          ),
+        ],
         ['a'],
       ),
     ],
   ],
   [
-    '§4.4 with a best fit at both boundaries, the evidence rule decides: jira a is browse/a',
+    '§4.4 with a best fit at both boundaries, the evidence rule decides: jira a is browse/a, sibling below',
     [state([jira]), 'jira', 'a'],
     [
       state([jira]),
@@ -236,6 +245,7 @@ const cases: readonly Case[] = [
             0,
             [0, 1, 2, 3],
           ),
+          m('https://jira.example.com', 'https://jira.example.com', 'jira', [], 1),
         ],
         ['jira'],
       ),
@@ -745,11 +755,21 @@ const cases: readonly Case[] = [
     ],
   ],
 
-  // §4.4 best fit vs one-per-variant, within one target
+  // §4.4 every variant is a row (ADR 0011); the best fit (argDelta 0) leads, within one target
   [
-    '§4.4 a best fit yields exactly one match: ladder with one argument uses the arity-1 variant',
+    '§4.4 every variant is a row; the best fit leads: ladder with one argument lists all three',
     [state([ladder]), 'ladder', '.', 'q'],
-    [state([ladder]), result([m('https://l/q', 'https://l/{}', 'ladder', ['q'], 0)], ['ladder'])],
+    [
+      state([ladder]),
+      result(
+        [
+          m('https://l/q', 'https://l/{}', 'ladder', ['q'], 0),
+          m('https://l/', 'https://l/', 'ladder', [], 1),
+          m('https://l/q/{}', 'https://l/{}/{}', 'ladder', ['q'], -1),
+        ],
+        ['ladder'],
+      ),
+    ],
   ],
   [
     '§4.4 no best fit fans out one row per variant: gap with one argument lists both',

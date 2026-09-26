@@ -146,12 +146,13 @@ A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`,
 
 Accept any valid URL with an **explicit scheme**, allowing anonymous `{}` placeholders as additional template syntax. There is no scheme allowlist, and a scheme does not require `//`. Do not infer a scheme or resolve a relative reference against a base URL.
 
-Validate by rendering, not by parsing the raw template: replace every `{}` with the probe token `thither`, then validate that rendered string with the standard WHATWG `URL` parser. Accept the destination when the rendered form parses and has an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of the probe.
+Validate by rendering, not by parsing the raw template: replace every `{}` with a probe token, then validate that rendered string with the standard WHATWG `URL` parser. No single probe is valid in every position — a port must be all digits, a scheme must begin with a letter — so render with **both** a word probe (`thither`) and a digit probe (`1`), and accept the destination when **either** rendering parses with an explicit scheme. Store and later substitute into the **original** template text, never the parser's normalized output of a probe.
 
 ```text
 accepted:  https://example.com/{}    https://{}.example.com/{}   file:///tmp/{}
            mailto:{}                 data:text/plain,{}          myapp:open/{}
-           {}://example.com          (renders as thither://example.com)
+           {}://example.com          (renders as thither://example.com, word probe)
+           https://localhost:{}      (renders as https://localhost:1, digit probe)
 
 rejected:  example.com/path          /path/{}                    //example.com/{}
            https://exa mple.com/{}
@@ -342,17 +343,17 @@ The boundary sits after the **last** literal that adds evidence, not the first t
 
 If the user supplied matching literals but **no nonempty prefix matches**, return no matches. Do not discard all supplied literals and fall back to focus; focus itself is never shortened.
 
-For every selected target, look for its **best fit**: the variant whose arity equals the number of arguments. A target with a best fit yields **exactly one match**, for that variant. A target without one yields **one match per variant**, each rendered as far as the arguments allow (section 5), so that the fallback page can show every page the target could have meant. Order the matches as section 5 defines; clients render that order rather than re-sorting.
+For every selected target, emit **one match per variant**, each rendered as far as the arguments allow (section 5), so the fallback page can show every page the target could have meant. A target's **best fit** — the variant whose arity equals the number of arguments — is not singled out in the result; it is simply the match with a zero argument balance (there is at most one, since a target has at most one variant per arity), which ordering (section 5) leads with. Order the matches as section 5 defines; clients render that order rather than re-sorting.
 
 With a target keyed `jira` whose variants are `[https://jira.example.com, https://jira.example.com/browse/{}]`:
 
 ```text
-jira               one match: https://jira.example.com          (arity 0 fits 0 arguments)
-jira PROJ          one match: https://jira.example.com/browse/PROJ
-jira PROJ extra    two matches: no variant has arity 2, so both are listed
+jira               two matches: https://jira.example.com (best fit, argDelta 0) then …/browse/{} (argDelta -1)
+jira PROJ          two matches: …/browse/PROJ (best fit, argDelta 0) then https://jira.example.com (argDelta +1)
+jira PROJ extra    two matches: no variant has arity 2, so neither is a best fit
 ```
 
-The third program cannot navigate directly even though one of its rows is complete: two arguments do not say which page was meant.
+The first two programs each have a best fit — the argDelta-0 row — and can navigate directly to it (section 5); the third has none, so it only ever shows the fallback page.
 
 `R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
 
@@ -403,13 +404,13 @@ A query with no dimensions still produces ordinary matches, with empty `position
 
 Within a target, compare two variants by `argDelta`:
 
-3. **Zero first.** The best fit, when there is one, is the target's only row.
+3. **Zero first.** The best fit, when there is one, leads the target's rows.
 4. **Positive ascending.** Complete destinations with arguments to spare: `+1` before `+2`.
 5. **Negative by `|argDelta|` ascending.** Destinations still showing a `{}`: `-1` before `-2`.
 
 So for a target keyed `jira` with arities `{0, 2}` and one argument, the rows are its arity-0 variant (`+1`) then its arity-2 variant (`-1`).
 
-A direct-navigation candidate requires **exactly one match** in `R` with a nonnegative argument balance. That is one selected target with a best fit, or one selected target with a single variant. Missing-argument matches remain in `R.matches` and count toward ambiguity, and so do the sibling variants of a target without a best fit. Ordering never turns several matches into a unique one: a client must check the match count, not take the first row.
+A direct-navigation candidate is a **single selected target** — every match in `R` shares its key — that has a **best fit**: navigate to its argDelta-0 row. A single-variant target whose one row has a nonnegative argument balance also navigates, dropping any surplus arguments. A target's sibling variants no longer suppress navigation, but matches from a **second** selected target do; a client checks the set of keys, not the raw match count ([ADR 0011](adr/0011-fan-out-variants-client-picks-navigable.md)). Ordering never turns an ambiguous result into a navigable one.
 
 ## 6. Errors and state preservation
 
@@ -526,18 +527,33 @@ https://jira.example.com/browse/{} jira .set
 jira .$
 ```
 
-The first `.set` creates `jira` with an arity-0 variant; the second adds an arity-1 variant to the same target. `jira` has no arguments, so the arity-0 variant is the best fit and the target yields one match: a direct-navigation candidate.
+The first `.set` creates `jira` with an arity-0 variant; the second adds an arity-1 variant to the same target. `jira` has no arguments, so the arity-0 variant is the best fit; the target yields one row per variant, the best fit (`argDelta 0`) leading, and is a direct-navigation candidate to that row:
 
 ```json
 ["R", {
   "matches": [
-    ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 0}]
+    ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 0}],
+    ["https://jira.example.com/browse/{}", "https://jira.example.com/browse/{}", "jira",
+      [], {"argDelta": -1}]
   ],
   "inputs": ["jira"]
 }]
 ```
 
-Against the same resulting state, `jira PROJ .$` yields one match for `https://jira.example.com/browse/PROJ`, and `jira PROJ extra .$` yields two rows because neither variant has arity 2:
+Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the best fit, again leading its arity-0 sibling; it navigates to the best-fit row:
+
+```json
+["R", {
+  "matches": [
+    ["https://jira.example.com/browse/PROJ", "https://jira.example.com/browse/{}", "jira",
+      ["PROJ"], {"argDelta": 0}],
+    ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 1}]
+  ],
+  "inputs": ["jira"]
+}]
+```
+
+`jira PROJ extra .$` yields two rows with no best fit, because neither variant has arity 2, so it cannot navigate:
 
 ```json
 ["R", {
@@ -550,7 +566,7 @@ Against the same resulting state, `jira PROJ .$` yields one match for `https://j
 }]
 ```
 
-Both rows are complete, but two matches are not a direct-navigation candidate. `jira . x .rm` then removes the arity-1 variant, leaving `jira` with the arity-0 variant alone, so `jira PROJ .$` afterwards yields one match with `argDelta: 1` and navigates.
+`jira . x .rm` then removes the arity-1 variant, leaving `jira` with the arity-0 variant alone, so `jira PROJ .$` afterwards yields one row with `argDelta: 1` and navigates.
 
 ### Select every target with an empty query
 

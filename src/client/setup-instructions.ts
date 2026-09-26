@@ -14,7 +14,7 @@ export const showsSetupInstructions = (register: OutputRegister): boolean =>
 
 // The page's own URL, with any query and fragment dropped, is the base of both shortcut templates.
 // `href` rather than `origin + pathname`: a `file:` URL's origin is the string "null".
-const shortcutTemplates = (pageUrl: string): readonly [query: string, fragment: string] => {
+export const shortcutTemplates = (pageUrl: string): readonly [query: string, fragment: string] => {
   const base = new URL(pageUrl);
   base.search = '';
   base.hash = '';

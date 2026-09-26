@@ -33,10 +33,10 @@ const fakeStorage = (
   };
 };
 
-const match = (argDelta: number): Match => [
-  'https://example.com/',
-  'https://example.com/',
-  'home',
+const match = (argDelta: number, key = 'home', dest = 'https://example.com/'): Match => [
+  dest,
+  dest,
+  key,
   [],
   { argDelta, positions: [], score: 1 },
 ];
@@ -61,6 +61,33 @@ describe('resolveNavigationDestination', () => {
     ).resolves.toBe('https://example.com/');
   });
 
+  it('a best fit navigates to its Δ0 row even when the target has sibling variants (ADR 0011)', async () => {
+    await expect(
+      resolveNavigationDestination(
+        register({
+          terminal: [
+            'R',
+            {
+              matches: [
+                match(0, 'jira', 'https://jira.example.com/browse/PROJ'),
+                match(-1, 'jira', 'https://jira.example.com'),
+              ],
+              inputs: ['jira'],
+            },
+          ],
+        }),
+      ),
+    ).resolves.toBe('https://jira.example.com/browse/PROJ');
+  });
+
+  it('a single-variant surplus navigates to its lone row: `home foo` -> home', async () => {
+    await expect(
+      resolveNavigationDestination(
+        register({ terminal: ['R', { matches: [match(1)], inputs: ['home', 'foo'] }] }),
+      ),
+    ).resolves.toBe('https://example.com/');
+  });
+
   const rejected: ReadonlyArray<[string, OutputRegister]> = [
     [
       'a terminal E does not navigate',
@@ -68,12 +95,47 @@ describe('resolveNavigationDestination', () => {
     ],
     ['no matches do not navigate', register({ terminal: ['R', { matches: [], inputs: ['x'] }] })],
     [
-      'more than one match does not navigate',
-      register({ terminal: ['R', { matches: [match(0), match(0)], inputs: ['home'] }] }),
+      'two matched targets do not navigate, even when both are complete',
+      register({
+        terminal: [
+          'R',
+          {
+            matches: [match(0, 'aaa', 'https://a/'), match(0, 'bbb', 'https://b/')],
+            inputs: ['x'],
+          },
+        ],
+      }),
+    ],
+    [
+      'a cross-target single Δ0 does not navigate: only one of two matched targets has an exact fit',
+      register({
+        terminal: [
+          'R',
+          {
+            matches: [
+              match(0, 'github', 'https://github/'),
+              match(-1, 'gitlab', 'https://gitlab/{}'),
+            ],
+            inputs: ['git'],
+          },
+        ],
+      }),
     ],
     [
       'a negative argument balance does not navigate',
       register({ terminal: ['R', { matches: [match(-1)], inputs: ['home'] }] }),
+    ],
+    [
+      'a multi-variant target with no best fit does not navigate (surplus on every variant)',
+      register({
+        terminal: [
+          'R',
+          {
+            matches: [match(1, 'gap', 'https://gap/'), match(2, 'gap', 'https://gap/x/')],
+            inputs: ['gap'],
+          },
+        ],
+      }),
     ],
     [
       'an empty query does not navigate, even to a single complete match',

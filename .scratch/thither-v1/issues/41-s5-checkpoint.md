@@ -1,8 +1,8 @@
 # S5 checkpoint: the page is usable
 
 Type: grilling
-Status: open
-Blocked by: 37, 38, 39, 40
+Status: resolved
+Blocked by: 37, 38, 39, 40, 45
 
 ## Question
 
@@ -17,3 +17,24 @@ Decide: is the page usable as `browser-client.md` intends, and does anything lea
 This checkpoint **graduates the S6 fog patch** (`docs/search-shortcut-checklist.md` authoring and the cross-browser `%s` run) into tickets.
 
 **Done when** the human signs off and the S6 tickets exist on the map, wired to their blockers.
+
+## Answer
+
+**Signed off** after the human drove the live page (dark themed, served from the built
+`dist/index.html`) through empty-profile setup, live execution without navigation, a live mutation
+that persisted and showed in Settings, highlights, the Settings actions (revert/clear/import/limit),
+and the `?`/gear controls. The code-facts held: `main.ts` is the only composition root, and the
+client reads only the register.
+
+The drive surfaced fixes that landed as their own tickets rather than blocking sign-off:
+[46](issues/46-probe-port-and-scheme.md) (`{}`-port destinations), [47](issues/47-s5-drive-ui-polish.md)
+(Escape-clears / sticky summary / row args), [48](issues/48-help-modal-and-larger-controls.md) (Help
+modal + SVG controls), and [49](issues/49-dark-theme-and-branding.md) (dark theme, colour-coded
+results, wordmark).
+
+**`Ctrl+digit` reachability on non-macOS was not exercised** (the drive was on macOS) and carries
+into S6 as ticket 51's explicit question. No auto-navigation once the page was shown, as specified.
+
+**S6 fog graduated** into [50 Author the search-shortcut checklist](issues/50-author-shortcut-checklist.md)
+→ [51 Cross-browser verification + `Ctrl+digit` fallback decision](issues/51-cross-browser-verification.md)
+→ [52 S6 checkpoint](issues/52-s6-checkpoint.md).

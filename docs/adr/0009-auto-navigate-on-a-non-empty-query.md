@@ -8,6 +8,8 @@ The browser client auto-navigates from an initial, URL-driven run when the termi
 
 Navigate iff the run is armed and initial, the terminal is an `R`, `R.matches` has exactly one entry, that match's `argDelta` is `≥ 0`, **and `R.inputs` is non-empty**. Nothing else is consulted: not the input token count, not the stored record, not whether a mutation ran.
 
+_([ADR 0011](0011-fan-out-variants-client-picks-navigable.md) restates the match test: once `.$` fans out one row per variant, "exactly one entry" is replaced by "a single selected target with a best-fit (`argDelta`-0) row, or a single-variant target with a nonnegative row". The non-empty-`R.inputs` gate and the query-not-`changed` rationale below are unaffected.)_
+
 `R.inputs` is the right witness because it is exactly the search the run performed, and it already separates every case we care about:
 
 | Program | `inputs` | Outcome |

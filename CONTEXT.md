@@ -62,7 +62,7 @@ A standalone `.` token separating the dimension-matching portion of an input fro
 One variant of a search-selected target represented with its fully or partially rendered destination, the variant's template, the target's key, applied arguments, and hints. Missing arguments leave their `{}` placeholders intact and prevent direct navigation; the argument balance is recorded in the hints. The template travels with the rendering so a presentation layer can show which placeholder each argument filled by walking the template, rather than searching the destination.
 
 **Best fit**:
-The variant of a selected target whose arity equals the number of supplied arguments. A target with a best fit yields exactly one match, for that variant; a target without one yields one match per variant, each rendered as far as the arguments allow, so it can never be navigated to directly.
+The variant of a selected target whose arity equals the number of supplied arguments; a target has at most one. A selected target always yields one match per variant, but the best fit is distinguished by carrying a zero argument balance, so it leads its target's rows in ordering and is the row a client navigates to. A target without a best fit still lists every variant and can never be navigated to directly.
 _Avoid_: Selected variant, default variant
 
 **Matching evidence**:
