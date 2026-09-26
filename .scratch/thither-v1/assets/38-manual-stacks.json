@@ -1,0 +1,27 @@
+[
+  [["S", { "targets": {}, "focus": [] }]],
+  [
+    [
+      "S",
+      {
+        "targets": {
+          "company git": ["https://github.com/company/{}", "https://github.com/company/{}/tree/{}"],
+          "digital ocean": ["https://cloud.digitalocean.com/"],
+          "home": ["https://example.com/"],
+          "jira": ["https://jira.example.com/", "https://jira.example.com/browse/{}"],
+          "docs thither": ["https://example.com/thither/{}"],
+          "api docs": ["https://docs.example.com/api/{}/{}"],
+          "mail": ["https://mail.example.com/"],
+          "calendar": ["https://calendar.example.com/"],
+          "wiki": ["https://wiki.example.com/{}"],
+          "search": ["https://duckduckgo.com/?q={}"],
+          "maps": ["https://maps.example.com/?q={}"],
+          "npm": ["https://www.npmjs.com/package/{}"],
+          "status": ["https://status.example.com/"],
+          "café menu": ["https://cafe.example.com/menu"]
+        },
+        "focus": []
+      }
+    ]
+  ]
+]

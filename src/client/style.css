@@ -1,5 +1,5 @@
 /* The Launcher: one centred column — the field, then whatever the run produced beneath it.
-   Row, badge, and dialog styling belong to the tickets that build them. */
+   Dialog styling belongs to the ticket that builds it. */
 
 :root {
   color-scheme: light dark;
@@ -44,27 +44,155 @@ body {
     monospace;
 }
 
-.results {
+.output {
   margin-top: 16px;
 }
 
-.results ul {
+/* One row per match: badge | key over destination | balance over score, the whole row a link. */
+
+.matches {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.results li {
-  padding: 8px 16px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  overflow-wrap: anywhere;
+.match + .match {
+  border-top: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
 }
 
-.results a {
+.match > a {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "badge key balance"
+    "badge destination score";
+  column-gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.match > a:hover,
+.match > a:focus-visible {
+  background: color-mix(in srgb, Canvas 94%, CanvasText 6%);
+}
+
+.match kbd {
+  grid-area: badge;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+  font:
+    12px system-ui,
+    sans-serif;
+}
+
+.match .key {
+  grid-area: key;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.match .destination {
+  grid-area: destination;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font:
+    12.5px / 1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: color-mix(in srgb, CanvasText 60%, transparent);
+}
+
+.match .balance,
+.match .score {
+  font:
+    11px system-ui,
+    sans-serif;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.match .balance {
+  grid-area: balance;
+}
+
+.match .score {
+  grid-area: score;
+}
+
+/* The evidence: matched characters of the key, and the argument each `{}` was filled with. */
+
+.match mark {
+  background: none;
   color: inherit;
 }
 
-.results p {
+.match .key mark {
+  font-weight: 700;
+  color: LinkText;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, LinkText 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.match .destination mark {
+  padding: 0 3px;
+  border-radius: 3px;
+  font-weight: 600;
+  color: CanvasText;
+  background: color-mix(in srgb, LinkText 14%, Canvas);
+}
+
+.match .destination .placeholder {
+  padding: 0 3px;
+  border: 1px dashed color-mix(in srgb, CanvasText 40%, transparent);
+  border-radius: 3px;
+}
+
+/* A row missing arguments keeps its digit but reads dimmer, its badge dashed, its balance a warning. */
+
+.match.incomplete > a {
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+.match.incomplete kbd {
+  border-style: dashed;
+  background: transparent;
+  color: color-mix(in srgb, CanvasText 45%, transparent);
+}
+
+.match.incomplete .key mark {
+  color: color-mix(in srgb, LinkText 55%, transparent);
+}
+
+.match.incomplete .balance {
+  color: color-mix(in srgb, #c0532e 85%, CanvasText);
+}
+
+.output footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  border-top: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  font:
+    12px system-ui,
+    sans-serif;
+  color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+.output p {
   margin: 0;
   padding: 12px 16px;
   color: color-mix(in srgb, CanvasText 60%, transparent);
