@@ -120,13 +120,12 @@ const addsEvidence = (before: readonly Selection[], after: readonly Selection[])
   });
 };
 
-// dsl.md §4.4 — for one selected target: its best fit (a variant whose arity equals the argument
-// count) yields exactly one match; without one, every variant yields a row (the fallback page).
+// dsl.md §4.4 (ADR 0011) — for one selected target, every variant yields a row. The best fit (a
+// variant whose arity equals the argument count) is not singled out here: it is simply the
+// argDelta === 0 row, which orderVariants leads with and the client navigates to.
 const matchesFor = (selection: Selection, args: readonly Literal[]): Match[] => {
   const [key, variants] = selection.target;
-  const bestFit = variants.find((variant) => arityOf(variant) === args.length);
-  const chosen = bestFit !== undefined ? [bestFit] : variants;
-  return chosen.map((template) => toMatch(selection, key, template, args));
+  return variants.map((template) => toMatch(selection, key, template, args));
 };
 
 // dsl.md §5 — render the template and record the argument balance for one variant.
