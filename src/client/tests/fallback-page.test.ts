@@ -161,7 +161,7 @@ describe('live execution ("triggers live execution after a 60 ms keystroke debou
   });
 });
 
-describe('setup instructions ("While the target set is empty \u2026 They disappear once the target set is non-empty")', () => {
+describe('setup instructions ("While the target set is empty … They disappear once the target set is non-empty")', () => {
   it('a fresh profile shows the shortcut templates for this page, and the first .set removes them', () => {
     const page = `${location.origin}/thither/`;
     history.replaceState(null, '', `${page}?x=1`);

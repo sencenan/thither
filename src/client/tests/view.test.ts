@@ -102,7 +102,7 @@ describe('renderView', () => {
     expect(root.textContent).toBe('gone');
   });
 
-  describe('setup instructions ("While the target set is empty \u2026 in place of the result list")', () => {
+  describe('setup instructions ("While the target set is empty … in place of the result list")', () => {
     // The page's URL is moved with `history.replaceState`, as `main.ts` moves it; happy-dom holds
     // it to the test origin, so the path stands in for the deployed `/thither/`.
     const PAGE = `${location.origin}/thither/`;

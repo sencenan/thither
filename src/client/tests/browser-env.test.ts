@@ -239,6 +239,58 @@ describe('browser env host operations', () => {
 
 // browser-client.md "Persistence" / "Bounded history" — `thither.stacks.v1` is oldest-first with the
 // current stack last; `.save` maintains it with structural-difference dedup and front eviction.
+// browser-client.md "Host operations" — `.save` persists only a run that reached its search: an `R` in
+// the register proves `.$` consumed the literals, so the stored stack is always one `.load` can read.
+describe('.save persists only when the register holds an R', () => {
+  const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
+
+  it('a run ending in an unbound operation persists nothing, and the next run still loads', () => {
+    const storage = fakeStorage();
+    runClient(storage, set('https://example.com/', 'home'));
+    const before = record(storage);
+
+    const paused = runClient(storage, ['https://github.com/{}', 'git', '.s']);
+    expect(paused.register.terminal?.[0]).toBe('E');
+    expect(record(storage)).toEqual(before);
+
+    const next = runClient(storage, ['home']);
+    expect(next.register.loaded).toBe(true);
+    expect(next.register.terminal?.[0]).toBe('R');
+  });
+
+  it('a mutation followed by an error in the same program persists nothing', () => {
+    const storage = fakeStorage();
+    runClient(storage, []);
+    const before = record(storage);
+
+    runClient(storage, [...set('https://example.com/', 'home'), 'git', '.set']);
+
+    expect(record(storage)).toEqual(before);
+  });
+
+  it("a stray .save typed before the search writes nothing; the epilogue's .save writes", () => {
+    const storage = fakeStorage();
+    const { interp } = wire(storage);
+    const tokens = [
+      '.load',
+      'https://example.com/',
+      'home',
+      '.save',
+      '.set',
+      '.$',
+      '.out',
+      '.save',
+    ];
+    const program = tokens.reduce<Program>((acc, t) => interp.pushToken(acc, t), []);
+    interp.execute(program);
+
+    expect(record(storage)).toEqual([
+      [emptyState()],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+    ]);
+  });
+});
+
 describe('bounded history', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
   const stateWith = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];

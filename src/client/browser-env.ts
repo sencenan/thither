@@ -104,14 +104,15 @@ export const createBrowserEnv = (
     return stack;
   };
 
-  // browser-client.md "Host operations" — persist the stack as it stands, never an empty one.
-  // The record is re-read by the write rather than carried from `.load`: the run is synchronous,
-  // so nothing intervenes, and `persistence.ts`'s settings actions write without any `.load` at
-  // all. A failed
-  // write leaves its `E` on the stack; it becomes the run's terminal in place of the `R` that
-  // `.out` captured, so the client never treats the execution as persisted.
+  // browser-client.md "Host operations" — persist the stack as it stands, but only for a run that
+  // reached its search: the `R` in the register proves `.$` consumed the literals, so what is
+  // stored is always a stack `.load` can read. A run that ended in an `E`, or has not searched
+  // yet, persists nothing. The record is re-read by the write rather than carried from `.load`:
+  // the run is synchronous, so nothing intervenes, and `persistence.ts`'s settings actions write
+  // without any `.load` at all. A failed write leaves its `E` on the stack; it becomes the run's
+  // terminal in place of the `R`, so the client never treats the execution as persisted.
   const save: OpFn = (_interp, stack) => {
-    if (stack.length > 0) {
+    if (env.terminal?.[0] === 'R') {
       writeCurrentStack(storage, stack);
       const top = stack[stack.length - 1];
       if (top !== undefined && top[0] === 'E') {
