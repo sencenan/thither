@@ -9,7 +9,7 @@ import type { OutputRegister } from './browser-env.ts';
 import { renderMatchList } from './match-list.ts';
 import { renderSetupInstructions, showsSetupInstructions } from './setup-instructions.ts';
 
-const RESET_HINT = 'Recovery is through the Settings reset.';
+const RESET_HINT = 'Recover in Settings: revert to an earlier stack, clear, or import one.';
 
 export const renderBareError = (root: Element, error: unknown): void => {
   const line = root.ownerDocument.createElement('p');

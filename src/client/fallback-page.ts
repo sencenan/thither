@@ -11,7 +11,9 @@ import type { BrowserEnv } from './browser-env.ts';
 import { tokenize } from './input.ts';
 import { rowLink, shortcutLink } from './match-list.ts';
 import { renderBareError, renderOutput } from './output.ts';
+import type { StorageArea } from './persistence.ts';
 import { run } from './run.ts';
+import { createSettingsDialog } from './settings.ts';
 
 export const LIVE_EXECUTION_DEBOUNCE_MS = 60;
 
@@ -40,6 +42,7 @@ export const mountFallbackPage = (
   root: Element,
   interp: Interpreter,
   env: BrowserEnv,
+  storage: StorageArea,
 ): FallbackPage => {
   const doc = root.ownerDocument;
 
@@ -49,9 +52,16 @@ export const mountFallbackPage = (
   field.spellcheck = false;
   field.value = completedMutation(env.input, env) ? '' : env.input.join(' ');
 
+  const settingsControl = doc.createElement('button');
+  settingsControl.type = 'button';
+  settingsControl.className = 'settings-control';
+  settingsControl.title = 'Settings';
+  settingsControl.setAttribute('aria-label', 'Settings');
+  settingsControl.textContent = '\u2699';
+
   const fieldRow = doc.createElement('div');
   fieldRow.className = 'field';
-  fieldRow.appendChild(field);
+  fieldRow.append(field, settingsControl);
 
   const output = doc.createElement('div');
   output.className = 'output';
@@ -61,7 +71,7 @@ export const mountFallbackPage = (
   };
 
   // A run throws only when localStorage itself has gone; that ends the page, as at load.
-  const liveRun = debounce(() => {
+  const runField = (): void => {
     try {
       const tokens = tokenize(field.value);
       run(interp, tokens);
@@ -72,10 +82,22 @@ export const mountFallbackPage = (
     } catch (error: unknown) {
       renderBareError(root, error);
     }
-  }, LIVE_EXECUTION_DEBOUNCE_MS);
+  };
+
+  const liveRun = debounce(runField, LIVE_EXECUTION_DEBOUNCE_MS);
 
   field.addEventListener('input', () => {
     liveRun.schedule();
+  });
+
+  // browser-client.md "Fallback UI and settings" — after an action the dialog has closed and the
+  // page re-runs the field's contents, so the list reflects the new current stack.
+  const settings = createSettingsDialog(doc, interp, storage, runField);
+  settingsControl.addEventListener('click', () => {
+    settings.open();
+  });
+  settings.element.addEventListener('close', () => {
+    field.focus();
   });
 
   // A query was searched (ADR 0009's test) when `R.inputs` is non-empty: then Enter opens the
@@ -85,9 +107,10 @@ export const mountFallbackPage = (
 
   // One listener on the document, so the shortcuts work whether or not the field has focus. It
   // outlives the page once `renderBareError` has replaced it, so a detached field releases the
-  // keyboard. Focus moves during keydown, so the browser inserts the character into the field.
+  // keyboard; while the settings dialog is open the keyboard is the dialog's. Focus moves during
+  // keydown, so the browser inserts the character into the field.
   doc.addEventListener('keydown', (event) => {
-    if (!field.isConnected) {
+    if (!field.isConnected || settings.element.open) {
       return;
     }
 
@@ -112,7 +135,7 @@ export const mountFallbackPage = (
     }
   });
 
-  root.replaceChildren(fieldRow, output);
+  root.replaceChildren(fieldRow, output, settings.element);
   render();
 
   field.focus();

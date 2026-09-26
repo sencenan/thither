@@ -87,12 +87,27 @@ const open = (storage: StorageArea, input: readonly string[]) => {
   const env = createBrowserEnv(storage, input);
   const interp = createInterpreter(env);
   run(interp, input);
-  const page = mountFallbackPage(root, interp, env);
-  const field = root.querySelector('input');
-  if (field === null) {
+  const page = mountFallbackPage(root, interp, env, storage);
+  const field = root.querySelector('.field input');
+  if (!(field instanceof HTMLInputElement)) {
     throw new Error('the page has no text field');
   }
   return { env, page, field };
+};
+
+const settingsDialog = (): HTMLDialogElement => {
+  const dialog = root.querySelector('dialog');
+  if (dialog === null) {
+    throw new Error('the page has no settings dialog');
+  }
+  return dialog;
+};
+
+const click = (element: Element | null | undefined): void => {
+  if (!(element instanceof HTMLElement)) {
+    throw new Error('nothing to click');
+  }
+  element.click();
 };
 
 const type = (field: HTMLInputElement, text: string): void => {
@@ -120,6 +135,103 @@ describe('the text field', () => {
 
     expect(root.textContent).toContain('No matches');
     expect(storage.writes).toBe(before + 1);
+  });
+});
+
+describe('the Settings control ("Provide a Settings control on the page, opening a modal dialog")', () => {
+  it('the gear beside the field opens the dialog over the page', () => {
+    open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    expect(settingsDialog().open).toBe(false);
+
+    click(root.querySelector('.field .settings-control'));
+
+    expect(settingsDialog().open).toBe(true);
+    expect(settingsDialog().textContent).toContain('1 target');
+  });
+
+  const twoDeepRecord = JSON.stringify([
+    [['S', { targets: {}, focus: [] }]],
+    [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+  ]);
+
+  it('"After an action the modal closes and the page re-runs the field\'s current contents": a revert shows the reverted stack', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: twoDeepRecord });
+    const { field } = open(storage, ['home']);
+    expect(links()).toEqual(['https://example.com/']);
+    click(root.querySelector('.settings-control'));
+
+    click(settingsDialog().querySelector('.revert'));
+
+    expect(settingsDialog().open).toBe(false);
+    expect(links()).toEqual([]);
+    expect(root.textContent).toContain('No targets yet');
+    expect(field.value).toBe('home');
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('a clear re-runs against first initialization, which the run then persists', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: twoDeepRecord });
+    open(storage, []);
+    click(root.querySelector('.settings-control'));
+
+    click(settingsDialog().querySelector('.clear'));
+
+    expect(root.textContent).toContain('No targets yet');
+    expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
+      [['S', { targets: {}, focus: [] }]],
+    ]);
+  });
+
+  describe('the keyboard while the dialog is open ("Neither may open a row while the dialog is open")', () => {
+    it('Ctrl+1 opens nothing', () => {
+      open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+      click(root.querySelector('.settings-control'));
+
+      keydown(settingsDialog(), { key: '1', code: 'Digit1', ctrlKey: true });
+
+      expect(location.href).toBe(PAGE);
+    });
+
+    it("Enter outside the dialog's editables opens nothing, and is not prevented", () => {
+      open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+      click(root.querySelector('.settings-control'));
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        key: 'Enter',
+        code: 'Enter',
+      });
+
+      settingsDialog().dispatchEvent(event);
+
+      expect(location.href).toBe(PAGE);
+      expect(event.defaultPrevented).toBe(false);
+    });
+
+    it('a printable key does not pull focus back to the field', () => {
+      const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+      click(root.querySelector('.settings-control'));
+      const textarea = settingsDialog().querySelector('textarea');
+      textarea?.focus();
+      expect(document.activeElement).toBe(textarea);
+
+      keydown(settingsDialog(), { key: 'a', code: 'KeyA' });
+
+      expect(document.activeElement).not.toBe(field);
+    });
+  });
+
+  it('closing without an action re-runs nothing and refocuses the field', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field } = open(storage, []);
+    const before = storage.writes;
+    click(root.querySelector('.settings-control'));
+    field.blur();
+
+    click(settingsDialog().querySelector('.close'));
+
+    expect(storage.writes).toBe(before);
+    expect(document.activeElement).toBe(field);
   });
 });
 
