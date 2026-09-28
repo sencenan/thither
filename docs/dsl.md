@@ -192,7 +192,7 @@ Focus is **not normalized at all**: it is stored exactly as accumulated, in type
 
 A target's **key** is its normalized dimensions joined with single spaces. Equivalent dimension sets therefore share one key, and the key is both the target's identity (what `.set` and `.rm` compare) and the text the matcher runs against (what `.$` searches). Focus is a stored list of search terms, not a key and not an argument list, and setting it replaces it rather than extending it. Focus is implicit fuzzy-search input for `.$` only, never part of what `.set` or `.rm` name, and not an exact namespace or an access-control boundary.
 
-**Target-set order** is the order targets occupy in the state's target map. A supplied `S` keeps the order it was given, as far as the host language's object iteration preserves it; `.set` appends a newly inserted target to the end; changing an existing target's variants leaves it in place; `.rm` removes targets without reordering the rest. That order is the final tiebreak between equally scored targets, and nothing more is promised of it.
+**Target-set order** is the order targets occupy in the state's target map. A supplied `S` keeps the order it was given, as far as the host language's object iteration preserves it; `.set` appends a newly inserted target to the end; changing an existing target's variants leaves it in place; `.rm` removes targets without reordering the rest. It is the **final** tiebreak, applied only after section 5's length tiebreaks cannot separate two targets, and nothing more is promised of it.
 
 To construct a matching query for `.$`:
 
@@ -395,20 +395,24 @@ Every match of one target carries the same `positions` and `score`: they describ
 
 These fields are evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
-A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because an empty pattern matches every target with no evidence. Every target then ties on score, so ordering falls to target-set order.
+A query with no dimensions still produces ordinary matches, with empty `positions` and a `score` of `0`, because an empty pattern matches every target with no evidence. Every target then ties on score, so ordering falls to the length tiebreaks below — shortest key first — and only then to target-set order.
 
 ### Match ordering
 
 `R.matches` is emitted in one total order, so a client renders it top to bottom without sorting. The rows of one target are **contiguous**: targets are ordered first, then each target's rows within its run. Compare two targets by:
 
 1. **`hint.score` descending.**
-2. **Target-set order.** Ties between equal scores fall to the order the matcher returns them, which is the order targets occupy in the state.
+2. **Key length ascending.** On equal scores the shorter key leads. The matcher's score ignores a key's unmatched tail, so every target a prefix query hits ties on score; the shorter key is the tighter fit for what was typed, and an exact key (`git`) leads its longer neighbours (`gitlab`, `githubprojects`) ([ADR 0013](adr/0013-break-score-ties-by-key-then-destination-length.md)).
+3. **Representative-destination length ascending.** On equal score and key length the shorter representative destination leads. A target's **representative destination** is the rendered destination of the row a client would navigate to — its best fit (`argDelta 0`), or its sole row when the target is single-variant — or, when no row is navigable, the shortest of its rendered destinations.
+4. **Target-set order.** Targets equal on all of the above fall to the order they occupy in the state.
+
+These are display tiebreaks only: reordering never turns an ambiguous result (more than one selected target) into a navigable one.
 
 Within a target, compare two variants by `argDelta`:
 
-3. **Zero first.** The best fit, when there is one, leads the target's rows.
-4. **Positive ascending.** Complete destinations with arguments to spare: `+1` before `+2`.
-5. **Negative by `|argDelta|` ascending.** Destinations still showing a `{}`: `-1` before `-2`.
+5. **Zero first.** The best fit, when there is one, leads the target's rows.
+6. **Positive ascending.** Complete destinations with arguments to spare: `+1` before `+2`.
+7. **Negative by `|argDelta|` ascending.** Destinations still showing a `{}`: `-1` before `-2`.
 
 So for a target keyed `jira` with arities `{0, 2}` and one argument, the rows are its arity-0 variant (`+1`) then its arity-2 variant (`-1`).
 
@@ -513,7 +517,7 @@ company git MyRepo .$
 git . thither .$
 ```
 
-Both targets are selected, so the result is ambiguous even though only one URL is complete. Each target yields one row: the arity-1 variant is `company git`'s best fit, and the arity-2 variant is `git personal`'s only variant. Targets are ordered by score, then target-set order; argument balance does not reorder rows across targets:
+Both targets are selected, so the result is ambiguous even though only one URL is complete. Each target yields one row: the arity-1 variant is `company git`'s best fit, and the arity-2 variant is `git personal`'s only variant. The two keys tie on score, so the shorter key (`company git`, eleven characters) leads the longer (`git personal`, twelve); argument balance does not reorder rows across targets:
 
 ```text
 https://github.com/company/thither          argDelta:  0
@@ -588,16 +592,16 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
 ```json
 ["R", {
   "matches": [
-    ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
-      {"argDelta": -1, "positions": [], "score": 0}],
     ["https://docs.example.com/", "https://docs.example.com/", "docs", [],
-      {"argDelta": 0, "positions": [], "score": 0}]
+      {"argDelta": 0, "positions": [], "score": 0}],
+    ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
+      {"argDelta": -1, "positions": [], "score": 0}]
   ],
   "inputs": []
 }]
 ```
 
-Both scores are `0`, so target-set order decides: `company git` leads because it comes first in the state, even though its destination is incomplete and `docs` is not. Two matches remain, so this is not a direct-navigation candidate.
+Both scores are `0`, so the shorter key decides: `docs` (four characters) leads `company git` (eleven), even though `company git` comes first in the state. Two matches remain, so this is not a direct-navigation candidate.
 
 ### Stop at the first result
 

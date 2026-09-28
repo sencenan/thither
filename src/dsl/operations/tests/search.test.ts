@@ -344,12 +344,13 @@ const cases: readonly Case[] = [
     ],
   ],
   [
-    '§7 an empty query selects every target; ties on score fall to target-set order',
+    '§5 an empty query ties every target on score; the shorter key leads (ADR 0013)',
     [state([companyGit, [['docs'], 'https://docs.example.com/']])],
     [
       state([companyGit, [['docs'], 'https://docs.example.com/']]),
       result(
         [
+          m('https://docs.example.com/', 'https://docs.example.com/', 'docs', [], 0, []),
           m(
             'https://github.com/company/{}',
             'https://github.com/company/{}',
@@ -358,7 +359,6 @@ const cases: readonly Case[] = [
             -1,
             [],
           ),
-          m('https://docs.example.com/', 'https://docs.example.com/', 'docs', [], 0, []),
         ],
         [],
       ),
@@ -861,6 +861,80 @@ const cases: readonly Case[] = [
           m('https://a2/{}', 'https://a2/{}', 'aaa', [], -1, []),
         ],
         [],
+      ),
+    ],
+  ],
+  [
+    '\u00a75 (ADR 0013) equal score falls to key length: the shortest/exact key leads, overriding set order',
+    [
+      state([
+        [['githubprojects'], 'https://ghp/{}'],
+        [['gitlab'], 'https://gl/{}'],
+        [['git'], 'https://git/{}'],
+      ]),
+      'git',
+    ],
+    [
+      state([
+        [['githubprojects'], 'https://ghp/{}'],
+        [['gitlab'], 'https://gl/{}'],
+        [['git'], 'https://git/{}'],
+      ]),
+      result(
+        [
+          m('https://git/{}', 'https://git/{}', 'git', [], -1),
+          m('https://gl/{}', 'https://gl/{}', 'gitlab', [], -1),
+          m('https://ghp/{}', 'https://ghp/{}', 'githubprojects', [], -1),
+        ],
+        ['git'],
+      ),
+    ],
+  ],
+  [
+    '\u00a75 (ADR 0013) equal score and key length fall to representative-destination length',
+    [
+      state([
+        [['gl'], 'https://gitlab.example.com/'],
+        [['gh'], 'https://gh/'],
+      ]),
+    ],
+    [
+      state([
+        [['gl'], 'https://gitlab.example.com/'],
+        [['gh'], 'https://gh/'],
+      ]),
+      result(
+        [
+          m('https://gh/', 'https://gh/', 'gh', [], 0, []),
+          m('https://gitlab.example.com/', 'https://gitlab.example.com/', 'gl', [], 0, []),
+        ],
+        [],
+      ),
+    ],
+  ],
+  [
+    '\u00a75 (ADR 0013) the representative destination is the navigable row, not the shortest partial',
+    [
+      state([
+        [['xa'], 'https://longexample.test/{}', 'https://s/{}/{}'],
+        [['xb'], 'https://mid.test/{}'],
+      ]),
+      'x',
+      '.',
+      'q',
+    ],
+    [
+      state([
+        [['xa'], 'https://longexample.test/{}', 'https://s/{}/{}'],
+        [['xb'], 'https://mid.test/{}'],
+      ]),
+      result(
+        [
+          m('https://mid.test/q', 'https://mid.test/{}', 'xb', ['q'], 0),
+          m('https://longexample.test/q', 'https://longexample.test/{}', 'xa', ['q'], 0),
+          m('https://s/q/{}', 'https://s/{}/{}', 'xa', ['q'], -1),
+        ],
+        ['x'],
       ),
     ],
   ],
