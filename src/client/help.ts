@@ -37,7 +37,7 @@ const RULES: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     '.rm',
-    'Remove the matching targets, or with a . separator only the variant whose argument count the suffix names.',
+    'Remove the target with the exact dimensions you name (no fuzzy matching), or with a . separator only the variant whose argument count the suffix names. A target with more than one variant needs the separator to say which.',
   ],
   [
     '.@',
