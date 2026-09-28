@@ -6,7 +6,6 @@ import { rm } from '../rm.ts';
 import {
   type Case,
   companyDocs,
-  companyGit,
   error,
   explicitError,
   personalGit,
@@ -29,27 +28,43 @@ const jira0: TargetSpec = [['jira'], 'https://jira.example.com'];
 const jira1: TargetSpec = [['jira'], 'https://jira.example.com/browse/{}'];
 
 const cases: readonly Case[] = [
-  // whole-target removal (no separator)
+  // whole-target removal (exact key, single variant)
   [
-    '§4.2 removes every target matching the complete combined query',
+    '§4.2 removes the target with the exact key',
+    [state(three), 'company', 'git', '.rm'],
+    [state([companyDocs, personalGit])],
+  ],
+  [
+    '§4.2 a single-variant target with no separator is removed whole',
+    [state([jira0]), 'jira', '.rm'],
+    [state([])],
+  ],
+  [
+    '§4.2 no fuzzy matching: git alone names no key and removes nothing',
     [state(three), 'git', '.rm'],
-    [state([companyDocs])],
-  ],
-  [
-    '§4.2 a unique match removes only that target, leaving the rest in place',
-    [state(three), 'comp', 'docs', '.rm'],
-    [state([companyGit, personalGit])],
-  ],
-  ['§4.2 zero matches is a successful no-op', [state(three), 'nonexistent', '.rm'], [state(three)]],
-  [
-    '§4.2 never shortens the query: company nonexistent removes nothing',
-    [state(three), 'company', 'nonexistent', '.rm'],
     [state(three)],
   ],
   [
-    '§4.2 without a separator removes the whole target with all its variants',
+    '§4.2 no prefix matching: comp docs names no key and removes nothing',
+    [state(three), 'comp', 'docs', '.rm'],
+    [state(three)],
+  ],
+  [
+    '§4.2 a key with no target is a successful no-op',
+    [state(three), 'nonexistent', '.rm'],
+    [state(three)],
+  ],
+  [
+    '§4.2 dimensions are normalized: GIT company names the same key as company git',
+    [state(three), 'GIT', 'company', '.rm'],
+    [state([companyDocs, personalGit])],
+  ],
+
+  // a multi-variant target must be disambiguated by arity
+  [
+    '§4.2 a multi-variant target with no separator is missing_operand',
     [state([jira]), 'jira', '.rm'],
-    [state([])],
+    [state([jira]), error('missing_operand')],
   ],
 
   // arity-targeted removal (with a separator)
@@ -79,7 +94,7 @@ const cases: readonly Case[] = [
     [state([jira0])],
   ],
 
-  // focus never authorizes removal
+  // focus never authorizes removal, and plays no part in the lookup
   [
     '§4.2 S .rm leaves state unchanged regardless of focus',
     [state(three, ['git']), '.rm'],
@@ -90,35 +105,25 @@ const cases: readonly Case[] = [
     [state(three, ['git']), '.', 'ignored', '.rm'],
     [state(three, ['git'])],
   ],
-
-  // focus joins the query
   [
-    '§3 focus is prepended to the explicit dimensions when matching',
+    '§4.2 focus plays no part in the key: a focused git still names no target',
     [state(three, ['company']), 'git', '.rm'],
-    [state([companyDocs, personalGit], ['company'])],
+    [state(three, ['company'])],
   ],
+
+  // operator syntax is refused, exactly as in .set
   [
-    '§3 query order is irrelevant: git company removes the same target as company git',
-    [state(three), 'git', 'company', '.rm'],
-    [state([companyDocs, personalGit])],
-  ],
-  [
-    '§3 smart-case: an uppercase term is case-sensitive, so GIT matches no key and removes nothing',
-    [state(three), 'GIT', '.rm'],
-    [state(three)],
-  ],
-  [
-    '§3 the NOT operator is live in .rm: !git removes every target without git',
+    '§4.2 the NOT operator is invalid_dimension in .rm',
     [state(three), '!git', '.rm'],
-    [state([companyGit, personalGit])],
+    [state(three), error('invalid_dimension')],
   ],
   [
-    '§3 the OR operator is live in .rm: docs | personal removes both',
+    '§4.2 the OR operator is invalid_dimension in .rm',
     [state(three), 'docs', '|', 'personal', '.rm'],
-    [state([companyGit])],
+    [state(three), error('invalid_dimension')],
   ],
   [
-    '§2 an escaped literal is resolved when matched: ..git matches the dimension .git',
+    '§2 an escaped literal is resolved into the key: ..git names the dimension .git',
     [state([[['.git'], 'https://example.com/']]), '..git', '.rm'],
     [state([])],
   ],
@@ -134,8 +139,8 @@ const cases: readonly Case[] = [
   // state preservation
   [
     "§6 operates on the nearest state: [S0, L0, S1, L1] .rm -> [S0, L0, S1']",
-    [state([]), 'stray', state(three), 'git', '.rm'],
-    [state([]), ['L', ['stray']], state([companyDocs])],
+    [state([]), 'stray', state(three), 'company', 'git', '.rm'],
+    [state([]), ['L', ['stray']], state([companyDocs, personalGit])],
   ],
   [
     '§1 on a sealed stack .rm produces nothing that survives',

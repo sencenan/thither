@@ -1,4 +1,4 @@
-// dsl.md §2 "Search operators", §3, §4.1, §4.3, §6 — where fzf's operators apply and where they
+// dsl.md §2 "Search operators", §3, §4.1, §4.2, §4.3, §6 — where fzf's operators apply and where they
 // are refused, one matrix through the public surface: every operator × every place it can land.
 
 import { describe, expect, it } from 'vitest';
@@ -70,13 +70,6 @@ describe('search operators apply in .$ (dsl.md §3, §4.4)', () => {
   );
 });
 
-describe('search operators apply in .rm (dsl.md §3, §4.2)', () => {
-  it.each(cases)('%s: %j .rm removes exactly the selected targets', (_op, terms, selects) => {
-    const stack = run([state(all), ...terms, '.rm']);
-    expect(stack[0]).toEqual(state(all.filter((target) => !selects.includes(target))));
-  });
-});
-
 // Every operator-bearing token, tested wherever it must be refused or accepted.
 const operatorTokens = ['|', '!personal', "'ompany", '^git', 'git$', '^docs$'];
 
@@ -91,6 +84,16 @@ describe('search operators are refused where a key is stored (dsl.md §4.1, §6)
 
   it.each(operatorTokens)('.set: a plain dimension next to %s still fails as a whole', (token) => {
     const stack = run([state(all), 'https://x/', 'home', token, '.set']);
+    expect(stack).toEqual([state(all), error('invalid_dimension')]);
+  });
+
+  it.each(operatorTokens)('.rm: %s .rm is invalid_dimension and removes nothing', (token) => {
+    const stack = run([state(all), token, '.rm']);
+    expect(stack).toEqual([state(all), error('invalid_dimension')]);
+  });
+
+  it.each(operatorTokens)('.rm: a plain dimension next to %s still fails as a whole', (token) => {
+    const stack = run([state(all), 'home', token, '.rm']);
     expect(stack).toEqual([state(all), error('invalid_dimension')]);
   });
 

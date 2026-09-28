@@ -61,7 +61,7 @@ Terminal rules take priority over the rest.
 | `[K]` | `R` | `[K, R]` | Push result and stop. |
 | `[K]` | `E` | `[K, E]` | Push an explicit error and stop without unwinding. |
 | `[K, S, L]` | `.set` | `[K, S']` | No target with the resulting key appends one; an existing target replaces or gains the variant of the destination's arity. |
-| `[K, S, L]` | `.rm` | `[K, S']` | Remove all complete-query matches, or with a separator only their variant of the arity the suffix length names; no explicit dimensions or 0 matches is a no-op. |
+| `[K, S, L]` | `.rm` | `[K, S']` | Remove the target with the exact key, or with a separator only its variant of the arity the suffix length names; a multi-variant target without a separator, no explicit dimensions, or no such key is a no-op or error. |
 | `[K, S]` | `.rm` | `[K, S]` | No explicit dimensions: leave state unchanged. |
 | `[K, S, L]` | `.@` | `[K, S']` | Replace focus with the dimensions before `.`. |
 | `[K, S]` | `.@` | `[K, S']` | Clear focus. |
@@ -102,7 +102,7 @@ Supported operations are:
 
 ```text
 .set    insert or update a target
-.rm     remove matching targets
+.rm     remove a target by exact key
 .@      replace or clear focus
 .$      search and produce a result
 ```
@@ -140,7 +140,7 @@ git$          the key ends with git
 ^git$         the key is exactly git
 ```
 
-A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in a target's dimensions alike. Operator-carrying terms are legal wherever a literal is search input — the matching portion of `.$` and `.rm`, and focus set by `.@` — and refused by `.set`, whose dimensions are stored as a key (section 4.1).
+A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in a target's dimensions alike. Operator-carrying terms are legal wherever a literal is search input — the matching portion of `.$`, and focus set by `.@` — and refused by `.set` and `.rm`, whose dimensions are stored or matched as a key (sections 4.1 and 4.2).
 
 ### URL and template validation
 
@@ -190,11 +190,11 @@ A target's dimensions are trimmed, lowercase, whitespace-free, deduplicated, and
 
 Focus is **not normalized at all**: it is stored exactly as accumulated, in typed order with its original case, like any literal array. It is a query fragment, so `|` binds the terms on either side of it by position, and an uppercase focus term is a case-sensitive term under smart-case just as it would be typed into a search. Each focus term must still be a valid single literal: non-empty, whitespace-free, and not operator-only (section 2).
 
-A target's **key** is its normalized dimensions joined with single spaces. Equivalent dimension sets therefore share one key, and the key is both the target's identity (what `.set` compares) and the text the matcher runs against (what `.$` and `.rm` search). Focus is a stored list of search terms, not a key and not an argument list, and setting it replaces it rather than extending it. Focus is implicit fuzzy-search input for `.$` and `.rm` only, never part of what `.set` stores, and not an exact namespace or an access-control boundary.
+A target's **key** is its normalized dimensions joined with single spaces. Equivalent dimension sets therefore share one key, and the key is both the target's identity (what `.set` and `.rm` compare) and the text the matcher runs against (what `.$` searches). Focus is a stored list of search terms, not a key and not an argument list, and setting it replaces it rather than extending it. Focus is implicit fuzzy-search input for `.$` only, never part of what `.set` or `.rm` name, and not an exact namespace or an access-control boundary.
 
 **Target-set order** is the order targets occupy in the state's target map. A supplied `S` keeps the order it was given, as far as the host language's object iteration preserves it; `.set` appends a newly inserted target to the end; changing an existing target's variants leaves it in place; `.rm` removes targets without reordering the rest. That order is the final tiebreak between equally scored targets, and nothing more is promised of it.
 
-To construct a matching query for `.$` and `.rm`:
+To construct a matching query for `.$`:
 
 1. Select the operation's explicit matching literals, resolving escapes (section 2).
 2. Prepend the current focus, resolving its escapes likewise (focus is stored in accumulated form).
@@ -208,7 +208,7 @@ Casing follows fzf's **smart-case**: a term written entirely in lowercase matche
 
 Operations differ only in how they choose query inputs:
 
-- `.rm` matches the **entire explicit matching portion**, combined with focus, operators included. It never retries shorter prefixes.
+- `.rm` does not search. Like `.set`, it normalizes its explicit dimensions into a key and looks for that exact key (section 4.2); focus plays no part, and operator terms are refused.
 - `.set` does not search. It normalizes its explicit dimensions into the key it would store and looks for that exact key (section 4.1); focus plays no part, and operator terms are refused.
 - `.$` infers the boundary between matching literals and arguments: the longest matching prefix, trimmed of trailing literals that add no matching evidence (section 4.4); operator terms take part in that inference like any other term.
 - `.@` sets focus directly; it does not search for targets.
@@ -269,6 +269,8 @@ S https://github.com/company/{} . ignored .set
 [K, S]    | .rm -> [K, S]
 ```
 
+`.rm` does not search. Like `.set` (section 4.1), it normalizes its explicit dimensions into a key and looks for a target with **exactly that key**: string equality, no fuzzy matching, no prefix, no focus. This is deliberately narrow — fuzzy matching let a one-letter shortcut authorize removal of every target whose key merely contained that letter, which is too destructive for a delete.
+
 With no literal array, or a matching portion that is empty, leave state unchanged without matching, regardless of focus. Focus alone never authorizes removal:
 
 ```text
@@ -276,21 +278,21 @@ S .rm
 S . x .rm
 ```
 
-Otherwise combine the explicit dimensions with focus and match that complete query, operators included. Zero matches is a successful no-op and multiple matches are allowed; never shorten the query to obtain a match. So `S company nonexistent .rm` removes nothing and does not retry `company`.
+An explicit dimension carrying a search operator (section 2) is `invalid_dimension`, exactly as in `.set`: what `.rm` names is a key, and a key is plain text. Uppercase is not an error; `Git` normalizes to `git` and names the same key.
 
-What is removed depends on the separator:
+A key with no target is a successful no-op: `S nonexistent .rm` removes nothing. When a target is found, what is removed depends on the separator:
 
-- **Without a separator**, remove every matching target whole, with all its variants.
-- **With a separator**, the suffix is not arguments: its **length is an arity**. Remove from every matching target the variant of that arity, if it has one; a target with no such variant is left as it is. A target whose last variant is removed is removed itself. The suffix tokens' text is irrelevant; only their count is read.
+- **Without a separator**, remove the target whole — but only when it is **unambiguous**. A target with a single variant is removed. A target with **more than one variant** is `missing_operand`: to remove more than one page you must name which by arity, using the `. x x x` separator syntax below. This keeps a bare `.rm` from silently deleting every variant of a target at once.
+- **With a separator**, the suffix is not arguments: its **length is an arity**. Remove from the target the variant of that arity, if it has one; a target with no such variant is left as it is. A target whose last variant is removed is removed itself. The suffix tokens' text is irrelevant; only their count is read.
 
 ```text
-S jira .rm            remove the whole jira target
+S jira .rm            remove jira if it has a single variant; otherwise missing_operand
 S jira . x .rm        remove its arity-1 variant
 S jira . .rm          remove its arity-0 variant
 S jira . a b .rm      remove its arity-2 variant, if any; otherwise no change
 ```
 
-A host that appends `.$` makes the no-op programs go on to search the unchanged state.
+Because `.rm` names a key rather than searching, `jira` and `company jira` are different targets: `S company jira .rm` never touches a target keyed `jira`. A host that appends `.$` makes the no-op programs go on to search the unchanged state.
 
 ### 4.3 `.@`
 
@@ -301,7 +303,7 @@ A host that appends `.$` makes the no-op programs go on to search the unchanged 
 
 Replace focus with the matching portion exactly as accumulated (section 3: no normalization), without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
 
-Focus is only ever prepended to a search query (section 3), so it may carry search operators: `!personal .@` makes every later `.$` and `.rm` exclude personal targets until focus changes.
+Focus is only ever prepended to a search query (section 3), so it may carry search operators: `!personal .@` makes every later `.$` exclude personal targets until focus changes. `.rm` does not consult focus.
 
 ### 4.4 `.$`
 
@@ -423,8 +425,8 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 | `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
-| `invalid_dimension` | Evaluation | A dimension about to be stored in a key by `.set` carries search-operator syntax (section 2). |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, or no state to operate on. |
+| `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax (section 2). |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, or a bare `.rm` naming a multi-variant target without an arity separator. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.

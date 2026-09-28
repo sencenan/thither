@@ -27,7 +27,7 @@ A short label used to recall and select a target, such as `company`, `personal`,
 _Avoid_: Tag keyword
 
 **Search operator**:
-fzf's extended-search syntax, available on the terms of a search or removal query: `|` between terms for either-or, a leading `!` for must-not-match, a leading `'` for exact substring, a leading `^` and a trailing `$` as anchors. A term carrying an operator is search syntax, never a dimension, so it cannot be stored in a target; focus, being search input, may carry one.
+fzf's extended-search syntax, available on the terms of a search query: `|` between terms for either-or, a leading `!` for must-not-match, a leading `'` for exact substring, a leading `^` and a trailing `$` as anchors. A term carrying an operator is search syntax, never a dimension, so it cannot be stored in or matched as a key (`.set`, `.rm`); focus, being search input for `.$`, may carry one.
 _Avoid_: Filter, modifier
 
 **Target**:
@@ -43,7 +43,7 @@ The number of anonymous `{}` placeholders in a destination template. A plain URL
 _Avoid_: Placeholder count, slot count
 
 **Key**:
-A target's normalized dimensions joined into one piece of text. It is the target's identity: target-setting finds the target whose key equals its own exactly, and fuzzy matching runs against it. Each query term is matched against the whole key independently, and a target is selected when every term matches; a single term may therefore match across the boundary between two of a target's dimensions.
+A target's normalized dimensions joined into one piece of text. It is the target's identity: target-setting and removal find the target whose key equals theirs exactly, and search's fuzzy matching runs against it. Each query term is matched against the whole key independently, and a target is selected when every term matches; a single term may therefore match across the boundary between two of a target's dimensions.
 _Avoid_: Searchable string, dimension string
 
 **Target set**:
@@ -56,7 +56,7 @@ A URL pattern whose anonymous `{}` placeholders are filled left-to-right by supp
 A single space-separated token supplied to fill one destination template placeholder, rather than to match dimensions. Arguments preserve their original spelling and case.
 
 **Argument separator**:
-A standalone `.` token separating the dimension-matching portion of an input from its arguments. For search, the following tokens are arguments. For removal, only their count matters: it names the arity of the variant to remove. Target-setting and focus-setting ignore the separator and everything after it.
+A standalone `.` token separating the dimension-matching portion of an input from its arguments. For search, the following tokens are arguments. For removal, only their count matters: it names the arity of the variant to remove, disambiguating a target that has more than one. Target-setting and focus-setting ignore the separator and everything after it.
 
 **Match**:
 One variant of a search-selected target represented with its fully or partially rendered destination, the variant's template, the target's key, applied arguments, and hints. Missing arguments leave their `{}` placeholders intact and prevent direct navigation; the argument balance is recorded in the hints. The template travels with the rendering so a presentation layer can show which placeholder each argument filled by walking the template, rather than searching the destination.
@@ -84,7 +84,7 @@ The matches produced by a search together with the user-supplied dimensions used
 The collection of available targets together with the current focus.
 
 **Focus**:
-Search terms stored exactly as typed and implicitly prepended to the query of search and removal operations; target-setting never consults it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
+Search terms stored exactly as typed and implicitly prepended to the search query; target-setting and removal never consult it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
 
 ### Navigation
 
