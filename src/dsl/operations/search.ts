@@ -53,13 +53,22 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
   // §3 — focus then the explicit terms, in typed order: the query is fzf's, operators and all.
   const query = [...focus, ...matching.map(resolveEscape)];
 
-  // §5 — each selected target becomes a contiguous group of variant rows; groups are ordered by
-  // score descending, ties falling to target-set order (a stable sort over the selection order).
-  const groups = searchTargets(targets, query).map((selection) => ({
-    score: selection.score,
-    rows: orderVariants(matchesFor(selection, args)),
-  }));
-  const matches = [...groups].sort((a, b) => b.score - a.score).flatMap((group) => group.rows);
+  // §5 (ADR 0013) — each selected target becomes a contiguous group of variant rows; groups are
+  // ordered by score descending, then by key length ascending (the shortest/exact key leads, since
+  // fzf's score ignores a key's unmatched tail), then by representative-destination length, and
+  // finally by target-set order (a stable sort over the selection order).
+  const groups = searchTargets(targets, query).map((selection) => {
+    const rows = orderVariants(matchesFor(selection, args));
+    return {
+      score: selection.score,
+      keyLength: selection.target[0].length,
+      destLength: representativeDest(rows).length,
+      rows,
+    };
+  });
+  const matches = [...groups]
+    .sort((a, b) => b.score - a.score || a.keyLength - b.keyLength || a.destLength - b.destLength)
+    .flatMap((group) => group.rows);
 
   return ['R', { matches, inputs: matching }];
 };
@@ -177,3 +186,23 @@ const orderVariants = (rows: readonly Match[]): Match[] =>
   });
 
 const bucket = (argDelta: number): number => (argDelta === 0 ? 0 : argDelta > 0 ? 1 : 2);
+
+// dsl.md §5 (ADR 0013) — the rendered destination that represents a target in the cross-target
+// length tiebreak: the row a client would navigate to (the best fit, or the sole row of a
+// single-variant target), or, when no row is navigable, the shortest of its rendered destinations.
+// The rows arrive in orderVariants order, so the best fit, when present, is first.
+const representativeDest = (rows: readonly Match[]): string => {
+  const bestFit = rows.find((row) => row[4].argDelta === 0);
+  if (bestFit !== undefined) {
+    return bestFit[0];
+  }
+  const [first, ...rest] = rows;
+  if (first !== undefined && rest.length === 0 && first[4].argDelta > 0) {
+    return first[0];
+  }
+  // No navigable row: the shortest rendering. A selected target always has at least one variant.
+  return rows.reduce(
+    (shortest, row) => (row[0].length < shortest.length ? row[0] : shortest),
+    first?.[0] ?? '',
+  );
+};

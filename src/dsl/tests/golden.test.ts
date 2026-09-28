@@ -289,18 +289,18 @@ describe('dsl.md §7 worked programs', () => {
         {
           matches: [
             [
-              'https://github.com/company/{}',
-              'https://github.com/company/{}',
-              'company git',
-              [],
-              { argDelta: -1, positions: [], score: 0 },
-            ],
-            [
               'https://docs.example.com/',
               'https://docs.example.com/',
               'docs',
               [],
               { argDelta: 0, positions: [], score: 0 },
+            ],
+            [
+              'https://github.com/company/{}',
+              'https://github.com/company/{}',
+              'company git',
+              [],
+              { argDelta: -1, positions: [], score: 0 },
             ],
           ],
           inputs: [],
