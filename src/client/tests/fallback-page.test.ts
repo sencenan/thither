@@ -90,9 +90,9 @@ const open = (storage: StorageArea, input: readonly string[]) => {
   const env = createBrowserEnv(storage, input);
   const interp = createInterpreter(env);
   if (isNontrivial(interp, input)) {
-    load(interp);
+    load(interp, env.base);
   } else {
-    run(interp, input);
+    run(interp, env.base, input);
   }
   const page = mountFallbackPage(root, interp, env, storage);
   const field = root.querySelector('.field input');
@@ -171,7 +171,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     expect(settingsDialog().open).toBe(false);
     expect(links()).toEqual([]);
-    expect(root.textContent).toContain('No targets yet');
+    expect(root.textContent).toContain('No custom targets yet');
     expect(field.value).toBe('home');
     expect(document.activeElement).toBe(field);
   });
@@ -183,7 +183,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     click(settingsDialog().querySelector('.clear'));
 
-    expect(root.textContent).toContain('No targets yet');
+    expect(root.textContent).toContain('No custom targets yet');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
       [['S', { targets: {}, focus: [], alias: {} }]],
     ]);
@@ -358,7 +358,17 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     const program = [...root.querySelectorAll('.output ol.program li.token')].map(
       (chip) => chip.textContent,
     );
-    expect(program).toEqual(['.load', 'https://example.com/x', 'x', '.set', '.$', '.out', '.save']);
+    expect(program).toEqual([
+      'S',
+      '.load',
+      '.merge',
+      'https://example.com/x',
+      'x',
+      '.set',
+      '.$',
+      '.out',
+      '.save',
+    ]);
     expect(root.querySelector('.output ol.program li.operation')?.textContent).toBe('.load');
   });
 

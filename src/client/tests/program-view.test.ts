@@ -4,7 +4,7 @@
 // token, each chip styled by what the parser made of it, its text as typed.
 
 import { describe, expect, it } from 'vitest';
-import { createInterpreter } from '../../dsl/index.ts';
+import { createInterpreter, type State } from '../../dsl/index.ts';
 import { createBrowserEnv } from '../browser-env.ts';
 import type { StorageArea } from '../persistence.ts';
 import { renderProgram } from '../program-view.ts';
@@ -52,5 +52,15 @@ describe('renderProgram', () => {
   it('dsl.md §6 a parse failure carries its type and description on hover', () => {
     const chip = renderProgram(document, interp, ['.s']).querySelector('li.error');
     expect(chip?.getAttribute('title')).toContain('missing_operation');
+  });
+
+  // browser-client.md "Fallback UI and settings" — the client base state is a supplied S, shown
+  // as one chip with its JSON on hover.
+  it('a state value is one S chip, its JSON on hover', () => {
+    const base: State = ['S', { targets: { thither: ['https://x/'] }, focus: [], alias: {} }];
+    const chip = renderProgram(document, interp, [base, '.load']).querySelector('li.token');
+    expect(chip?.textContent).toBe('S');
+    expect(chip?.className).toBe('token state');
+    expect(chip?.getAttribute('title')).toBe(JSON.stringify(base));
   });
 });

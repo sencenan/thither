@@ -1,18 +1,22 @@
-// browser-client.md "Fallback UI and settings" — the setup instructions shown in place of the
-// match list while the target set is empty: the default search-shortcut URL template for this
-// page, one example `.set` program, and one example fuzzy (fzf) search. Display only; they disappear once a
-// target exists, and are not shown when the stored data could not be loaded. Help carries the
-// fuller reference, including the `#q=` template.
+// browser-client.md "Fallback UI and settings" — the setup instructions shown above the match
+// list while the target set holds no target beyond the client base state's: the default
+// search-shortcut URL template for this page, one example `.set` program, and one example fuzzy
+// (fzf) search. Display only; they disappear once a target of the user's own exists, and are not
+// shown when the stored data could not be loaded. Help carries the fuller reference, including
+// the `#q=` template.
 
+import type { State } from '../dsl/index.ts';
 import type { OutputRegister } from './browser-env.ts';
 
 const EXAMPLE_SET_PROGRAM = 'https://github.com/company/{} company git .set';
 const EXAMPLE_SEARCH = 'cmpny gt . my-repo';
 
-export const showsSetupInstructions = (register: OutputRegister): boolean =>
+// The client base state's targets are not the user's, so a target set holding only its keys, even
+// with a variant overridden, is still empty.
+export const showsSetupInstructions = (register: OutputRegister, base: State): boolean =>
   register.loaded &&
   register.state !== undefined &&
-  Object.keys(register.state[1].targets).length === 0;
+  Object.keys(register.state[1].targets).every((key) => key in base[1].targets);
 
 // The page's own URL, with any query and fragment dropped, is the base of both shortcut templates.
 // `href` rather than `origin + pathname`: a `file:` URL's origin is the string "null".
@@ -28,7 +32,7 @@ export const renderSetupInstructions = (doc: Document, pageUrl: string): Element
   section.className = 'setup';
 
   const heading = doc.createElement('h2');
-  heading.textContent = 'No targets yet';
+  heading.textContent = 'No custom targets yet';
 
   const shortcuts = doc.createElement('p');
   shortcuts.textContent =

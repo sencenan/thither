@@ -7,7 +7,7 @@ The interpreter used to append a terminal `.$` to every program unless one was a
 | Host | Program |
 | --- | --- |
 | REPL | `[...tokens, '.$']` |
-| Browser client | `['.load', ...tokens, '.$', '.out', '.save']` |
+| Browser client | `[B, '.load', '.merge', ...tokens, '.$', '.out', '.save']`, `B` the client base state ([ADR 0016](0016-merge-a-client-base-state-under-the-stored-state.md)) |
 
 The browser client's three **host operations** are the whole of its persistence:
 

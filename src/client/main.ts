@@ -9,6 +9,7 @@
 // `program.ts`, and the page through `fallback-page.ts`.
 
 import { createInterpreter } from '../dsl/index.ts';
+import { baseState } from './base-state.ts';
 import { createBrowserEnv } from './browser-env.ts';
 import { mountFallbackPage } from './fallback-page.ts';
 import { readInput, stripInput } from './input.ts';
@@ -26,18 +27,18 @@ const root = document.querySelector('#app');
 if (root !== null) {
   // `async` so a throw out of `run` (or out of the `localStorage` getter) is a rejection too.
   const main = async (): Promise<void> => {
-    const env = createBrowserEnv(localStorage, readInput(location.href));
+    const env = createBrowserEnv(localStorage, readInput(location.href), baseState(location.href));
     const interp = createInterpreter(env);
 
     // ADR 0015 — a nontrivial program waits for Enter, even from a URL.
     if (isNontrivial(interp, env.input)) {
-      load(interp);
+      load(interp, env.base);
       history.replaceState(null, '', stripInput(location.href));
       mountFallbackPage(root, interp, env, localStorage, version);
       return;
     }
 
-    run(interp, env.input);
+    run(interp, env.base, env.input);
 
     return resolveNavigationDestination(env)
       .then((destination) => location.replace(destination))

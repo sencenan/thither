@@ -20,6 +20,10 @@ _Avoid_: Mutating program, command, write program
 An operation a host registers on the interpreter's environment beyond the language's own five, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
 _Avoid_: Plugin, hook, built-in
 
+**Client base state**:
+The state of the world the browser client places beneath the stored state in every run, then merges the stored state into, so its targets exist unless the stored state overrides them. It holds one target, keyed `thither`, whose destination is the page itself. The run saves the merged state, so the base state becomes part of the stored state: its target can be changed there, but not removed, since the next run merges it in again.
+_Avoid_: Default state, seed state, built-in state
+
 **Output register**:
 The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R` or `E`, the state of the world the run left behind, and facts about the run such as whether the stored record loaded. The host reads the register, never the returned stack.
 _Avoid_: Result variable, side channel

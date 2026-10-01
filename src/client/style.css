@@ -438,14 +438,30 @@ body {
   border-color: color-mix(in srgb, var(--arg) 55%, transparent);
 }
 
+.program .state {
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+  font-weight: 700;
+  cursor: help;
+}
+
 .program .error {
   color: var(--warn);
   border-color: var(--warn);
   border-style: dashed;
 }
 
+/* Set apart from the results around it: a tinted card with an accent edge. */
 .setup {
-  padding: 16px;
+  margin: 0 16px 14px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.setup > :last-child {
+  margin-bottom: 0;
 }
 
 .setup h2 {

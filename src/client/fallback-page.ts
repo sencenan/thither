@@ -98,9 +98,13 @@ export const mountFallbackPage = (
 
   const render = (): void => {
     if (waiting) {
-      renderWaiting(output, env, renderProgram(doc, interp, compose(tokenize(field.value))));
+      renderWaiting(
+        output,
+        env,
+        renderProgram(doc, interp, compose(env.base, tokenize(field.value))),
+      );
     } else {
-      renderOutput(output, env);
+      renderOutput(output, env, env.base);
     }
   };
 
@@ -116,7 +120,7 @@ export const mountFallbackPage = (
 
   const runField = (): void => {
     guarded(() => {
-      run(interp, tokenize(field.value));
+      run(interp, env.base, tokenize(field.value));
     });
   };
 
@@ -126,7 +130,7 @@ export const mountFallbackPage = (
   const runWaiting = (): void => {
     guarded(() => {
       waiting = false;
-      run(interp, tokenize(field.value));
+      run(interp, env.base, tokenize(field.value));
       if (env.terminal?.[0] === 'R') {
         field.value = searchTokens(env.terminal).join(' ');
       }
@@ -138,7 +142,7 @@ export const mountFallbackPage = (
   const refresh = (): void => {
     if (waiting) {
       guarded(() => {
-        load(interp);
+        load(interp, env.base);
       });
     } else {
       runField();
