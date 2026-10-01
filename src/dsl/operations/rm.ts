@@ -48,7 +48,7 @@ export const rm: OpFn = (_interp, stack) => {
   }
 
   // §4.2 — exact key lookup, no search, no focus. A missing key is a successful no-op.
-  const { targets, focus } = state[1];
+  const { targets, focus, alias } = state[1];
   const key = keyOf(explicit);
   const variants = targets[key];
   if (variants === undefined) {
@@ -87,6 +87,6 @@ export const rm: OpFn = (_interp, stack) => {
   }
 
   stack.pop();
-  const nextState: State = ['S', { targets: nextTargets, focus }];
+  const nextState: State = ['S', { targets: nextTargets, focus, alias }];
   return push(stack, nextState);
 };

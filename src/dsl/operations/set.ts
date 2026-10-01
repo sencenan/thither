@@ -53,7 +53,7 @@ export const set: OpFn = (_interp, stack) => {
 
   // §4.1 — exact key lookup, no search, no focus. A missing key inserts; an existing key gains
   // or replaces the variant of the destination's arity, keeping its position and other variants.
-  const { targets, focus } = state[1];
+  const { targets, focus, alias } = state[1];
   const key = keyOf(explicit);
   const existing = targets[key];
   const variants = existing === undefined ? [dest] : upsertVariant(existing, dest);
@@ -61,7 +61,7 @@ export const set: OpFn = (_interp, stack) => {
   const nextTargets: Record<string, readonly Template[]> = { ...targets, [key]: variants };
 
   stack.pop();
-  const nextState: State = ['S', { targets: nextTargets, focus }];
+  const nextState: State = ['S', { targets: nextTargets, focus, alias }];
   return push(stack, nextState);
 };
 

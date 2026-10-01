@@ -26,7 +26,7 @@ describe('run', () => {
   it('a search leaves the R in the register, with the tokens as the query', () => {
     const storage = fakeStorage({
       [STACKS_KEY]: JSON.stringify([
-        [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+        [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
       ]),
     });
     const env = createBrowserEnv(storage);
@@ -48,8 +48,8 @@ describe('run', () => {
 
     const record: unknown = JSON.parse(storage.getItem(STACKS_KEY) ?? 'null');
     expect(record).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 

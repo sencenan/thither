@@ -31,7 +31,4 @@ export const at: OpFn = (_interp, stack) => {
   return push(stack, withFocus(state, [...matching]));
 };
 
-const withFocus = (state: State, focus: readonly Dim[]): State => [
-  'S',
-  { targets: state[1].targets, focus },
-];
+const withFocus = (state: State, focus: readonly Dim[]): State => ['S', { ...state[1], focus }];

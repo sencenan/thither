@@ -27,7 +27,7 @@ const state = (specs: readonly Spec[], focus: readonly string[] = []): State => 
   for (const [dims, variant] of specs) {
     targets[keyOf(dims)] = [variant];
   }
-  return ['S', { targets, focus }];
+  return ['S', { targets, focus, alias: {} }];
 };
 const error = (type: string) => ['E', expect.objectContaining({ type })];
 

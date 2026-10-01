@@ -20,10 +20,10 @@ beforeEach(() => {
   root = app;
 });
 
-const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [] }];
+const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {} }];
 const oneTarget: OutputRegister['state'] = [
   'S',
-  { targets: { home: ['https://example.com/'] }, focus: [] },
+  { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
 ];
 const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
 
@@ -67,7 +67,7 @@ describe('renderOutput', () => {
   describe('the focus bar ("the current focus, the dimensions added to every search")', () => {
     const focused: OutputRegister['state'] = [
       'S',
-      { targets: { home: ['https://example.com/'] }, focus: ['company', '!archived'] },
+      { targets: { home: ['https://example.com/'] }, focus: ['company', '!archived'], alias: {} },
     ];
 
     it('shows the current focus above the results when focus is non-empty', () => {

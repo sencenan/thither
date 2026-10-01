@@ -11,7 +11,7 @@ import {
   type ThitherError,
 } from './types.ts';
 
-export const emptyState = (): State => ['S', { targets: {}, focus: [] }];
+export const emptyState = (): State => ['S', { targets: {}, focus: [], alias: {} }];
 
 export const thitherError = (
   type: ErrorType,

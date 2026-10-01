@@ -33,7 +33,7 @@ export const state = (specs: readonly TargetSpec[], focus: readonly string[] = [
   for (const [dims, ...variants] of specs) {
     targets[keyOf(dims)] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
-  return ['S', { targets, focus }];
+  return ['S', { targets, focus, alias: {} }];
 };
 
 export const error = (type: string) => ['E', expect.objectContaining({ type })];

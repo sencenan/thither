@@ -116,7 +116,7 @@ const parseState = (raw: unknown): Token => {
     normalized[key] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
 
-  return ['S', { targets: normalized, focus: [...focus] }];
+  return ['S', { targets: normalized, focus: [...focus], alias: {} }];
 };
 
 const parseResult = (raw: unknown): Result | ThitherError => {

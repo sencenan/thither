@@ -172,7 +172,7 @@ describe('resolveNavigationDestination', () => {
 
 // A record whose current stack holds one complete, single-match target.
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
 ]);
 
 // As main.ts performs it: run, then ask the register where to go. The destination is
@@ -194,7 +194,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('a destination-search hit shows the page rather than navigating (ADR 0014)', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [] }]],
+      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [], alias: {} }]],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), [
       'browse',
@@ -255,7 +255,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('an incomplete single match is listed but not navigated to', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [] }]],
+      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [], alias: {} }]],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), ['docs']);
 

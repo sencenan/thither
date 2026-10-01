@@ -51,7 +51,14 @@ export type ErrorType = (typeof ErrorTypes)[number];
 // top level parsed types
 
 export type LiteralArray = ['L', Literal[]];
-export type State = readonly ['S', { readonly targets: TargetSet; readonly focus: readonly Dim[] }];
+export type State = readonly [
+  'S',
+  {
+    readonly targets: TargetSet;
+    readonly focus: readonly Dim[];
+    readonly alias: Record<string, string>;
+  },
+];
 
 export type Result = readonly [
   'R',

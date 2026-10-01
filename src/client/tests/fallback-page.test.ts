@@ -42,7 +42,7 @@ const fakeStorage = (
 };
 
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
 ]);
 
 // `t01` … `t11`, each to `https://example.com/tNN`, in target-set order.
@@ -58,6 +58,7 @@ const elevenTargetsRecord = JSON.stringify([
           }),
         ),
         focus: [],
+        alias: {},
       },
     ],
   ],
@@ -150,8 +151,8 @@ describe('the Settings control ("Provide a Settings control on the page, opening
   });
 
   const twoDeepRecord = JSON.stringify([
-    [['S', { targets: {}, focus: [] }]],
-    [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+    [['S', { targets: {}, focus: [], alias: {} }]],
+    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
   ]);
 
   it('"After an action the modal closes and the page re-runs the field\'s current contents": a revert shows the reverted stack', () => {
@@ -178,7 +179,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     expect(root.textContent).toContain('No targets yet');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
     ]);
   });
 
@@ -249,8 +250,8 @@ describe('live execution ("triggers live execution after a 60 ms keystroke debou
     vi.advanceTimersByTime(1);
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 
@@ -703,7 +704,12 @@ describe('shortcuts ("navigation shortcuts Ctrl+1 through Ctrl+9, then Ctrl+0 fo
 
   it('"A shortcut … opens the row\'s destination as rendered, an unfilled {} included"', () => {
     const record = JSON.stringify([
-      [['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }]],
+      [
+        [
+          'S',
+          { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+        ],
+      ],
     ]);
     open(fakeStorage({ [STACKS_KEY]: record }), ['company']);
     expect(links()).toEqual(['https://github.com/company/{}']);
@@ -737,8 +743,8 @@ describe('Enter ("Enter opens the first row when the run searched a query … a 
     expect(location.href).toBe(PAGE);
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 
