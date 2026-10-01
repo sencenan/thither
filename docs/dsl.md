@@ -36,7 +36,7 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
 | `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
 | `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
-| `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
+| `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `on`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
@@ -204,13 +204,13 @@ The query terms are joined with spaces into **one fzf extended-search query** an
 
 Term order does not affect selection or score except around `|`, which binds the terms on either side of it: with focus `[company]`, the query `git | docs` is `company AND (git OR docs)`. Only `.$`'s prefix inference otherwise cares about the user's original token order.
 
-Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Keys are lowercase, so an uppercase term matches no key: `Git` finds nothing where `git` finds every git target. An uppercase letter is read as a deliberate request for case-sensitive matching, and the language does not second-guess it — so under `.$`'s prefix inference (section 4.4), `company Git MyRepo` stops matching at `company` and takes `Git` as the first argument. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
+Casing follows fzf's **smart-case**: a term written entirely in lowercase matches case-insensitively, and a term containing an uppercase letter matches case-sensitively. Keys are lowercase, so an uppercase term matches no key: `Git` finds no key where `git` finds every git target. An uppercase letter is read as a deliberate request for case-sensitive matching, and the language does not second-guess it — so under `.$`'s prefix inference (section 4.4), `company Git MyRepo` stops matching at `company` and takes `Git` as the first argument. Matching is diacritic-insensitive for a term written without diacritics: `cafe` matches `café`. No confidence threshold or winner-margin rule is applied, so a first-ranked match is not automatically a unique match.
 
 Operations differ only in how they choose query inputs:
 
 - `.rm` does not search. Like `.set`, it normalizes its explicit dimensions into a key and looks for that exact key (section 4.2); focus plays no part, and operator terms are refused.
 - `.set` does not search. It normalizes its explicit dimensions into the key it would store and looks for that exact key (section 4.1); focus plays no part, and operator terms are refused.
-- `.$` infers the boundary between matching literals and arguments: the longest matching prefix, trimmed of trailing literals that add no matching evidence (section 4.4); operator terms take part in that inference like any other term.
+- `.$` infers the boundary between matching literals and arguments: the longest matching prefix, trimmed of trailing literals that add no matching evidence (section 4.4); operator terms take part in that inference like any other term. When no key matches, `.$` runs the same query against destination templates instead (destination search, section 4.4).
 - `.@` sets focus directly; it does not search for targets.
 
 An empty explicit query searches on focus alone; empty focus with no explicit input selects all targets.
@@ -343,7 +343,11 @@ api a docs   -> `docs` adds evidence, so everything before it is matching input 
 
 The boundary sits after the **last** literal that adds evidence, not the first that does not: an OR group `git | docs` is informative as a whole even though the standalone `|` changes nothing by itself. Conversely a NOT term that excludes no target, or a key word typed twice, adds nothing and becomes an argument. Use `.` when an explicit boundary is needed.
 
-If the user supplied matching literals but **no nonempty prefix matches**, return no matches. Do not discard all supplied literals and fall back to focus; focus itself is never shortened.
+If the user supplied matching literals but **no nonempty prefix matches**, every literal is matching input and there are no arguments. Do not discard all supplied literals and fall back to focus; focus itself is never shortened.
+
+**Destination search.** When the search above selects no target — with or without a separator — run the **same query** (focus then the matching portion, operators live) against each variant's **destination template** instead of the key ([ADR 0014](adr/0014-destination-search-when-no-key-matches.md)). Each variant is matched on its own, against its raw template, `{}` included. A target is selected when at least one of its variants matches, and **only the variants that matched** yield matches; arguments are applied to them exactly as for a key match (section 5) — the separator's suffix when there is one, none otherwise. Their evidence says it came from the destination (section 5). If no template matches either, return no matches.
+
+With a target keyed `jira` whose variants are `[https://jira.example.com, https://jira.example.com/browse/{}]`, no key contains `browse`, so `browse . PROJ` matches only the second variant's template and yields one match, `https://jira.example.com/browse/PROJ`, with destination evidence. Its arity-0 sibling did not match and is not listed.
 
 For every selected target, emit **one match per variant**, each rendered as far as the arguments allow (section 5), so the fallback page can show every page the target could have meant. A target's **best fit** — the variant whose arity equals the number of arguments — is not singled out in the result; it is simply the match with a zero argument balance (there is at most one, since a target has at most one variant per arity), which ordering (section 5) leads with. Order the matches as section 5 defines; clients render that order rather than re-sorting.
 
@@ -357,7 +361,7 @@ jira PROJ extra    two matches: no variant has arity 2, so neither is a best fit
 
 The first two programs each have a best fit — the argDelta-0 row — and can navigate directly to it (section 5); the third has none, so it only ever shows the fallback page.
 
-`R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
+`R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments, whether the key search or destination search found the matches. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
 
 ## 5. Arguments, rendering, and match ordering
 
@@ -388,10 +392,11 @@ The variant's template travels with its rendering: `m` carries the template in i
 
 Each match reports why it matched, so a presentation layer can highlight without re-running the matcher:
 
-- `hint.positions`: the ascending, deduplicated character indices matched within that target's key, the union over every term of the query; NOT terms contribute none, and the joining spaces are never among them. Because a term may span dimension boundaries, these are string indices, not dimension indices.
+- `hint.on`: what the query was matched against — `"key"` for the target's key, or `"destination"` for the variant's destination template, when the match came from destination search (section 4.4). An `R` supplied without `on` in a hint is read as `"key"`.
+- `hint.positions`: the ascending, deduplicated character indices matched within what `on` names — the target's key, or the variant's raw template — the union over every term of the query; NOT terms contribute none, and a key's joining spaces are never among them. Because a term may span dimension boundaries, these are string indices, not dimension indices. A destination position may fall inside a `{}`.
 - `hint.score`: the match's ranking score, the sum of the matcher's score for each term.
 
-Every match of one target carries the same `positions` and `score`: they describe the target, and the variants share them.
+Every key match of one target carries the same `positions` and `score`: they describe the target, and the variants share them. Destination matches describe their own variant, so variants of one target may differ; the target's score, for ordering, is its best variant's.
 
 These fields are evidence, not presentation instructions: the language defines no highlight markup, colour, or label. Other hint fields may be added for debugging or custom presentation.
 
@@ -401,7 +406,7 @@ A query with no dimensions still produces ordinary matches, with empty `position
 
 `R.matches` is emitted in one total order, so a client renders it top to bottom without sorting. The rows of one target are **contiguous**: targets are ordered first, then each target's rows within its run. Compare two targets by:
 
-1. **`hint.score` descending.**
+1. **`hint.score` descending.** A destination-search target's score is its best variant's (section 4.4).
 2. **Key length ascending.** On equal scores the shorter key leads. The matcher's score ignores a key's unmatched tail, so every target a prefix query hits ties on score; the shorter key is the tighter fit for what was typed, and an exact key (`git`) leads its longer neighbours (`gitlab`, `githubprojects`) ([ADR 0013](adr/0013-break-score-ties-by-key-then-destination-length.md)).
 3. **Representative-destination length ascending.** On equal score and key length the shorter representative destination leads. A target's **representative destination** is the rendered destination of the row a client would navigate to — its best fit (`argDelta 0`), or its sole row when the target is single-variant — or, when no row is navigable, the shortest of its rendered destinations.
 4. **Target-set order.** Targets equal on all of the above fall to the order they occupy in the state.
@@ -416,7 +421,7 @@ Within a target, compare two variants by `argDelta`:
 
 So for a target keyed `jira` with arities `{0, 2}` and one argument, the rows are its arity-0 variant (`+1`) then its arity-2 variant (`-1`).
 
-A direct-navigation candidate is a **single selected target** — every match in `R` shares its key — that has a **best fit**: navigate to its argDelta-0 row. A single-variant target whose one row has a nonnegative argument balance also navigates, dropping any surplus arguments. A target's sibling variants no longer suppress navigation, but matches from a **second** selected target do; a client checks the set of keys, not the raw match count ([ADR 0011](adr/0011-fan-out-variants-client-picks-navigable.md)). Ordering never turns an ambiguous result into a navigable one.
+A direct-navigation candidate is a **single selected target** — every match in `R` shares its key — that has a **best fit**: navigate to its argDelta-0 row. A single-variant target whose one row has a nonnegative argument balance also navigates, dropping any surplus arguments. A target's sibling variants no longer suppress navigation, but matches from a **second** selected target do; a client checks the set of keys, not the raw match count ([ADR 0011](adr/0011-fan-out-variants-client-picks-navigable.md)). Ordering never turns an ambiguous result into a navigable one. A result of destination search (`hint.on` is `"destination"`) is never a direct-navigation candidate, however many targets it selects ([ADR 0014](adr/0014-destination-search-when-no-key-matches.md)).
 
 ## 6. Errors and state preservation
 
@@ -492,7 +497,7 @@ https://github.com/company/{} company git .set .$
 company git MyRepo .$
 ```
 
-`.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match nothing: an uppercase term is case-sensitive and keys are lowercase.)
+`.$` matches `company git` and treats `MyRepo` as the argument, keeping its case. (Under smart-case, `Company Git` would match no key: an uppercase term is case-sensitive and keys are lowercase. Destination search would then try the same case-sensitive query against the lowercase template, and find nothing either.)
 
 ```json
 ["R", {
@@ -593,15 +598,42 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
 ["R", {
   "matches": [
     ["https://docs.example.com/", "https://docs.example.com/", "docs", [],
-      {"argDelta": 0, "positions": [], "score": 0}],
+      {"argDelta": 0, "on": "key", "positions": [], "score": 0}],
     ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
-      {"argDelta": -1, "positions": [], "score": 0}]
+      {"argDelta": -1, "on": "key", "positions": [], "score": 0}]
   ],
   "inputs": []
 }]
 ```
 
 Both scores are `0`, so the shorter key decides: `docs` (four characters) leads `company git` (eleven), even though `company git` comes first in the state. Two matches remain, so this is not a direct-navigation candidate.
+
+### Search destinations when no key matches
+
+```text
+["S", {
+  "targets": {
+    "jira": ["https://jira.example.com", "https://jira.example.com/browse/{}"],
+    "company git": ["https://github.com/company/{}"]
+  },
+  "focus": []
+}]
+browse . PROJ .$
+```
+
+No key contains `browse`, so destination search matches the query against each variant's template. Only `jira`'s arity-1 template matches; the separator's suffix is still applied, and the match carries destination evidence, its positions indexing the template:
+
+```json
+["R", {
+  "matches": [
+    ["https://jira.example.com/browse/PROJ", "https://jira.example.com/browse/{}", "jira",
+      ["PROJ"], {"argDelta": 0, "on": "destination", "positions": [25, 26, 27, 28, 29, 30]}]
+  ],
+  "inputs": ["browse"]
+}]
+```
+
+`jira`'s arity-0 variant did not match and is not listed. The one row is a best fit, but it is destination evidence, so it is not a direct-navigation candidate: the client shows it on the fallback page.
 
 ### Stop at the first result
 
