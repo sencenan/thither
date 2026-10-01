@@ -214,9 +214,37 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
     ]);
   });
 
-  it('§2 drops unknown fields on the S envelope', () => {
+  it.each([
+    ['an empty S body', {}],
+    ['an S with only targets', { targets: {} }],
+    ['an S with only focus', { focus: [] }],
+    ['an S with only alias', { alias: {} }],
+  ])('§2 omitted fields default to empty: %s parses as the empty state', (_name, body) => {
+    expect(parse(env, frozen(['S', body]))).toEqual(['S', { targets: {}, focus: [], alias: {} }]);
+  });
+
+  it('§2 an omitted field defaults to empty; the supplied fields are kept', () => {
+    const token = parse(env, frozen(['S', { focus: ['company'], alias: { gh: 'git' } }]));
+    expect(token).toEqual(['S', { targets: {}, focus: ['company'], alias: { gh: 'git' } }]);
+  });
+
+  it('§2 an unknown field on the S envelope makes the state invalid', () => {
     const token = parse(env, frozen(['S', { targets: {}, focus: [], note: 'x' }]));
-    expect(token).toEqual(['S', { targets: {}, focus: [], alias: {} }]);
+    expect(token).toEqual([
+      'E',
+      expect.objectContaining({ type: 'parse_error', description: 'unknown State field note' }),
+    ]);
+  });
+
+  it.each([
+    ['an array', []],
+    ['null', null],
+    ['a string', 'gh'],
+    ['a non-string value', { gh: 1 }],
+  ])('§2 an alias map that is %s makes the state invalid', (_name, alias) => {
+    const token = parse(env, frozen(['S', { targets: {}, focus: [], alias }]));
+    expect(token[0]).toBe('E');
+    expect(token[1]).toMatchObject({ type: 'parse_error' });
   });
 
   it('§2 accepts destinations with an explicit scheme and {} placeholders', () => {
@@ -244,7 +272,8 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
   });
 
   it('§2 rejects a malformed State envelope', () => {
-    expect(parse(env, frozen(['S', { targets: {} }]))[0]).toBe('E');
+    expect(parse(env, frozen(['S', 'wrong']))[0]).toBe('E');
+    expect(parse(env, frozen(['S', { targets: {}, focus: 'wrong' }]))[0]).toBe('E');
     expect(parse(env, frozen(['S', { targets: 'wrong', focus: [], alias: {} }]))[0]).toBe('E');
     expect(parse(env, frozen(['S', { targets: { x: [] }, focus: [], alias: {} }]))[0]).toBe('E');
   });

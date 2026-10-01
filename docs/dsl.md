@@ -35,7 +35,7 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `k` | Key | A target's normalized dimensions joined with single spaces (section 3). A target's identity and the text matching runs against. |
 | `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
 | `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
-| `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
+| `S` | State of the world | `["S", { "targets": T, "focus": [d], "alias": { string: string } }]`. |
 | `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `on`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
@@ -172,7 +172,7 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 ### Supplied structured values
 
-Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
+Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` carries only `targets`, `focus`, and `alias`: an omitted field defaults to empty (`{}`, `[]`, and `{}` respectively), so `["S", {}]` is the empty state, and any other field makes the `S` invalid, so it parses to `E`. An `alias` must be an object whose values are strings. A supplied `R` carries only its defined fields; unknown fields on it are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
 
 Normalize each supplied `S`'s target keys by the rules of section 3: a key is split on whitespace into dimensions, each dimension normalized, and the result rejoined. A key that is empty after normalization, or that carries a search operator, is invalid. Focus is kept verbatim; a focus term that is empty, contains whitespace, or is operator-only is invalid. Normalization does not change target order, variant text, focus, argument spelling, or `R.inputs`.
 
@@ -431,7 +431,7 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as an unknown field on an `S`, duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
 | `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax (section 2). |

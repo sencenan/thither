@@ -11,6 +11,7 @@ import {
   SEP,
   SEP_ESCAPE,
   type Separator,
+  type State,
   type Template,
   type ThitherError,
   type Token,
@@ -81,8 +82,13 @@ const parseState = (raw: unknown): Token => {
     return createParseError('malformed State');
   }
 
-  const { targets, focus } = raw;
-  if (!isRecord(targets) || !isFocusList(focus)) {
+  const unknownField = Object.keys(raw).find((field) => !STATE_FIELD_SET.has(field));
+  if (unknownField !== undefined) {
+    return createParseError(`unknown State field ${unknownField}`);
+  }
+
+  const { targets = {}, focus = [], alias = {} } = raw;
+  if (!isRecord(targets) || !isFocusList(focus) || !isAliasMap(alias)) {
     return createParseError('malformed State');
   }
 
@@ -116,8 +122,11 @@ const parseState = (raw: unknown): Token => {
     normalized[key] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
 
-  return ['S', { targets: normalized, focus: [...focus], alias: {} }];
+  return ['S', { targets: normalized, focus: [...focus], alias: { ...alias } }];
 };
+
+const STATE_FIELDS: (keyof State[1])[] = ['targets', 'focus', 'alias'];
+const STATE_FIELD_SET: ReadonlySet<string> = new Set(STATE_FIELDS);
 
 const parseResult = (raw: unknown): Result | ThitherError => {
   if (isRecord(raw)) {
@@ -207,6 +216,10 @@ const isFocusList = (value: unknown): value is Dim[] => {
         !isOperatorOnly(term),
     )
   );
+};
+
+const isAliasMap = (value: unknown): value is Record<string, string> => {
+  return isRecord(value) && Object.values(value).every((it) => typeof it === 'string');
 };
 
 const isStringArray = (value: unknown): value is string[] => {
