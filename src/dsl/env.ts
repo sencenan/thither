@@ -1,3 +1,4 @@
+import { alias } from './operations/alias.ts';
 import { at } from './operations/at.ts';
 import { rm } from './operations/rm.ts';
 import { search } from './operations/search.ts';
@@ -10,5 +11,6 @@ export const defaultEnv = (): InterpreterEnv => ({
     ['.rm', rm],
     ['.@', at],
     ['.$', search],
+    ['.alias', alias],
   ]),
 });

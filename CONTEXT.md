@@ -13,7 +13,7 @@ The program that embeds the interpreter and composes the programs it runs, such 
 _Avoid_: Client (when the REPL is included), runtime, shell
 
 **Host operation**:
-An operation a host registers on the interpreter's environment beyond the language's own four, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
+An operation a host registers on the interpreter's environment beyond the language's own five, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
 _Avoid_: Plugin, hook, built-in
 
 **Output register**:
@@ -85,10 +85,14 @@ The matches produced by a search together with the user-supplied dimensions used
 ### State and focus
 
 **State of the world**:
-The collection of available targets together with the current focus.
+The collection of available targets together with the current focus and the aliases.
 
 **Focus**:
 Search terms stored exactly as typed and implicitly prepended to the search query; target-setting and removal never consult it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
+
+**Alias**:
+A short literal that stands for another literal wherever it is typed: as search input, a dimension, or an argument. Aliases are part of the state of the world, keyed by their lowercased short form.
+_Avoid_: Constant, macro, shortcut
 
 ### Navigation
 

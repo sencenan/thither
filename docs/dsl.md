@@ -67,6 +67,7 @@ Terminal rules take priority over the rest.
 | `[K, S]` | `.@` | `[K, S']` | Clear focus. |
 | `[K, S, L]` | `.$` | `[K, S, R]` | Search, render matches, and stop. |
 | `[K, S]` | `.$` | `[K, S, R]` | Search using focus alone; empty focus selects all targets. Stop. |
+| `[K, S, L]` | `.alias` | `[K, S']` or `[K, S', L']` | Map the last two literals of `L` as short form and literal; the literals before them stay as `L'`. A separator in `L`, or a single literal, is an error. |
 | Any invalid stack or operands | Operation | Unwind, then push `E` | Preserve the nearest working state; see section 6. |
 
 Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or deduplicate `L`: that would destroy argument spelling, ordering, and the boundary inferred by search.
@@ -217,7 +218,7 @@ An empty explicit query searches on focus alone; empty focus with no explicit in
 
 ## 4. Operations
 
-Each operation reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
+Each operation except `.alias`, which takes no separator (section 4.5), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
 
 ### 4.1 `.set`
 
@@ -363,6 +364,27 @@ The first two programs each have a best fit — the argDelta-0 row — and can n
 
 `R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments, whether the key search or destination search found the matches. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
 
+### 4.5 `.alias`
+
+```text
+[K, S, L ++ [a, b]] | .alias -> [K, S', L]
+[K, S, [a, b]]      | .alias -> [K, S']
+```
+
+Store an alias: the last two literals of `L` are its short form `a` and the literal `b` it stands for. `S'` is `S` with `alias[a]` set to `b`, overwriting any existing entry for that short form; targets, focus, and the other aliases are unchanged. Only the pair is consumed: any earlier literals stay on the stack, in order, as a literal array above `S'`.
+
+The short form is lowercased and otherwise kept exactly as accumulated; the literal is kept exactly as accumulated, spelling and case included. Either may carry search operators, and an escaped literal keeps its escape, as focus does (section 3). This section only stores an alias; expanding one where it is typed is not yet specified.
+
+`.alias` takes no argument separator. An `L` containing `.` anywhere is `missing_operand` before anything is consumed, so the stack keeps both `S` and `L` beneath the error. An `L` with a single literal is `missing_operand` after that literal is consumed: `[S, [gh]] | .alias -> [S, E]`.
+
+```text
+S gh github .alias          alias gh -> github
+S GH GitHub .alias          alias gh -> GitHub
+S company gh github .alias  alias gh -> github; [company] stays on the stack
+S gh .alias                 missing_operand; [S, E]
+S gh . github .alias        missing_operand; [S, [gh, ., github], E]
+```
+
 ## 5. Arguments, rendering, and match ordering
 
 Rendering is per variant. Each anonymous `{}` in a variant requires one argument, in left-to-right order. Each supplied argument is one literal, preserving its original spelling and case. For a variant of arity `P` and `A` supplied arguments:
@@ -435,7 +457,7 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
 | `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax (section 2). |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, or a bare `.rm` naming a multi-variant target without an arity separator. |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, or an `.alias` given a separator or a single literal. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.

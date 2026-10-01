@@ -28,12 +28,16 @@ export const runWith =
 // so an expected state built the same way compares equal to the one the code produces.
 export type TargetSpec = readonly [dims: readonly string[], ...variants: Template[]];
 
-export const state = (specs: readonly TargetSpec[], focus: readonly string[] = []): State => {
+export const state = (
+  specs: readonly TargetSpec[],
+  focus: readonly string[] = [],
+  alias: Readonly<Record<string, string>> = {},
+): State => {
   const targets: Record<string, readonly Template[]> = {};
   for (const [dims, ...variants] of specs) {
     targets[keyOf(dims)] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
-  return ['S', { targets, focus, alias: {} }];
+  return ['S', { targets, focus, alias }];
 };
 
 export const error = (type: string) => ['E', expect.objectContaining({ type })];
