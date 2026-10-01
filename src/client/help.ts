@@ -20,6 +20,10 @@ const USAGE: ReadonlyArray<readonly [string, string]> = [
     'Type words that describe where you want to go; Thither fuzzy-matches them against your targets and lists the best fits.',
   ],
   [
+    'URL matches',
+    'When no target\u2019s name matches, the same words are matched against the targets\u2019 URLs instead. Those matches are highlighted in the URL and never open on their own.',
+  ],
+  [
     'Arguments',
     'Put a standalone . after the matching words, then the values that fill the target\u2019s {} placeholders: git company . my-branch',
   ],
@@ -29,9 +33,13 @@ const USAGE: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     'Run',
-    'A program with an operation (.set, .rm, .@, .alias) does not run as you type: press Enter to run it. A plain search runs as you type.',
+    'A program with an operation (.set, .rm, .@, .alias) does not run as you type: it waits, showing each token it will run, until you press Enter. The field then keeps only the search it ended with. A plain search runs as you type.',
   ],
   ['Clear', 'Press Escape to empty the field and start over.'],
+  [
+    'thither',
+    'A built-in target that opens this page. You can replace its URL with .set, but not remove it: it comes back on the next run.',
+  ],
 ];
 
 const RULES: ReadonlyArray<readonly [string, string]> = [
@@ -48,6 +56,10 @@ const RULES: ReadonlyArray<readonly [string, string]> = [
     'Set a focus: dimensions added to every search until you change it. Focus may carry search operators.',
   ],
   [
+    '.alias',
+    'Define a short form, then the text it stands for: gh github .alias. Typing ~gh then stands for github in searches and focus, as a search term or an argument. .set and .rm reject aliases; an undefined ~name is plain text.',
+  ],
+  [
     '.$',
     'Search. It runs automatically at the end of what you type, so you rarely write it yourself.',
   ],
@@ -57,7 +69,7 @@ const RULES: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     'Escaping',
-    'A literal that begins with a dot is written with an extra leading dot (..set is the text ".set"); a lone . is always the argument separator.',
+    'A literal that begins with a dot is written with an extra leading dot (..set is the text ".set", .~gh the text "~gh" rather than an alias); a lone . is always the argument separator.',
   ],
 ];
 

@@ -33,15 +33,25 @@ describe('createHelpDialog', () => {
     expect(headings(help.element)).toEqual(['Usage', 'Basic rules', 'Setup']);
   });
 
-  it('lists each of the four operations in the rules', () => {
+  it('lists each of the five language operations in the rules', () => {
     const help = createHelpDialog(document);
     root.appendChild(help.element);
     help.open('https://host.example/thither/');
 
     const rules = help.element.textContent ?? '';
-    for (const op of ['.set', '.rm', '.@', '.$']) {
+    for (const op of ['.set', '.rm', '.@', '.$', '.alias']) {
       expect(rules).toContain(op);
     }
+  });
+
+  it('explains aliases, destination search, and the built-in thither target', () => {
+    const help = createHelpDialog(document);
+    root.appendChild(help.element);
+    help.open('https://host.example/thither/');
+
+    const terms = [...help.element.querySelectorAll('dt')].map((dt) => dt.textContent ?? '');
+    expect(terms).toEqual(expect.arrayContaining(['.alias', 'URL matches', 'thither']));
+    expect(help.element.textContent).toContain('~gh');
   });
 
   it('the Setup section shows both shortcut templates for the current page URL', () => {
