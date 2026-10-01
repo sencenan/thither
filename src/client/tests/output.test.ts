@@ -6,8 +6,13 @@
 // page that replaces everything when no execution happened.
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { State } from '../../dsl/index.ts';
 import type { OutputRegister } from '../browser-env.ts';
-import { renderBareError, renderOutput } from '../output.ts';
+import { renderBareError, renderOutput as renderOutputOver } from '../output.ts';
+
+const noBase: State = ['S', { targets: {}, focus: [], alias: {} }];
+const renderOutput = (region: Element, register: OutputRegister): void =>
+  renderOutputOver(region, register, noBase);
 
 let root: HTMLElement;
 
@@ -114,7 +119,7 @@ describe('renderOutput', () => {
     expect(root.textContent).toContain('Recover in Settings');
   });
 
-  describe('setup instructions ("in place of the result list")', () => {
+  describe('setup instructions ("above the result list")', () => {
     // The page's URL is moved with `history.replaceState`, as `main.ts` moves it; happy-dom holds
     // it to the test origin, so the path stands in for the deployed `/thither/`.
     const PAGE = `${location.origin}/thither/`;
@@ -123,12 +128,42 @@ describe('renderOutput', () => {
       history.replaceState(null, '', PAGE);
     });
 
-    it('an empty target set shows the instructions for this page instead of the list', () => {
+    it('an empty target set shows the instructions for this page, with no list beneath', () => {
       renderOutput(root, { loaded: true, terminal: everyTarget, state: emptySet });
 
       expect(root.textContent).toContain(`${PAGE}?q=%s`);
       expect(root.textContent).not.toContain(`${PAGE}#q=%s`);
       expect(root.textContent).not.toContain('No matches');
+    });
+
+    it('a target set holding only the client base state shows the instructions, then the list', () => {
+      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {} }];
+      const terminal: OutputRegister['terminal'] = [
+        'R',
+        {
+          matches: [
+            [PAGE, PAGE, 'thither', [], { argDelta: 0, on: 'key', positions: [], score: 0 }],
+          ],
+          inputs: [],
+          args: [],
+        },
+      ];
+      renderOutputOver(root, { loaded: true, terminal, state: base }, base);
+
+      expect(root.textContent).toContain('No custom targets yet');
+      // The summary bar stays directly beneath the field; the instructions sit between it and the rows.
+      expect(
+        [...root.children].map((child) => child.tagName.toLowerCase() + '.' + child.className),
+      ).toEqual(['footer.', 'section.setup', 'ol.matches']);
+      expect(root.querySelector('ol.matches a')?.getAttribute('href')).toBe(PAGE);
+    });
+
+    it('a search matching nothing in the base state lists no matches beneath the instructions', () => {
+      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {} }];
+      renderOutputOver(root, { loaded: true, terminal: everyTarget, state: base }, base);
+
+      const text = root.textContent ?? '';
+      expect(text.indexOf('?q=%s')).toBeLessThan(text.indexOf('No matches'));
     });
 
     it('"They are not shown when loaded is false": a corrupted record shows the E and the hint only', () => {

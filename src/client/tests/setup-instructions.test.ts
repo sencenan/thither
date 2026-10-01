@@ -5,6 +5,7 @@
 // page, the example `.set` program, and an example fuzzy (fzf) search).
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { State } from '../../dsl/index.ts';
 import type { OutputRegister } from '../browser-env.ts';
 import { renderSetupInstructions, showsSetupInstructions } from '../setup-instructions.ts';
 
@@ -14,6 +15,7 @@ const oneTarget: OutputRegister['state'] = [
   { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
 ];
 const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
+const noBase: State = ['S', { targets: {}, focus: [], alias: {} }];
 
 describe('showsSetupInstructions ("While the target set is empty … They are not shown when loaded is false")', () => {
   it.each<[name: string, register: OutputRegister, shown: boolean]>([
@@ -43,7 +45,31 @@ describe('showsSetupInstructions ("While the target set is empty … They are no
       false,
     ],
   ])('%s', (_name, register, shown) => {
-    expect(showsSetupInstructions(register)).toBe(shown);
+    expect(showsSetupInstructions(register, noBase)).toBe(shown);
+  });
+
+  // The client base state's targets are not the user's, so they do not end the empty state.
+  const base: State = [
+    'S',
+    { targets: { thither: ['https://host.example/'] }, focus: [], alias: {} },
+  ];
+  const withBase = (targets: State[1]['targets']): OutputRegister => ({
+    loaded: true,
+    terminal: everyTarget,
+    state: ['S', { targets, focus: [], alias: {} }],
+  });
+
+  it.each<[name: string, register: OutputRegister, shown: boolean]>([
+    ['only the base target', withBase({ thither: ['https://host.example/'] }), true],
+    ['the base target overridden', withBase({ thither: ['https://mine.example/'] }), true],
+    ['the base target removed in this run', withBase({}), true],
+    [
+      "a target of the user's own beside the base one",
+      withBase({ thither: ['https://host.example/'], home: ['https://example.com/'] }),
+      false,
+    ],
+  ])('with a base state: %s', (_name, register, shown) => {
+    expect(showsSetupInstructions(register, base)).toBe(shown);
   });
 });
 

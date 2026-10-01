@@ -1,11 +1,12 @@
 // browser-client.md "Fallback UI" — what a run leaves behind, rendered. `renderOutput` draws the
 // output register into the region beneath the field: an `E` as its `type` and `description`
-// verbatim, then either the setup instructions (while the target set is empty) or the match
-// list, and the settings-reset hint when the stored data could not be loaded. `renderWaiting`
+// verbatim, then the match list's summary bar, the setup instructions (while the target set holds
+// no target beyond the client base state's), and the list's rows, and the settings-reset hint when
+// the stored data could not be loaded. `renderWaiting`
 // draws a nontrivial program that has not run yet (ADR 0015). `renderBareError` is the other
 // page: what an unavailable localStorage leaves, with no execution behind it.
 
-import type { ThitherError } from '../dsl/index.ts';
+import type { State, ThitherError } from '../dsl/index.ts';
 import type { OutputRegister } from './browser-env.ts';
 import { type KeyHint, renderKeyHints, renderMatchList } from './match-list.ts';
 import { renderSetupInstructions, showsSetupInstructions } from './setup-instructions.ts';
@@ -63,7 +64,7 @@ const focusNodes = (doc: Document, register: OutputRegister): Node[] => {
   return focus.length > 0 ? [renderFocus(doc, focus)] : [];
 };
 
-export const renderOutput = (region: Element, register: OutputRegister): void => {
+export const renderOutput = (region: Element, register: OutputRegister, base: State): void => {
   const doc = region.ownerDocument;
   const nodes = focusNodes(doc, register);
 
@@ -72,12 +73,27 @@ export const renderOutput = (region: Element, register: OutputRegister): void =>
     nodes.push(renderError(doc, terminal));
   }
 
-  if (showsSetupInstructions(register)) {
-    nodes.push(renderSetupInstructions(doc, location.href));
-  } else if (terminal?.[0] === 'R') {
-    // The first row starts selected only when a query was searched (R.inputs non-empty, ADR 0009).
-    nodes.push(...renderMatchList(doc, terminal[1].matches, terminal[1].inputs.length > 0));
+  // Beside the instructions the list shows only the client base state's targets, so with no
+  // target at all there is nothing to list and no "No matches" to say. The first row starts
+  // selected only when a query was searched (R.inputs non-empty, ADR 0009).
+  const setup = showsSetupInstructions(register, base);
+  const hasTargets = Object.keys(register.state?.[1].targets ?? {}).length > 0;
+  const results =
+    terminal?.[0] === 'R' && (!setup || hasTargets)
+      ? renderMatchList(doc, terminal[1].matches, terminal[1].inputs.length > 0)
+      : [];
+
+  // A list with rows is its summary bar then its rows (match-list.ts). The bar stays directly
+  // beneath the field, so the instructions go between it and the rows.
+  const [summary, rows] =
+    results.length > 1 ? [results[0], results.slice(1)] : [undefined, results];
+  if (summary !== undefined) {
+    nodes.push(summary);
   }
+  if (setup) {
+    nodes.push(renderSetupInstructions(doc, location.href));
+  }
+  nodes.push(...rows);
 
   if (!register.loaded) {
     nodes.push(renderResetHint(doc));

@@ -548,3 +548,16 @@ describe('settings record', () => {
     );
   });
 });
+
+// browser-client.md "Execution flow" — the env carries the client base state the composition
+// root built, for every run of the page.
+describe('createBrowserEnv base', () => {
+  it('carries the base state it is given', () => {
+    const base = ['S', { targets: { thither: ['https://x/'] }, focus: [], alias: {} }] as const;
+    expect(createBrowserEnv(fakeStorage(), [], base).base).toBe(base);
+  });
+
+  it('defaults to the empty state', () => {
+    expect(createBrowserEnv(fakeStorage()).base).toEqual(emptyState());
+  });
+});

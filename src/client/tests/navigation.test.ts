@@ -188,7 +188,7 @@ const oneTargetRecord = JSON.stringify([
 const open = async (storage: StorageArea, tokens: readonly string[]) => {
   const env = createBrowserEnv(storage);
   const interp = createInterpreter(env);
-  run(interp, tokens);
+  run(interp, env.base, tokens);
   const destination = await resolveNavigationDestination(env).catch(() => undefined);
   return { register: env, destination };
 };

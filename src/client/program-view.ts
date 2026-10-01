@@ -2,9 +2,9 @@
 // program would run, shown in place of the list: every token of the composed program, in order,
 // as the parser reads it. Parsing executes nothing, so this is what will run, not what it will do.
 
-import type { Interpreter } from '../dsl/index.ts';
+import type { Interpreter, State } from '../dsl/index.ts';
 
-type TokenKind = 'operation' | 'literal' | 'separator' | 'alias' | 'error';
+type TokenKind = 'operation' | 'literal' | 'separator' | 'alias' | 'error' | 'state';
 
 interface ParsedToken {
   readonly kind: TokenKind;
@@ -33,19 +33,27 @@ const parseToken = (interp: Interpreter, source: string): ParsedToken => {
   return { kind: 'literal' };
 };
 
+// A supplied state, such as the client base state, is one `S` chip with its JSON on hover.
+const stateChip = (state: State): ParsedToken & { readonly text: string } => ({
+  kind: 'state',
+  title: JSON.stringify(state),
+  text: 'S',
+});
+
 // Each chip shows its source token as typed: an E does not carry the text that produced it.
 export const renderProgram = (
   doc: Document,
   interp: Interpreter,
-  tokens: readonly string[],
+  items: readonly (string | State)[],
 ): Element => {
   const list = doc.createElement('ol');
   list.className = 'program';
-  for (const source of tokens) {
-    const { kind, title } = parseToken(interp, source);
+  for (const item of items) {
+    const { kind, title, text } =
+      typeof item === 'string' ? { ...parseToken(interp, item), text: item } : stateChip(item);
     const chip = doc.createElement('li');
     chip.className = `token ${kind}`;
-    chip.textContent = source;
+    chip.textContent = text;
     if (title !== undefined) {
       chip.title = title;
     }

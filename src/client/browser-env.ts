@@ -15,7 +15,7 @@ import type {
   State,
   ThitherError,
 } from '../dsl/index.ts';
-import { defaultEnv } from '../dsl/index.ts';
+import { defaultEnv, emptyState } from '../dsl/index.ts';
 import { readHistory, type StorageArea, writeCurrentStack } from './persistence.ts';
 
 // The client-held slot the host operations write and the client reads after execution.
@@ -24,7 +24,8 @@ export interface OutputRegister {
   terminal?: Result | ThitherError | undefined;
   loaded: boolean;
   // The world as the run left it: the `S` on top after `.out`, so a mutation the user's tokens
-  // made is already in it. Absent when nothing is left, as after a failed `.load`.
+  // made is already in it. After a failed `.load`, it is the state beneath the error, if any:
+  // in a composed run, the client base state.
   state?: State | undefined;
 }
 
@@ -34,6 +35,7 @@ export interface OutputRegister {
 // `input` is the initial program input, read from the URL before the client strips it.
 export interface BrowserEnv extends InterpreterEnv, OutputRegister {
   readonly input: readonly string[];
+  readonly base: State;
 }
 
 const parseError = (description: string): ThitherError => [
@@ -48,11 +50,12 @@ const isStackValue = (token: Program[number] | undefined): token is State | Resu
 export const createBrowserEnv = (
   storage: StorageArea,
   input: readonly string[] = [],
+  base: State = emptyState(),
 ): BrowserEnv => {
   // The env is also the output register (its fields are splatted in), so the host operations
   // mutate it directly and the client reads terminal/loaded/state off the same object.
   const { symbols } = defaultEnv();
-  const env: BrowserEnv = { symbols, input, loaded: true };
+  const env: BrowserEnv = { symbols, input, base, loaded: true };
 
   // browser-client.md "Host operations" — open a run: clear the register and push the stored
   // current stack. A malformed record or a value that fails validation seals the stack with the
