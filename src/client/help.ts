@@ -25,7 +25,7 @@ const USAGE: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     'Open',
-    'One complete match opens on its own. Otherwise press Enter for the first result, Ctrl+1\u2013Ctrl+9 / Ctrl+0 for a numbered row, or click a row.',
+    'One complete match opens on its own. Otherwise press Enter for the selected row (the first result, or move with \u2191 / \u2193), Ctrl+1\u2013Ctrl+9 / Ctrl+0 for a numbered row, or click a row.',
   ],
   ['Clear', 'Press Escape to empty the field and start over.'],
 ];

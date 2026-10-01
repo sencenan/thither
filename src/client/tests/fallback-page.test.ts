@@ -3,7 +3,7 @@
 // browser-client.md "Fallback UI and settings" — the text field and live execution: the field
 // is seeded from the run's input and owns the keyboard; editing re-runs the ordinary program on
 // a 60 ms debounce and re-renders from the register; live runs never navigate. Navigation from
-// the page is by click, `Ctrl+digit`, or Enter on a row; navigating in happy-dom only moves
+// the page is by click, `Ctrl+digit`, or Enter on the selected row; navigating in happy-dom only moves
 // `location.href`, which every test starts from `PAGE`.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -495,6 +495,96 @@ describe('the field owns the keyboard ("a printable key pressed while it is not 
   });
 });
 
+describe('the arrows ("The Up and Down arrows move the selection one row, whether or not the text field has focus")', () => {
+  const selected = (): string[] =>
+    [...root.querySelectorAll('li.selected > a')].map((a) => a.getAttribute('href') ?? '');
+
+  it('Down and Up move the selection, prevent the caret move, and keep focus in the field', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowDown',
+      code: 'ArrowDown',
+    });
+
+    field.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(selected()).toEqual(['https://example.com/t02']);
+    expect(document.activeElement).toBe(field);
+
+    keydown(field, { key: 'ArrowUp', code: 'ArrowUp' });
+    expect(selected()).toEqual(['https://example.com/t01']);
+  });
+
+  it('work with the field blurred', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    field.blur();
+
+    keydown(document.body, { key: 'ArrowDown', code: 'ArrowDown' });
+
+    expect(selected()).toEqual(['https://example.com/t02']);
+  });
+
+  it('do not run a pending debounce', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: elevenTargetsRecord });
+    const { field } = open(storage, []);
+    const before = storage.writes;
+
+    type(field, 't0');
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+
+    expect(storage.writes).toBe(before);
+  });
+
+  it('Shift+Down is left to the field', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown', shiftKey: true });
+
+    expect(selected()).toEqual(['https://example.com/t01']);
+  });
+
+  it('are left alone while Help is open', () => {
+    open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    click(root.querySelector('.field .help-control'));
+
+    keydown(helpDialog(), { key: 'ArrowDown', code: 'ArrowDown' });
+
+    expect(selected()).toEqual(['https://example.com/t01']);
+  });
+});
+
+describe('Tab ("Tab is blocked on the page while no dialog is open")', () => {
+  const tab = (target: EventTarget, shiftKey = false): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Tab',
+      code: 'Tab',
+      shiftKey,
+    });
+    target.dispatchEvent(event);
+    return event;
+  };
+
+  it('Tab and Shift+Tab are prevented on the page', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+
+    expect(tab(field).defaultPrevented).toBe(true);
+    expect(tab(field, true).defaultPrevented).toBe(true);
+    expect(tab(document.body).defaultPrevented).toBe(true);
+  });
+
+  it('Tab inside an open dialog is left to the dialog', () => {
+    open(fakeStorage(), []);
+    click(root.querySelector('.field .settings-control'));
+
+    expect(tab(settingsDialog()).defaultPrevented).toBe(false);
+  });
+});
+
 describe('flush ("a pending debounce is run first, so Enter acts on what was typed")', () => {
   it('runs a pending debounce now, once', () => {
     const storage = fakeStorage();
@@ -679,6 +769,36 @@ describe('Enter ("Enter opens the first row when the run searched a query … a 
     keydown(document.body, { key: 'Enter', code: 'Enter' });
 
     expect(location.href).toBe(first);
+  });
+
+  it('Enter opens the row the arrows selected, not the first', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    const [, second] = links();
+
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(second);
+  });
+
+  it('on a blank open, Down selects the first row and Enter then opens it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+    const [first] = links();
+
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe(first);
+  });
+
+  it('a run resets the selection: an arrow press before the debounce lands is dropped', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), []);
+
+    type(field, 't0');
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    keydown(field, { key: 'Enter', code: 'Enter' });
+
+    expect(location.href).toBe('https://example.com/t01');
   });
 
   it('Enter pressed in another editable element is left alone', () => {

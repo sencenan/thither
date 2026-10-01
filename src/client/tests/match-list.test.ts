@@ -7,7 +7,13 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Hint, Match } from '../../dsl/index.ts';
-import { renderMatchList, rowLink, shortcutLink } from '../match-list.ts';
+import {
+  moveSelection,
+  renderMatchList,
+  rowLink,
+  selectedLink,
+  shortcutLink,
+} from '../match-list.ts';
 
 let root: HTMLElement;
 
@@ -71,7 +77,7 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
   it('"display the digit beside each of those rows, and nothing beside the rest": 1–9, 0, then an empty badge', () => {
     render(numbered(12));
 
-    expect(texts('kbd')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '', '']);
+    expect(texts('li kbd')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '', '']);
   });
 
   it('the key marks the matched characters from hint.positions: cg → [c]ompany [g]it', () => {
@@ -211,12 +217,12 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(root.textContent).toContain('No matches');
   });
 
-  it('marks the list enter-armed only when Enter would open the first row', () => {
+  it('selects the first row only when asked to (the run searched a query)', () => {
     render(numbered(2));
-    expect(root.querySelector('ol')?.classList.contains('enter-armed')).toBe(false);
+    expect(root.querySelectorAll('li.selected')).toHaveLength(0);
 
     root.replaceChildren(...renderMatchList(document, numbered(2), true));
-    expect(root.querySelector('ol')?.classList.contains('enter-armed')).toBe(true);
+    expect(rows().map((row) => row.classList.contains('selected'))).toEqual([true, false]);
   });
 
   it('the summary bar sits above the list, not after it', () => {
@@ -235,6 +241,22 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(footer).toContain('Ctrl');
     expect(footer).toContain('Enter');
     expect(footer).not.toContain('first ten');
+  });
+
+  it('the key hints show each key as a chip, so they read as keyboard shortcuts', () => {
+    render(numbered(2));
+
+    expect(texts('footer .hints kbd')).toEqual([
+      '\u2191',
+      '\u2193',
+      'Enter',
+      'Ctrl',
+      '1\u20130',
+      'Esc',
+    ]);
+    expect(root.querySelector('footer .hints')?.textContent).toBe(
+      '\u2191\u2193 select \u00b7 Enter open \u00b7 Ctrl+1\u20130 open row \u00b7 Esc clear',
+    );
   });
 
   it('"Every match is listed": past ten rows the footer notes that only the first ten have shortcuts', () => {
@@ -261,6 +283,52 @@ describe('rowLink', () => {
     expect(rowLink(root, 0)?.getAttribute('href')).toBe('https://example.com/0');
     expect(rowLink(root, 1)?.getAttribute('href')).toBe('https://example.com/1');
     expect(rowLink(root, 2)).toBeUndefined();
+  });
+});
+
+describe('selection ("At most one row is selected, and Enter opens it")', () => {
+  const selected = (): number[] =>
+    rows().flatMap((row, index) => (row.classList.contains('selected') ? [index] : []));
+
+  it('selectedLink is the selected row\u2019s link, or undefined while nothing is selected', () => {
+    render(numbered(3));
+    expect(selectedLink(root)).toBeUndefined();
+
+    root.replaceChildren(...renderMatchList(document, numbered(3), true));
+    expect(selectedLink(root)?.getAttribute('href')).toBe('https://example.com/0');
+  });
+
+  it('"with no row selected, Down selects the first row and Up does nothing"', () => {
+    render(numbered(3));
+
+    moveSelection(root, -1);
+    expect(selected()).toEqual([]);
+
+    moveSelection(root, 1);
+    expect(selected()).toEqual([0]);
+  });
+
+  it('moves one row at a time and stops at either end', () => {
+    root.replaceChildren(...renderMatchList(document, numbered(3), true));
+
+    moveSelection(root, 1);
+    expect(selected()).toEqual([1]);
+    moveSelection(root, 1);
+    moveSelection(root, 1);
+    expect(selected()).toEqual([2]);
+    expect(selectedLink(root)?.getAttribute('href')).toBe('https://example.com/2');
+
+    moveSelection(root, -1);
+    moveSelection(root, -1);
+    moveSelection(root, -1);
+    expect(selected()).toEqual([0]);
+  });
+
+  it('does nothing with no rows', () => {
+    render([]);
+
+    moveSelection(root, 1);
+    expect(selectedLink(root)).toBeUndefined();
   });
 });
 
