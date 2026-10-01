@@ -965,8 +965,231 @@ const cases: readonly Case[] = [
   ],
 ];
 
+// m found by destination search: positions index the variant's raw template (dsl.md §4.4, §5).
+const dm = (
+  dest: string,
+  template: string,
+  key: string,
+  args: readonly string[],
+  argDelta: number,
+  positions: readonly number[],
+) => [
+  dest,
+  template,
+  key,
+  args,
+  expect.objectContaining({ argDelta, on: 'destination', positions }),
+];
+
+// destination-search targets: no key below contains `browse`, `example`, `github`, or `https`
+const dests = state([jira, companyGit]);
+// scattered vs contiguous `browse`: the matcher scores the second far higher
+const weak = 'https://b.example/xbxrxoxwxsxe';
+const strong = 'https://q.example/{}/browse';
+const scored = state([
+  [['zz'], weak],
+  [['mixed'], weak, strong],
+]);
+
+const destinationCases: readonly Case[] = [
+  [
+    '§5 a key match says its evidence is on the key',
+    [state([companyGit]), 'company'],
+    [
+      state([companyGit]),
+      result(
+        [
+          [
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            expect.objectContaining({ on: 'key' }),
+          ],
+        ],
+        ['company'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 destination search: no key matches, so the query runs against each template',
+    [dests, 'browse'],
+    [
+      dests,
+      result(
+        [
+          dm(
+            'https://jira.example.com/browse/{}',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            [],
+            -1,
+            [25, 26, 27, 28, 29, 30],
+          ),
+        ],
+        ['browse'],
+      ),
+    ],
+  ],
+  [
+    "§4.4 destination search applies the separator's suffix as arguments",
+    [dests, 'browse', '.', 'PROJ'],
+    [
+      dests,
+      result(
+        [
+          dm(
+            'https://jira.example.com/browse/PROJ',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            ['PROJ'],
+            0,
+            [25, 26, 27, 28, 29, 30],
+          ),
+        ],
+        ['browse'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 destination search without a separator takes no arguments: every literal is matched',
+    [dests, 'github', 'com'],
+    [
+      dests,
+      result(
+        [
+          dm(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [8, 9, 10, 11, 12, 13, 15, 16, 17],
+          ),
+        ],
+        ['github', 'com'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 destination search with no separator never infers arguments: a literal no template has fails the search',
+    [dests, 'browse', 'PROJ'],
+    [dests, result([], ['browse', 'PROJ'])],
+  ],
+  [
+    '§4.4 neither a key nor a template matches: the result is empty and inputs report the attempt',
+    [dests, 'zzz'],
+    [dests, result([], ['zzz'])],
+  ],
+  [
+    '§4.4 every variant whose template matches yields a row, ordered by argument balance',
+    [dests, 'example'],
+    [
+      dests,
+      result(
+        [
+          dm(
+            'https://jira.example.com',
+            'https://jira.example.com',
+            'jira',
+            [],
+            0,
+            [13, 14, 15, 16, 17, 18, 19],
+          ),
+          dm(
+            'https://jira.example.com/browse/{}',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            [],
+            -1,
+            [13, 14, 15, 16, 17, 18, 19],
+          ),
+        ],
+        ['example'],
+      ),
+    ],
+  ],
+  [
+    '§5 destination matches order by score, then key length, like key matches',
+    [dests, 'https'],
+    [
+      dests,
+      result(
+        [
+          dm(
+            'https://jira.example.com',
+            'https://jira.example.com',
+            'jira',
+            [],
+            0,
+            [0, 1, 2, 3, 4],
+          ),
+          dm(
+            'https://jira.example.com/browse/{}',
+            'https://jira.example.com/browse/{}',
+            'jira',
+            [],
+            -1,
+            [0, 1, 2, 3, 4],
+          ),
+          dm(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [0, 1, 2, 3, 4],
+          ),
+        ],
+        ['https'],
+      ),
+    ],
+  ],
+  [
+    "§5 a destination-search target ranks by its best variant's score; its rows stay contiguous",
+    [scored, 'browse'],
+    [
+      scored,
+      result(
+        [
+          dm(weak, weak, 'mixed', [], 0, [8, 21, 23, 25, 27, 29]),
+          dm(strong, strong, 'mixed', [], -1, [21, 22, 23, 24, 25, 26]),
+          dm(weak, weak, 'zz', [], 0, [8, 21, 23, 25, 27, 29]),
+        ],
+        ['browse'],
+      ),
+    ],
+  ],
+  [
+    '§4.4 destination search runs the same query, focus included',
+    [state([jira, companyGit], ['github'])],
+    [
+      state([jira, companyGit], ['github']),
+      result(
+        [
+          dm(
+            'https://github.com/company/{}',
+            'https://github.com/company/{}',
+            'company git',
+            [],
+            -1,
+            [8, 9, 10, 11, 12, 13],
+          ),
+        ],
+        [],
+      ),
+    ],
+  ],
+];
+
 describe('.$ (dsl.md §4.4, §5)', () => {
   it.each(cases)('%s', (_name, program, stack) => {
+    expect(run(program)).toEqual(stack);
+  });
+});
+
+describe('.$ — destination search (dsl.md §4.4, §5)', () => {
+  it.each(destinationCases)('%s', (_name, program, stack) => {
     expect(run(program)).toEqual(stack);
   });
 });
@@ -984,16 +1207,19 @@ const fillSlots = (template: string, args: readonly string[]): string => {
 };
 
 describe('.$ — the template travels with its rendering (dsl.md §5)', () => {
-  it.each(cases)('%s: template filled slot by slot equals the destination', (_name, program) => {
-    const stack = run(program);
-    const top = stack[stack.length - 1];
-    if (top?.[0] !== 'R') {
-      expect.fail(`expected an R on top, got ${JSON.stringify(top)}`);
-    }
-    for (const [destination, template, , args] of top[1].matches) {
-      expect(fillSlots(template, args)).toBe(destination);
-    }
-  });
+  it.each([...cases, ...destinationCases])(
+    '%s: template filled slot by slot equals the destination',
+    (_name, program) => {
+      const stack = run(program);
+      const top = stack[stack.length - 1];
+      if (top?.[0] !== 'R') {
+        expect.fail(`expected an R on top, got ${JSON.stringify(top)}`);
+      }
+      for (const [destination, template, , args] of top[1].matches) {
+        expect(fillSlots(template, args)).toBe(destination);
+      }
+    },
+  );
 });
 
 // The transition table's invalid-stack rule: no state to search over is missing_operand.

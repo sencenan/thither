@@ -309,6 +309,43 @@ describe('dsl.md §7 worked programs', () => {
     ]);
   });
 
+  it('§7 search destinations when no key matches', () => {
+    const state = [
+      'S',
+      {
+        targets: {
+          jira: ['https://jira.example.com', 'https://jira.example.com/browse/{}'],
+          'company git': ['https://github.com/company/{}'],
+        },
+        focus: [],
+      },
+    ];
+    const stack = run([state, 'browse', '.', 'PROJ', '.$']);
+
+    expect(stack).toEqual([
+      state,
+      [
+        'R',
+        {
+          matches: [
+            [
+              'https://jira.example.com/browse/PROJ',
+              'https://jira.example.com/browse/{}',
+              'jira',
+              ['PROJ'],
+              expect.objectContaining({
+                argDelta: 0,
+                on: 'destination',
+                positions: [25, 26, 27, 28, 29, 30],
+              }),
+            ],
+          ],
+          inputs: ['browse'],
+        },
+      ],
+    ]);
+  });
+
   it('§7 stop at the first result', () => {
     const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [] }];
     const s1 = ['S', { targets: { docs: ['https://docs.example.com/'] }, focus: [] }];

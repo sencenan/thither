@@ -7,7 +7,8 @@
 // ADR 0009's teleport behaviour exactly: best fit teleports, single-variant surplus teleports, two
 // matched targets never do, incomplete never does. `R.inputs` is the query the trailing `.$`
 // consumed, so `<u> a b .set a b` navigates while `<u> home .set`, a blank open, and a focus-only
-// search (focus is not part of `inputs`) all show the page.
+// search (focus is not part of `inputs`) all show the page. A destination-search result (ADR 0014)
+// never navigates: a query that named no key is confirmed by eye.
 
 import type { OutputRegister } from './browser-env.ts';
 
@@ -18,7 +19,7 @@ export const resolveNavigationDestination = (register: OutputRegister): Promise<
   }
 
   const { matches, inputs } = terminal[1];
-  if (inputs.length === 0) {
+  if (inputs.length === 0 || matches.some((match) => match[4].on === 'destination')) {
     return Promise.reject();
   }
 

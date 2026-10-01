@@ -123,20 +123,11 @@ const parseResult = (raw: unknown): Result | ThitherError => {
   if (isRecord(raw)) {
     const { matches, inputs } = raw;
 
-    if (isStringArray(inputs) && Array.isArray(matches) && matches.every(isMatch)) {
-      return [
-        'R',
-        {
-          matches: matches.map(([dest, template, key, args, hint]) => [
-            dest,
-            template,
-            key,
-            args,
-            hint,
-          ]),
-          inputs,
-        },
-      ];
+    if (isStringArray(inputs) && Array.isArray(matches)) {
+      const parsed = matches.map(parseMatch);
+      if (parsed.every((match) => match !== undefined)) {
+        return ['R', { matches: parsed, inputs }];
+      }
     }
   }
 
@@ -162,22 +153,36 @@ const parseError = (err: unknown): Token => {
 const createParseError = (description: string): ThitherError =>
   thitherError('parse_error', description);
 
-const isMatch = (value: readonly unknown[]): value is Match => {
-  const [dest, template, key, args, hint, ...rest] = value;
+const parseMatch = (value: unknown): Match | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const [dest, template, key, args, raw, ...rest] = value;
+  const hint = parseHint(raw);
 
-  return (
-    rest.length === 0 &&
+  return rest.length === 0 &&
     typeof dest === 'string' &&
     isTemplate(dest) &&
     typeof template === 'string' &&
     isTemplate(template) &&
     typeof key === 'string' &&
     isDimList(args) &&
-    isHint(hint)
-  );
+    hint !== undefined
+    ? [dest, template, key, args, hint]
+    : undefined;
 };
 
-const isHint = (value: unknown): value is Hint => {
+// dsl.md §5 — an `R` written before destination search carries no `on`; every match was then a key
+// match. Other hint fields are kept, since hints may carry extra debugging fields.
+const parseHint = (value: unknown): Hint | undefined => {
+  if (!isHintFields(value)) {
+    return undefined;
+  }
+  const on = value.on ?? 'key';
+  return on === 'key' || on === 'destination' ? { ...value, on } : undefined;
+};
+
+const isHintFields = (value: unknown): value is Omit<Hint, 'on'> & { readonly on?: unknown } => {
   return (
     isRecord(value) &&
     typeof value.argDelta === 'number' &&
