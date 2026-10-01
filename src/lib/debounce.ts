@@ -1,9 +1,11 @@
 // A trailing-edge debounce: `schedule` (re)starts the delay and `fn` runs once it elapses with
-// no further schedule; `flush` runs a pending call immediately instead of waiting.
+// no further schedule; `flush` runs a pending call immediately instead of waiting, and `cancel`
+// drops it.
 
 export interface Debounced {
   schedule(): void;
   flush(): void;
+  cancel(): void;
 }
 
 export const debounce = (fn: () => void, delayMs: number): Debounced => {
@@ -24,6 +26,10 @@ export const debounce = (fn: () => void, delayMs: number): Debounced => {
         clearTimeout(timer);
         fire();
       }
+    },
+    cancel: () => {
+      clearTimeout(timer);
+      timer = undefined;
     },
   };
 };

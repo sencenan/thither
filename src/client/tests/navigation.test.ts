@@ -43,7 +43,7 @@ const match = (argDelta: number, key = 'home', dest = 'https://example.com/'): M
 
 const register = (over: Partial<OutputRegister>): OutputRegister => ({
   loaded: true,
-  terminal: ['R', { matches: [match(0)], inputs: ['home'] }],
+  terminal: ['R', { matches: [match(0)], inputs: ['home'], args: [] }],
   ...over,
 });
 
@@ -56,7 +56,7 @@ describe('resolveNavigationDestination', () => {
     // `<u> a b .set a b` — the trailing `.$` consumed `a b`, so `inputs` is non-empty.
     await expect(
       resolveNavigationDestination(
-        register({ terminal: ['R', { matches: [match(0)], inputs: ['a', 'b'] }] }),
+        register({ terminal: ['R', { matches: [match(0)], inputs: ['a', 'b'], args: [] }] }),
       ),
     ).resolves.toBe('https://example.com/');
   });
@@ -73,6 +73,7 @@ describe('resolveNavigationDestination', () => {
                 match(-1, 'jira', 'https://jira.example.com'),
               ],
               inputs: ['jira'],
+              args: [],
             },
           ],
         }),
@@ -83,7 +84,7 @@ describe('resolveNavigationDestination', () => {
   it('a single-variant surplus navigates to its lone row: `home foo` -> home', async () => {
     await expect(
       resolveNavigationDestination(
-        register({ terminal: ['R', { matches: [match(1)], inputs: ['home', 'foo'] }] }),
+        register({ terminal: ['R', { matches: [match(1)], inputs: ['home', 'foo'], args: [] }] }),
       ),
     ).resolves.toBe('https://example.com/');
   });
@@ -93,7 +94,10 @@ describe('resolveNavigationDestination', () => {
       'a terminal E does not navigate',
       register({ terminal: ['E', { type: 'parse_error', description: 'x' }] }),
     ],
-    ['no matches do not navigate', register({ terminal: ['R', { matches: [], inputs: ['x'] }] })],
+    [
+      'no matches do not navigate',
+      register({ terminal: ['R', { matches: [], inputs: ['x'], args: [] }] }),
+    ],
     [
       'two matched targets do not navigate, even when both are complete',
       register({
@@ -102,6 +106,7 @@ describe('resolveNavigationDestination', () => {
           {
             matches: [match(0, 'aaa', 'https://a/'), match(0, 'bbb', 'https://b/')],
             inputs: ['x'],
+            args: [],
           },
         ],
       }),
@@ -117,13 +122,14 @@ describe('resolveNavigationDestination', () => {
               match(-1, 'gitlab', 'https://gitlab/{}'),
             ],
             inputs: ['git'],
+            args: [],
           },
         ],
       }),
     ],
     [
       'a negative argument balance does not navigate',
-      register({ terminal: ['R', { matches: [match(-1)], inputs: ['home'] }] }),
+      register({ terminal: ['R', { matches: [match(-1)], inputs: ['home'], args: [] }] }),
     ],
     [
       'a multi-variant target with no best fit does not navigate (surplus on every variant)',
@@ -133,13 +139,14 @@ describe('resolveNavigationDestination', () => {
           {
             matches: [match(1, 'gap', 'https://gap/'), match(2, 'gap', 'https://gap/x/')],
             inputs: ['gap'],
+            args: [],
           },
         ],
       }),
     ],
     [
       'an empty query does not navigate, even to a single complete match',
-      register({ terminal: ['R', { matches: [match(0)], inputs: [] }] }),
+      register({ terminal: ['R', { matches: [match(0)], inputs: [], args: [] }] }),
     ],
     [
       'destination evidence never navigates, even a single target with a best fit (ADR 0014)',
@@ -157,6 +164,7 @@ describe('resolveNavigationDestination', () => {
               ],
             ],
             inputs: ['browse'],
+            args: [],
           },
         ],
       }),
@@ -172,7 +180,7 @@ describe('resolveNavigationDestination', () => {
 
 // A record whose current stack holds one complete, single-match target.
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
 ]);
 
 // As main.ts performs it: run, then ask the register where to go. The destination is
@@ -194,7 +202,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('a destination-search hit shows the page rather than navigating (ADR 0014)', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [] }]],
+      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [], alias: {} }]],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), [
       'browse',
@@ -204,7 +212,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
     expect(destination).toBeUndefined();
     expect(register.terminal).toEqual([
       'R',
-      expect.objectContaining({ matches: [expect.anything()], inputs: ['browse'] }),
+      expect.objectContaining({ matches: [expect.anything()], inputs: ['browse'], args: ['PROJ'] }),
     ]);
   });
 
@@ -255,7 +263,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('an incomplete single match is listed but not navigated to', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [] }]],
+      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [], alias: {} }]],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), ['docs']);
 

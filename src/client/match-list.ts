@@ -15,7 +15,9 @@ const SHORTCUT_DIGITS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '
 
 // Each hint is a run of key chips and plain text, so the bar reads as keyboard shortcuts.
 type HintPart = readonly ['key' | 'text', string];
-const KEY_HINTS: readonly (readonly HintPart[])[] = [
+export type KeyHint = readonly HintPart[];
+
+const KEY_HINTS: readonly KeyHint[] = [
   [
     ['key', '\u2191'],
     ['key', '\u2193'],
@@ -137,9 +139,14 @@ const renderFooter = (doc: Document, count: number, onDestination: boolean): Ele
     note.textContent = ' · on URL';
     summary.append(note);
   }
+  footer.append(summary, renderKeyHints(doc, KEY_HINTS));
+  return footer;
+};
+
+export const renderKeyHints = (doc: Document, keyHints: readonly KeyHint[]): Element => {
   const hints = doc.createElement('span');
   hints.className = 'hints';
-  KEY_HINTS.forEach((hint, index) => {
+  keyHints.forEach((hint, index) => {
     if (index > 0) {
       hints.append(' \u00b7 ');
     }
@@ -153,8 +160,7 @@ const renderFooter = (doc: Document, count: number, onDestination: boolean): Ele
       }
     }
   });
-  footer.append(summary, hints);
-  return footer;
+  return hints;
 };
 
 // `selectFirst` is true when the run searched a query (ADR 0009's test): the first row starts

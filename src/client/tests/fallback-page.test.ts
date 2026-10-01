@@ -11,7 +11,8 @@ import { createInterpreter } from '../../dsl/index.ts';
 import { createBrowserEnv } from '../browser-env.ts';
 import { mountFallbackPage } from '../fallback-page.ts';
 import type { StorageArea } from '../persistence.ts';
-import { run } from '../run.ts';
+import { isNontrivial } from '../program.ts';
+import { load, run } from '../run.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 
@@ -42,7 +43,7 @@ const fakeStorage = (
 };
 
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
 ]);
 
 // `t01` … `t11`, each to `https://example.com/tNN`, in target-set order.
@@ -58,6 +59,7 @@ const elevenTargetsRecord = JSON.stringify([
           }),
         ),
         focus: [],
+        alias: {},
       },
     ],
   ],
@@ -82,11 +84,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// The page as main.ts shows it: the page-load run has executed and did not navigate.
+// The page as main.ts shows it: a plain search has run at page load and did not navigate; a
+// nontrivial program (ADR 0015) has not run, and only the stored world has been loaded.
 const open = (storage: StorageArea, input: readonly string[]) => {
   const env = createBrowserEnv(storage, input);
   const interp = createInterpreter(env);
-  run(interp, input);
+  if (isNontrivial(interp, input)) {
+    load(interp);
+  } else {
+    run(interp, input);
+  }
   const page = mountFallbackPage(root, interp, env, storage);
   const field = root.querySelector('.field input');
   if (!(field instanceof HTMLInputElement)) {
@@ -150,8 +157,8 @@ describe('the Settings control ("Provide a Settings control on the page, opening
   });
 
   const twoDeepRecord = JSON.stringify([
-    [['S', { targets: {}, focus: [] }]],
-    [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+    [['S', { targets: {}, focus: [], alias: {} }]],
+    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
   ]);
 
   it('"After an action the modal closes and the page re-runs the field\'s current contents": a revert shows the reverted stack', () => {
@@ -178,7 +185,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     expect(root.textContent).toContain('No targets yet');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
     ]);
   });
 
@@ -236,32 +243,29 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 });
 
 describe('live execution ("triggers live execution after a 60 ms keystroke debounce")', () => {
-  it('re-runs the field 60 ms after the edit, not before, through the ordinary flow', () => {
-    const storage = fakeStorage();
-    const { field } = open(storage, []);
+  it('re-runs a plain search 60 ms after the edit, not before, through the ordinary flow', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field } = open(storage, ['zzz']);
     const before = storage.writes;
 
-    type(field, 'https://example.com/ home .set');
+    type(field, 'home');
     vi.advanceTimersByTime(59);
     expect(storage.writes).toBe(before);
     expect(links()).toEqual([]);
 
     vi.advanceTimersByTime(1);
+    expect(storage.writes).toBe(before + 1);
     expect(links()).toEqual(['https://example.com/']);
-    expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
-    ]);
   });
 
   it('each keystroke restarts the delay, so a burst of edits runs once', () => {
-    const storage = fakeStorage();
-    const { field } = open(storage, []);
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field } = open(storage, ['zzz']);
     const before = storage.writes;
 
-    type(field, 'https://example.com/ ho');
+    type(field, 'ho');
     vi.advanceTimersByTime(40);
-    type(field, 'https://example.com/ home .set');
+    type(field, 'home');
     vi.advanceTimersByTime(40);
     expect(storage.writes).toBe(before);
 
@@ -283,83 +287,216 @@ describe('live execution ("triggers live execution after a 60 ms keystroke debou
     expect(document.activeElement).toBe(field);
   });
 
-  it('a live E replaces the list beneath the field', () => {
+  it('a live E replaces the list beneath the field: a half-typed operation is not an operation', () => {
     const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['home']);
     expect(links()).toEqual(['https://example.com/']);
 
-    type(field, 'git .set');
+    type(field, 'home .s');
     vi.advanceTimersByTime(60);
 
     expect(links()).toEqual([]);
-    expect(root.textContent).toContain('invalid_destination');
+    expect(root.textContent).toContain('missing_operation');
     expect(root.querySelector('input')).toBe(field);
   });
 });
 
-describe('a completed mutation empties the field ("a program ending in `.set` or `.rm` that ran to its search leaves the field empty")', () => {
-  it('a live .set that ran to its search clears the field; the list shows every target', () => {
-    const { field } = open(fakeStorage(), []);
+const enter = (field: HTMLInputElement): void => {
+  field.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+  );
+};
 
-    type(field, 'https://example.com/ home .set');
-    vi.advanceTimersByTime(60);
+const waitingNotice = (): string => root.querySelector('.output footer.waiting')?.textContent ?? '';
 
-    expect(field.value).toBe('');
-    expect(links()).toEqual(['https://example.com/']);
-    expect(document.activeElement).toBe(field);
-  });
+describe('a nontrivial program waits for Enter (ADR 0015)', () => {
+  it.each([
+    ['.set', 'https://example.com/x x .set'],
+    ['.rm', 'home .rm'],
+    ['.@', 'home .@'],
+    ['.alias', 'h home .alias'],
+    ['a .$ before the end', 'home .$ zzz'],
+  ])(
+    'typing a program with %s runs nothing and shows the notice in place of the list',
+    (_name, program) => {
+      const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+      const { field } = open(storage, []);
+      const before = storage.writes;
 
-  it('a live .rm that ran to its search clears the field', () => {
-    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+      type(field, program);
+      vi.advanceTimersByTime(60);
 
-    type(field, 'home .rm');
-    vi.advanceTimersByTime(60);
-
-    expect(field.value).toBe('');
-    expect(links()).toEqual([]);
-  });
-
-  it('a mutation that errored keeps its text, so it can be corrected', () => {
-    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
-
-    type(field, 'git .set');
-    vi.advanceTimersByTime(60);
-
-    expect(field.value).toBe('git .set');
-    expect(root.textContent).toContain('invalid_destination');
-  });
-
-  it('a live .@ that ran to its search clears the field, like .set and .rm', () => {
-    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
-
-    type(field, 'home .@');
-    vi.advanceTimersByTime(60);
-
-    expect(field.value).toBe('');
-  });
+      expect(storage.writes).toBe(before);
+      expect(links()).toEqual([]);
+      expect(waitingNotice()).toContain('press Enter');
+      expect(waitingNotice()).toContain('Enter run');
+      expect(waitingNotice()).toContain('Esc clear');
+      expect(field.value).toBe(program);
+    },
+  );
 
   it.each([
-    ['a search', 'home'],
-    ['a mutation followed by a search', 'https://example.com/ home .set home'],
-  ])('%s keeps its text', (_name, program) => {
-    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    ['a plain search', 'home'],
+    ['a search ending in a typed .$, which the closing .$ makes redundant', 'home .$'],
+    ['an escaped ..set, which is a literal', 'home ..set'],
+  ])('%s runs live', (_name, program) => {
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field } = open(storage, ['zzz']);
+    const before = storage.writes;
 
     type(field, program);
     vi.advanceTimersByTime(60);
 
-    expect(field.value).toBe(program);
+    expect(storage.writes).toBe(before + 1);
+    expect(waitingNotice()).toBe('');
   });
 
-  it('the page-load run is treated the same: `?q=<url> home .set` opens with an empty field', () => {
-    const { field } = open(fakeStorage(), ['https://example.com/', 'home', '.set']);
+  it('while it waits, the body shows the whole program it would run, token by token', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'https://example.com/x x .set');
+
+    const program = [...root.querySelectorAll('.output ol.program li.token')].map(
+      (chip) => chip.textContent,
+    );
+    expect(program).toEqual(['.load', 'https://example.com/x', 'x', '.set', '.$', '.out', '.save']);
+    expect(root.querySelector('.output ol.program li.operation')?.textContent).toBe('.load');
+  });
+
+  it('the program view follows the field as it is edited', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'home .rm');
+    type(field, 'home .rm .s');
+
+    expect(root.querySelector('.output ol.program li.error')?.textContent).toBe('.s');
+  });
+
+  it('Enter runs it; a run with nothing left to search empties the field and lists every target', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, []);
+
+    type(field, 'https://example.com/ home .set');
+    enter(field);
+
+    expect(field.value).toBe('');
+    expect(waitingNotice()).toBe('');
+    expect(links()).toEqual(['https://example.com/']);
+    expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+    ]);
+  });
+
+  it('a run that went on to search puts that search back, inputs then . and args (dsl.md §4.4)', () => {
+    const { field } = open(fakeStorage(), []);
+
+    type(field, 'https://jira.example.com/browse/{} jira .set jira PROJ');
+    enter(field);
+
+    expect(field.value).toBe('jira . PROJ');
+    expect(links()).toEqual(['https://jira.example.com/browse/PROJ']);
+  });
+
+  it('after the run the field is a plain search again: the next edit runs live', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, []);
+    type(field, 'https://example.com/ home .set');
+    enter(field);
+    const before = storage.writes;
+
+    type(field, 'home');
+    vi.advanceTimersByTime(60);
+
+    expect(storage.writes).toBe(before + 1);
+  });
+
+  it('a run that failed keeps the program as typed, beside its error', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'git .set');
+    enter(field);
+
+    expect(field.value).toBe('git .set');
+    expect(root.textContent).toContain('invalid_destination');
+    expect(waitingNotice()).toBe('');
+  });
+
+  it('a live run already scheduled is dropped once the field becomes nontrivial', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field } = open(storage, []);
+    const before = storage.writes;
+
+    type(field, 'home');
+    vi.advanceTimersByTime(30);
+    type(field, 'home .rm');
+    vi.advanceTimersByTime(60);
+
+    expect(storage.writes).toBe(before);
+  });
+
+  it('while it waits, the row shortcuts and the arrows do nothing', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    type(field, 'home .rm');
+    const href = location.href;
+
+    keydown(field, { key: '1', code: 'Digit1', ctrlKey: true });
+    keydown(field, { key: 'ArrowDown' });
+
+    expect(location.href).toBe(href);
+    expect(root.querySelector('li.match.selected')).toBeNull();
+  });
+
+  it('Escape clears it and runs the empty search', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+    type(field, 'home .rm');
+
+    keydown(field, { key: 'Escape' });
+
+    expect(field.value).toBe('');
+    expect(waitingNotice()).toBe('');
+    expect(links()).toEqual(['https://example.com/']);
+  });
+
+  it('a program from the URL waits the same way: the page opens with it in the field, unrun', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, ['https://example.com/', 'home', '.set']);
+
+    expect(field.value).toBe('https://example.com/ home .set');
+    expect(waitingNotice()).toContain('press Enter');
+    expect(storage.getItem(STACKS_KEY)).toBeNull();
+
+    enter(field);
 
     expect(field.value).toBe('');
     expect(links()).toEqual(['https://example.com/']);
   });
 
-  it('a page-load mutation that errored seeds the field with the program', () => {
-    const { field } = open(fakeStorage(), ['git', '.set']);
+  it('the waiting page still shows the stored focus, loaded without running the program', () => {
+    const focused = JSON.stringify([
+      [['S', { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {} }]],
+    ]);
+    open(fakeStorage({ [STACKS_KEY]: focused }), ['home', '.rm']);
 
-    expect(field.value).toBe('git .set');
+    expect(root.querySelector('.focus')?.textContent).toContain('company');
+  });
+
+  it('a settings action re-renders the stored world but does not run the waiting program', () => {
+    const twoDeep = JSON.stringify([
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+    ]);
+    const storage = fakeStorage({ [STACKS_KEY]: twoDeep });
+    const { field } = open(storage, []);
+    type(field, 'https://example.com/x x .set');
+    click(root.querySelector('.settings-control'));
+
+    click(settingsDialog().querySelector('.revert'));
+
+    expect(field.value).toBe('https://example.com/x x .set');
+    expect(waitingNotice()).toContain('press Enter');
+    expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
+      [['S', { targets: {}, focus: [], alias: {} }]],
+    ]);
   });
 });
 
@@ -374,7 +511,7 @@ describe('setup instructions ("While the target set is empty … They disappear 
     expect(links()).toEqual([]);
 
     type(field, 'https://example.com/ home .set');
-    vi.advanceTimersByTime(60);
+    enter(field);
 
     expect(root.textContent).not.toContain('?q=%s');
     expect(links()).toEqual(['https://example.com/']);
@@ -587,11 +724,11 @@ describe('Tab ("Tab is blocked on the page while no dialog is open")', () => {
 
 describe('flush ("a pending debounce is run first, so Enter acts on what was typed")', () => {
   it('runs a pending debounce now, once', () => {
-    const storage = fakeStorage();
-    const { field, page } = open(storage, []);
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field, page } = open(storage, ['zzz']);
     const before = storage.writes;
 
-    type(field, 'https://example.com/ home .set');
+    type(field, 'home');
     page.flush();
 
     expect(storage.writes).toBe(before + 1);
@@ -601,11 +738,11 @@ describe('flush ("a pending debounce is run first, so Enter acts on what was typ
     expect(storage.writes).toBe(before + 1);
   });
 
-  it('with nothing pending it executes nothing: a settled mutation is not repeated', () => {
-    const storage = fakeStorage();
-    const { field, page } = open(storage, []);
+  it('with nothing pending it executes nothing: a settled search is not repeated', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: oneTargetRecord });
+    const { field, page } = open(storage, ['zzz']);
 
-    type(field, 'https://example.com/ home .set');
+    type(field, 'home');
     vi.advanceTimersByTime(60);
     const before = storage.writes;
 
@@ -703,7 +840,12 @@ describe('shortcuts ("navigation shortcuts Ctrl+1 through Ctrl+9, then Ctrl+0 fo
 
   it('"A shortcut … opens the row\'s destination as rendered, an unfilled {} included"', () => {
     const record = JSON.stringify([
-      [['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }]],
+      [
+        [
+          'S',
+          { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+        ],
+      ],
     ]);
     open(fakeStorage({ [STACKS_KEY]: record }), ['company']);
     expect(links()).toEqual(['https://github.com/company/{}']);
@@ -737,8 +879,8 @@ describe('Enter ("Enter opens the first row when the run searched a query … a 
     expect(location.href).toBe(PAGE);
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 

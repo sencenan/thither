@@ -1,4 +1,6 @@
 import {
+  ALIAS,
+  ALIAS_ESCAPE,
   type Dim,
   type ErrorType,
   type Literal,
@@ -11,7 +13,7 @@ import {
   type ThitherError,
 } from './types.ts';
 
-export const emptyState = (): State => ['S', { targets: {}, focus: [] }];
+export const emptyState = (): State => ['S', { targets: {}, focus: [], alias: {} }];
 
 export const thitherError = (
   type: ErrorType,
@@ -46,6 +48,46 @@ export const push = (stack: Stack, value: StackValue): Stack => {
       return stack;
   }
 };
+
+type Sigil = StackValue[0];
+type ValueOf<K extends Sigil> = Extract<StackValue, readonly [K, unknown]>;
+
+// Written bottom to top, the way dsl.md notates a stack: ['S', 'L'] is [.., S, L].
+export type Operands<P extends readonly Sigil[]> = {
+  readonly [I in keyof P]: P[I] extends Sigil ? ValueOf<P[I]> : never;
+};
+
+// The match is tagged rather than told apart from the error by shape, so a pattern may itself
+// expect an E operand.
+export type Taken<P extends readonly Sigil[]> =
+  | readonly ['matched', Operands<P>]
+  | readonly ['unmatched', ThitherError];
+
+// dsl.md §6 — take an operation's operands off the top of the stack, matching `pattern` from the
+// top down. Every value that fits is consumed; the first that does not is put back and the match
+// fails with `missing_operand`, the values already taken staying consumed. Pushing the error is
+// left to the caller, which may try another pattern first: try longer patterns first, since a
+// pattern that is the top of another would otherwise always win. On a sealed stack the R or E
+// is put back, so the caller's push of the error is absorbed by `push`.
+export function takeOperands<const P extends readonly Sigil[]>(stack: Stack, pattern: P): Taken<P>;
+export function takeOperands(stack: Stack, pattern: readonly Sigil[]): Taken<readonly Sigil[]> {
+  const taken: StackValue[] = [];
+  for (let index = pattern.length - 1; index >= 0; index--) {
+    const value = stack.pop();
+    if (value === undefined) {
+      return ['unmatched', missingOperands(pattern)];
+    }
+    if (value[0] !== pattern[index]) {
+      stack.push(value);
+      return ['unmatched', missingOperands(pattern)];
+    }
+    taken.unshift(value);
+  }
+  return ['matched', taken];
+}
+
+const missingOperands = (pattern: readonly Sigil[]): ThitherError =>
+  thitherError('missing_operand', `expected [.., ${pattern.join(', ')}]`);
 
 // The core omits the DOM lib, which drops `URL`'s type with it; see
 // docs/code-standards.md "Layout" on universal platform globals.
@@ -85,7 +127,6 @@ export const splitAtSeparator = (
     : [literals.slice(0, separator), literals.slice(separator + 1)];
 };
 
-// dsl.md §2 — one leading dot is removed when an escaped literal is used
 // dsl.md §3 — fzf's extended-search operators, mirrored from the library's `parseTerms`: a
 // standalone `|` is OR; a leading `!`, `'` or `^` and a trailing `$` (on anything but a bare `$`)
 // decorate a term. Stripping them the way fzf does leaves the text the term matches on.
@@ -110,5 +151,24 @@ export const isOperatorTerm = (term: string): boolean =>
 export const isOperatorOnly = (term: string): boolean =>
   term !== OR_TERM && stripOperators(term).length === 0;
 
+// dsl.md §2 — one leading dot is removed when an escaped literal is used
 export const resolveEscape = (literal: Literal): Dim =>
-  literal.startsWith(SEP_ESCAPE) ? literal.slice(1) : literal;
+  literal.startsWith(SEP_ESCAPE) || literal.startsWith(ALIAS_ESCAPE) ? literal.slice(1) : literal;
+
+// dsl.md §2 — an alias is `~` followed by a short form; a bare `~` has none and is plain text.
+export const isAlias = (literal: Literal): boolean =>
+  literal.startsWith(ALIAS) && literal.length > ALIAS.length;
+
+// dsl.md §2 — replace each alias that has a definition with the definition's literal, once: that
+// literal is not itself resolved again. An alias with no definition stays as typed. Own keys only,
+// so `~constructor` cannot reach Object.prototype.
+export const resolveAliases = (state: State, literals: readonly Literal[]): Literal[] => {
+  const { alias } = state[1];
+  return literals.map((literal) => {
+    if (!isAlias(literal)) {
+      return literal;
+    }
+    const short = literal.slice(ALIAS.length).toLowerCase();
+    return Object.hasOwn(alias, short) ? (alias[short] ?? literal) : literal;
+  });
+};

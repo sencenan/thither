@@ -28,7 +28,10 @@ const fakeStorage = (initial: Record<string, string> = {}): StorageArea => {
   };
 };
 
-const state = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];
+const state = (targets: Record<string, readonly string[]>) => [
+  'S',
+  { targets, focus: [], alias: {} },
+];
 
 // Oldest first: no targets, then `home`, then `home` + `docs` (the current stack).
 const threeDeep = [
@@ -182,7 +185,7 @@ describe('import ("accepts a JSON stack array directly \u2026 appended as the la
     dialog.open();
 
     panel(dialog.element).value =
-      '[["S", {"targets": {"Docs": ["https://example.com/d"]}, "focus": []}]]';
+      '[["S", {"targets": {"Docs": ["https://example.com/d"]}, "focus": [], "alias": {}}]]';
     click(dialog.element.querySelector('.import'));
 
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
@@ -216,7 +219,7 @@ describe('import ("accepts a JSON stack array directly \u2026 appended as the la
     const { dialog } = mount(storage);
     dialog.open();
 
-    panel(dialog.element).value = '[["S", {"targets": {}, "focus": []}], ["X"]]';
+    panel(dialog.element).value = '[["S", {"targets": {}, "focus": [], "alias": {}}], ["X"]]';
     click(dialog.element.querySelector('.import'));
 
     const record: unknown[] = JSON.parse(storage.getItem(STACKS_KEY) ?? 'null');
@@ -271,7 +274,7 @@ describe('an unreadable record ("say so in place of the list and offer clear and
     expect(dialog.element.querySelector('.clear')).not.toBeNull();
     expect(dialog.element.querySelector('.import')).not.toBeNull();
 
-    panel(dialog.element).value = '[["S", {"targets": {}, "focus": []}]]';
+    panel(dialog.element).value = '[["S", {"targets": {}, "focus": [], "alias": {}}]]';
     click(dialog.element.querySelector('.import'));
 
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([[state({})]]);

@@ -5,6 +5,8 @@ export type Template = string;
 
 export const SEP = '.' as const;
 export const SEP_ESCAPE = '..';
+export const ALIAS = '~';
+export const ALIAS_ESCAPE = '.~';
 export type Separator = typeof SEP;
 
 export type Op = string;
@@ -51,13 +53,22 @@ export type ErrorType = (typeof ErrorTypes)[number];
 // top level parsed types
 
 export type LiteralArray = ['L', Literal[]];
-export type State = readonly ['S', { readonly targets: TargetSet; readonly focus: readonly Dim[] }];
+export type State = readonly [
+  'S',
+  {
+    readonly targets: TargetSet;
+    readonly focus: readonly Dim[];
+    readonly alias: Record<string, string>;
+  },
+];
 
 export type Result = readonly [
   'R',
   {
     readonly matches: Match[];
     readonly inputs: readonly Dim[];
+    // dsl.md §4.4 — the arguments, in accumulated form after alias resolution.
+    readonly args: readonly Literal[];
   },
 ];
 export type ThitherError = readonly [

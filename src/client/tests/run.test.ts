@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createInterpreter } from '../../dsl/index.ts';
 import { createBrowserEnv } from '../browser-env.ts';
 import type { StorageArea } from '../persistence.ts';
-import { run } from '../run.ts';
+import { load, run } from '../run.ts';
 
 const STACKS_KEY = 'thither.stacks.v1';
 
@@ -26,7 +26,7 @@ describe('run', () => {
   it('a search leaves the R in the register, with the tokens as the query', () => {
     const storage = fakeStorage({
       [STACKS_KEY]: JSON.stringify([
-        [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+        [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
       ]),
     });
     const env = createBrowserEnv(storage);
@@ -35,7 +35,7 @@ describe('run', () => {
     run(interp, ['home']);
 
     expect(env.terminal?.[0]).toBe('R');
-    expect(env.terminal?.[1]).toMatchObject({ inputs: ['home'] });
+    expect(env.terminal?.[1]).toMatchObject({ inputs: ['home'], args: [] });
     expect(env.loaded).toBe(true);
   });
 
@@ -48,8 +48,8 @@ describe('run', () => {
 
     const record: unknown = JSON.parse(storage.getItem(STACKS_KEY) ?? 'null');
     expect(record).toEqual([
-      [['S', { targets: {}, focus: [] }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 
@@ -62,5 +62,34 @@ describe('run', () => {
 
     run(interp, ['git', '.set']);
     expect(env.terminal?.[0]).toBe('E');
+  });
+});
+
+// ADR 0015 — what the page shows while a nontrivial program waits: the stored world, with no
+// search and nothing written.
+describe('load', () => {
+  it('records the stored state without searching or saving', () => {
+    const record = JSON.stringify([
+      [['S', { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {} }]],
+    ]);
+    const storage = fakeStorage({ [STACKS_KEY]: record });
+    const env = createBrowserEnv(storage);
+    const interp = createInterpreter(env);
+
+    load(interp);
+
+    expect(env.state?.[1].focus).toEqual(['company']);
+    expect(env.terminal).toBeUndefined();
+    expect(env.loaded).toBe(true);
+    expect(storage.getItem(STACKS_KEY)).toBe(record);
+  });
+
+  it('reports an unreadable record, as a run would', () => {
+    const env = createBrowserEnv(fakeStorage({ [STACKS_KEY]: 'not json' }));
+    const interp = createInterpreter(env);
+
+    load(interp);
+
+    expect(env.loaded).toBe(false);
   });
 });

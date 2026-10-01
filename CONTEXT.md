@@ -12,8 +12,12 @@ Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 The program that embeds the interpreter and composes the programs it runs, such as the browser client or the REPL. The interpreter evaluates exactly what a host gives it and appends nothing.
 _Avoid_: Client (when the REPL is included), runtime, shell
 
+**Nontrivial program**:
+A program containing any operation other than a single `.$` as its last item, such as one that sets, removes, focuses, or defines an alias. Typed into the fallback page, it runs only when the user presses Enter; any other program is a plain search and runs as it is typed.
+_Avoid_: Mutating program, command, write program
+
 **Host operation**:
-An operation a host registers on the interpreter's environment beyond the language's own four, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
+An operation a host registers on the interpreter's environment beyond the language's own five, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
 _Avoid_: Plugin, hook, built-in
 
 **Output register**:
@@ -85,10 +89,19 @@ The matches produced by a search together with the user-supplied dimensions used
 ### State and focus
 
 **State of the world**:
-The collection of available targets together with the current focus.
+The collection of available targets together with the current focus and the alias definitions.
 
 **Focus**:
 Search terms stored exactly as typed and implicitly prepended to the search query; target-setting and removal never consult it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
+
+**Alias**:
+A literal written as `~` followed by a short form, standing for the literal its alias definition gives when typed in focus-setting or search, whether as a search term or an argument; never in target-setting or removal. An alias with no definition is an ordinary literal.
+_Avoid_: Alias reference, variable, macro
+
+**Alias definition**:
+A short form paired with the literal its alias stands for, part of the state of the world, at most one for each lowercased short form.
+_Avoid_: Constant, shortcut
+
 
 ### Navigation
 

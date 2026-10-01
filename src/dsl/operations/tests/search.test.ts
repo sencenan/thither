@@ -33,9 +33,11 @@ const m = (
   positions?: readonly number[],
 ) => [dest, template, key, args, hint(argDelta, positions)];
 
+// `args` is asserted on its own in the R.args table below; elsewhere it is any array.
+// `args` is asserted on its own in the R.args table below; here it is any array.
 const result = (matches: readonly unknown[], inputs: readonly string[]) => [
   'R',
-  { matches, inputs },
+  { matches, inputs, args: expect.any(Array) },
 ];
 
 // rendering-table targets (one target, one variant, so ordering is trivial)
@@ -1223,6 +1225,35 @@ describe('.$ — the template travels with its rendering (dsl.md §5)', () => {
 });
 
 // The transition table's invalid-stack rule: no state to search over is missing_operand.
+// dsl.md §4.4 — R.args is the other half of what the search consumed: the arguments, in
+// accumulated form, so a host can put the search back together as `inputs . args`.
+describe('.$ — R.args (dsl.md §4.4)', () => {
+  it.each<[string, readonly unknown[], readonly string[]]>([
+    ['§4.4 an inferred argument', [state([companyGit]), 'company', 'git', 'thither'], ['thither']],
+    ['§4.4 re-hitting literals are arguments', [state([apiDocs]), 'api', 'a', 'b'], ['a', 'b']],
+    [
+      '§4.4 the suffix after a separator',
+      [state([companyGit]), 'company', 'git', '.', 'a', 'b'],
+      ['a', 'b'],
+    ],
+    ['§4.4 an empty matching portion keeps the suffix', [state([companyGit]), '.', 'a'], ['a']],
+    [
+      '§2 an escaped argument keeps its accumulated form',
+      [state([companyGit]), 'company', 'git', '..git'],
+      ['..git'],
+    ],
+    [
+      '§4.4 no prefix matched: every literal is input, none is an argument',
+      [state([companyGit]), 'zzz'],
+      [],
+    ],
+    ['§4.4 a focus-only search has no arguments', [state([companyGit])], []],
+  ])('%s', (_name, program, args) => {
+    const [, terminal] = run(program);
+    expect(terminal).toEqual(['R', expect.objectContaining({ args })]);
+  });
+});
+
 describe('.$ — operand contract', () => {
   const error = (type: string) => ['E', expect.objectContaining({ type })];
 

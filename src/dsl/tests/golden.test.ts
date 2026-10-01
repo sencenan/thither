@@ -19,15 +19,18 @@ describe('execute resumes from a caller-supplied stack', () => {
 
     expect(stack[0]).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
     ]);
     expect(stack[1]?.[0]).toBe('R');
-    expect(persisted).toEqual([['S', { targets: {}, focus: [] }]]);
+    expect(persisted).toEqual([['S', { targets: {}, focus: [], alias: {} }]]);
   });
 });
 
 describe('the public surface holds the browser-client.md contract', () => {
-  const state = ['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }];
+  const state = [
+    'S',
+    { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+  ];
 
   it('§2 a whitespace-bearing token is an E in the stream: earlier items execute, then it stops', () => {
     // The client splits on whitespace, so it can never send this; a host extension could.
@@ -54,7 +57,7 @@ describe('the public surface holds the browser-client.md contract', () => {
 describe('dsl.md §7 worked programs', () => {
   it('§7 create and search', () => {
     const stack = run([
-      ['S', { targets: {}, focus: [] }],
+      ['S', { targets: {}, focus: [], alias: {} }],
       'https://github.com/company/{}',
       'company',
       'git',
@@ -63,7 +66,10 @@ describe('dsl.md §7 worked programs', () => {
     ]);
 
     expect(stack).toEqual([
-      ['S', { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] }],
+      [
+        'S',
+        { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      ],
       [
         'R',
         {
@@ -77,6 +83,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: [],
+          args: [],
         },
       ],
     ]);
@@ -85,7 +92,7 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 navigate with inferred arguments', () => {
     const state = [
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
     ];
     const stack = run([state, 'company', 'git', 'MyRepo', '.$']);
 
@@ -104,6 +111,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['company', 'git'],
+          args: ['MyRepo'],
         },
       ],
     ]);
@@ -118,6 +126,7 @@ describe('dsl.md §7 worked programs', () => {
           'git personal': ['https://github.com/personal/{}/tree/{}'],
         },
         focus: [],
+        alias: {},
       },
     ];
     const stack = run([state, 'git', '.', 'thither', '.$']);
@@ -144,6 +153,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['git'],
+          args: ['thither'],
         },
       ],
     ]);
@@ -152,7 +162,7 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 variants of one target', () => {
     // Two .set programs build one target with an arity-0 and an arity-1 variant.
     const created = run([
-      ['S', { targets: {}, focus: [] }],
+      ['S', { targets: {}, focus: [], alias: {} }],
       'https://jira.example.com',
       'jira',
       '.set',
@@ -167,6 +177,7 @@ describe('dsl.md §7 worked programs', () => {
           jira: ['https://jira.example.com', 'https://jira.example.com/browse/{}'],
         },
         focus: [],
+        alias: {},
       },
     ];
     expect(created).toEqual([state]);
@@ -195,6 +206,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['jira'],
+          args: [],
         },
       ],
     ]);
@@ -220,6 +232,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ'],
       },
     ]);
 
@@ -244,13 +257,14 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ', 'extra'],
       },
     ]);
 
     // Removing the arity-1 variant leaves the arity-0 variant, and jira PROJ then navigates.
     const removed = run([state, 'jira', '.', 'x', '.rm']);
     expect(removed).toEqual([
-      ['S', { targets: { jira: ['https://jira.example.com'] }, focus: [] }],
+      ['S', { targets: { jira: ['https://jira.example.com'] }, focus: [], alias: {} }],
     ]);
     expect(run([removed[0], 'jira', 'PROJ', '.$'])[1]).toEqual([
       'R',
@@ -265,6 +279,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ'],
       },
     ]);
   });
@@ -278,6 +293,7 @@ describe('dsl.md §7 worked programs', () => {
           docs: ['https://docs.example.com/'],
         },
         focus: [],
+        alias: {},
       },
     ];
     const stack = run([state, '.$']);
@@ -304,6 +320,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: [],
+          args: [],
         },
       ],
     ]);
@@ -318,6 +335,7 @@ describe('dsl.md §7 worked programs', () => {
           'company git': ['https://github.com/company/{}'],
         },
         focus: [],
+        alias: {},
       },
     ];
     const stack = run([state, 'browse', '.', 'PROJ', '.$']);
@@ -341,14 +359,15 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['browse'],
+          args: ['PROJ'],
         },
       ],
     ]);
   });
 
   it('§7 stop at the first result', () => {
-    const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [] }];
-    const s1 = ['S', { targets: { docs: ['https://docs.example.com/'] }, focus: [] }];
+    const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [], alias: {} }];
+    const s1 = ['S', { targets: { docs: ['https://docs.example.com/'] }, focus: [], alias: {} }];
     const stack = run([s0, 'git', '.$', s1, 'docs', '.$']);
 
     expect(stack).toHaveLength(2);
@@ -366,6 +385,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['git'],
+        args: [],
       }),
     ]);
   });
@@ -393,12 +413,12 @@ const alphabet: readonly unknown[] = [
   'not a url',
   'Ünïcödé',
   '$&',
-  '["S", {"targets": {}, "focus": []}]',
-  ['S', { targets: {}, focus: [] }],
-  ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'] }],
+  '["S", {"targets": {}, "focus": [], "alias": {}}]',
+  ['S', { targets: {}, focus: [], alias: {} }],
+  ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'], alias: {} }],
   ['S', { targets: 'wrong' }],
-  ['S', { targets: { a: ['not-a-url'] }, focus: [] }],
-  ['R', { matches: [], inputs: [] }],
+  ['S', { targets: { a: ['not-a-url'] }, focus: [], alias: {} }],
+  ['R', { matches: [], inputs: [], args: [] }],
   ['R', 'wrong'],
   ['E', { type: 'unknown_error', description: 'boom' }],
   ['E', { type: 'made_up', description: 'boom' }],

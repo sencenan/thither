@@ -121,7 +121,7 @@ describe('browser env host operations', () => {
     // ADR 0008 changed the persisted shape (targets: array -> keyed object) with no migration; an
     // existing record parses to parse_error and is reset by hand rather than silently converted.
     const oldShape = JSON.stringify([
-      [['S', { targets: [[['home'], 'https://example.com/']], focus: [] }]],
+      [['S', { targets: [[['home'], 'https://example.com/']], focus: [], alias: {} }]],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: oldShape });
     const { register } = runClient(storage, ['home']);
@@ -185,7 +185,7 @@ describe('browser env host operations', () => {
 
     expect(register.state).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [] },
+      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
     ]);
   });
 
@@ -286,14 +286,17 @@ describe('.save persists only when the register holds an R', () => {
 
     expect(record(storage)).toEqual([
       [emptyState()],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
     ]);
   });
 });
 
 describe('bounded history', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
-  const stateWith = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];
+  const stateWith = (targets: Record<string, readonly string[]>) => [
+    'S',
+    { targets, focus: [], alias: {} },
+  ];
   const A = stateWith({});
   const B = stateWith({ home: ['https://example.com/'] });
   const stacks = (storage: StorageArea & { map: Map<string, string> }): readonly unknown[] => {
@@ -411,7 +414,10 @@ describe('bounded history', () => {
 // browser-client.md "Fallback UI and settings" — the three actions the settings modal performs
 // on the stored record. There is no current stack apart from the last entry of the history.
 describe('settings actions on the history', () => {
-  const stateWith = (targets: Record<string, readonly string[]>) => ['S', { targets, focus: [] }];
+  const stateWith = (targets: Record<string, readonly string[]>) => [
+    'S',
+    { targets, focus: [], alias: {} },
+  ];
   const A = stateWith({ home: ['https://example.com/'] });
   const B = stateWith({ git: ['https://github.com/{}'] });
   const C = stateWith({ jira: ['https://jira.example.com/{}'] });

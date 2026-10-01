@@ -35,10 +35,10 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `k` | Key | A target's normalized dimensions joined with single spaces (section 3). A target's identity and the text matching runs against. |
 | `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
 | `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
-| `S` | State of the world | `["S", { "targets": T, "focus": [d] }]`. |
+| `S` | State of the world | `["S", { "targets": T, "focus": [d], "alias": { string: string } }]`. |
 | `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `on`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
-| `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
+| `R` | Search result | `["R", { "matches": M, "inputs": [d], "args": [d] }]`. |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
 
 The `[d]` and `[args]` notation means an array, not necessarily a single element.
@@ -67,6 +67,7 @@ Terminal rules take priority over the rest.
 | `[K, S]` | `.@` | `[K, S']` | Clear focus. |
 | `[K, S, L]` | `.$` | `[K, S, R]` | Search, render matches, and stop. |
 | `[K, S]` | `.$` | `[K, S, R]` | Search using focus alone; empty focus selects all targets. Stop. |
+| `[K, S, L]` | `.alias` | `[K, S']` or `[K, S', L']` | Define an alias: the last two literals of `L` are its short form and literal; the literals before them stay as `L'`. A separator in `L`, or a single literal, is an error. |
 | Any invalid stack or operands | Operation | Unwind, then push `E` | Preserve the nearest working state; see section 6. |
 
 Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or deduplicate `L`: that would destroy argument spelling, ordering, and the boundary inferred by search.
@@ -111,7 +112,7 @@ Ordinary literals retain their spelling and order. URL literals and templates ac
 
 ### Separator and escaping
 
-A leading dot is the language's only control syntax: `.set`, `.rm`, `.@`, and `.$` are operations, and a **standalone `.`** is the argument separator. Every other token is data. Only the standalone token is a separator; a dot inside a literal or URL, as in `node.js` or `example.com`, is ordinary content.
+A leading dot is the language's control syntax: `.set`, `.rm`, `.@`, `.$`, and `.alias` are operations, and a **standalone `.`** is the argument separator. The one other marker is a leading `~`, which makes a literal an alias (below). Every other token is data. Only the standalone token is a separator; a dot inside a literal or URL, as in `node.js` or `example.com`, is ordinary content.
 
 A leading double dot escapes a dot-prefixed token: parsing keeps the token verbatim as an ordinary literal, `..` and all. One leading dot is removed whenever the literal is later *used* — both when it is matched and when it is substituted into a destination — while the accumulated form retains the `..`. So `..git` matches as `.git` and renders as `.git`.
 
@@ -122,7 +123,14 @@ A leading double dot escapes a dot-prefixed token: parsing keeps the token verba
 ..     -> literal ..     (resolves to .)
 ```
 
-Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the four above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
+A leading `.~` escapes an alias the same way: the token is an ordinary literal kept verbatim, `.~` and all, never resolved, and one leading dot is removed when it is used.
+
+```text
+.~gh   -> literal .~gh   (resolves to ~gh)
+.~     -> literal .~     (resolves to ~)
+```
+
+Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the five above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
 The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them: `.$` takes the suffix as arguments, `.rm` reads only its length, and `.set` and `.@` ignore it.
 
@@ -141,6 +149,26 @@ git$          the key ends with git
 ```
 
 A bare `$` is plain text. A token that is nothing but operator syntax (`!`, `'`, `^`, `^$`, ...) has no text to match; the matcher would drop it silently, so it parses to `parse_error`. There is no escape for these characters: a leading `!`, `'` or `^`, a trailing `$`, and a standalone `|` are reserved, in queries and in a target's dimensions alike. Operator-carrying terms are legal wherever a literal is search input — the matching portion of `.$`, and focus set by `.@` — and refused by `.set` and `.rm`, whose dimensions are stored or matched as a key (sections 4.1 and 4.2).
+
+### Aliases
+
+A literal written `~` followed by at least one character is an **alias**: it stands for the literal of the **alias definition** whose short form is the rest of the literal, lowercased (section 4.5). A bare `~` has no short form and is plain text. Parsing does not resolve aliases; it keeps `~gh` as an ordinary literal, and the operations that read literals as search input resolve it against the alias definitions of the state they operate on:
+
+- `.@` resolves its matching portion before storing it as focus, so focus never holds an alias (section 4.3).
+- `.$` resolves its whole literal array, matching inputs and arguments alike, before inferring the boundary (section 4.4).
+
+Resolution replaces an alias that has a definition with the definition's literal, once: that literal is not resolved again, and it keeps any escape it carries, so an alias defined as `..set` resolves to the text `.set` when used and never runs the operation. An alias with no definition stays as typed, spelling and case included. An alias defined earlier in the same program resolves, since resolution reads the state at the moment the operation runs.
+
+`.set` and `.rm` never resolve aliases, so that an alias cannot silently decide which target is written or removed: an alias anywhere in their literal array is `invalid_dimension` (sections 4.1 and 4.2). An escaped `.~x` is not an alias and is accepted, giving the dimension `~x`.
+
+```text
+S gh github .alias ~gh .@     focus [github]
+S ~gh ~me .$                  searches github, with me's defined literal as its argument
+S ~nope .$                    searches the text ~nope
+S https://x/ ~gh .set         invalid_dimension
+S https://x/ .~gh .set        sets a target keyed ~gh
+```
+
 
 ### URL and template validation
 
@@ -172,7 +200,7 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 ### Supplied structured values
 
-Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` or `R` carries only its defined fields; unknown fields on those envelopes are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
+Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` carries only `targets`, `focus`, and `alias`: an omitted field defaults to empty (`{}`, `[]`, and `{}` respectively), so `["S", {}]` is the empty state, and any other field makes the `S` invalid, so it parses to `E`. The `alias` field holds the alias definitions: an object whose short forms and literals are each a single literal (non-empty, whitespace-free, not the separator) not starting with `~`; anything else makes the `S` invalid. A supplied `R` carries only its defined fields; unknown fields on it are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
 
 Normalize each supplied `S`'s target keys by the rules of section 3: a key is split on whitespace into dimensions, each dimension normalized, and the result rejoined. A key that is empty after normalization, or that carries a search operator, is invalid. Focus is kept verbatim; a focus term that is empty, contains whitespace, or is operator-only is invalid. Normalization does not change target order, variant text, focus, argument spelling, or `R.inputs`.
 
@@ -217,7 +245,7 @@ An empty explicit query searches on focus alone; empty focus with no explicit in
 
 ## 4. Operations
 
-Each operation reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
+Each operation except `.alias`, which takes no separator (section 4.5), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
 
 ### 4.1 `.set`
 
@@ -240,7 +268,7 @@ Interpret `L` in this order:
 
 Because `.set` compares keys rather than searching, `jira` and `company jira` are different targets even though a search for `jira` selects both: given an existing `company jira`, `https://jira.example.com jira .set` creates a second target keyed `jira` rather than touching the first. A variant is addressed by arity alone, so setting a second template with the same number of `{}` replaces the earlier one, and there is no way to hold two arity-1 templates under one key.
 
-An explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` stores is a key, and a key is plain text. Uppercase is not an error; `Git` normalizes to `git` and finds the same key.
+An explicit dimension carrying a search operator (section 2) is `invalid_dimension`: what `.set` stores is a key, and a key is plain text. An alias anywhere in `L` — destination, dimension, or suffix — is `invalid_dimension` too, checked before the destination is validated, since `.set` does not resolve aliases (section 2). Uppercase is not an error; `Git` normalizes to `git` and finds the same key.
 
 ```text
 S https://github.com/company/{} company git . ignored .set
@@ -278,7 +306,7 @@ S .rm
 S . x .rm
 ```
 
-An explicit dimension carrying a search operator (section 2) is `invalid_dimension`, exactly as in `.set`: what `.rm` names is a key, and a key is plain text. Uppercase is not an error; `Git` normalizes to `git` and names the same key.
+An explicit dimension carrying a search operator (section 2) is `invalid_dimension`, exactly as in `.set`: what `.rm` names is a key, and a key is plain text. An alias anywhere in `L`, the arity suffix included, is `invalid_dimension` too, since `.rm` does not resolve aliases (section 2). Uppercase is not an error; `Git` normalizes to `git` and names the same key.
 
 A key with no target is a successful no-op: `S nonexistent .rm` removes nothing. When a target is found, what is removed depends on the separator:
 
@@ -301,7 +329,7 @@ Because `.rm` names a key rather than searching, `jira` and `company jira` are d
 [K, S]    | .@ -> [K, S']
 ```
 
-Replace focus with the matching portion exactly as accumulated (section 3: no normalization), without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
+Replace focus with the matching portion exactly as accumulated (section 3: no normalization), after resolving its aliases (section 2), without combining it with the old focus. No literal array, or an empty matching portion, clears focus. So `S company . git .@` sets focus to `[company]`, not `[company, git]`.
 
 Focus is only ever prepended to a search query (section 3), so it may carry search operators: `!personal .@` makes every later `.$` exclude personal targets until focus changes. `.rm` does not consult focus.
 
@@ -361,7 +389,31 @@ jira PROJ extra    two matches: no variant has arity 2, so neither is a best fit
 
 The first two programs each have a best fit — the argDelta-0 row — and can navigate directly to it (section 5); the third has none, so it only ever shows the fallback page.
 
-`R.inputs` records the user-supplied literals used as matching inputs, in their original spelling, excluding focus, the separator, and arguments, whether the key search or destination search found the matches. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
+`.$` resolves the aliases in `L` before anything else (section 2), so inference, matching, rendering, and `R.inputs` all see the defined literals. `R.inputs` records the user-supplied literals used as matching inputs, in their original spelling after that resolution, excluding focus, the separator, and arguments, whether the key search or destination search found the matches. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
+
+`R.args` records the arguments the search took, in the same accumulated form and order: the suffix after a separator, or the literals inference gave back. A search with no arguments, including one where no prefix matched, has empty `args`. Together, `inputs` and `args` are exactly what the search consumed, so a host can rebuild that search as `inputs`, then `.` and `args` when there are any. A supplied `R` without `args` has none.
+
+### 4.5 `.alias`
+
+```text
+[K, S, L ++ [a, b]] | .alias -> [K, S', L]
+[K, S, [a, b]]      | .alias -> [K, S']
+```
+
+Define an alias: the last two literals of `L` are its short form `a` and the literal `b` it stands for. `S'` is `S` with the alias definition `a -> b`, held as `alias[a]` set to `b`, overwriting any existing definition for that short form; targets, focus, and the other alias definitions are unchanged. Only the pair is consumed: any earlier literals stay on the stack, in order, as a literal array above `S'`.
+
+The short form is lowercased and otherwise kept exactly as accumulated; the literal is kept exactly as accumulated, spelling and case included. Either may carry search operators, and an escaped literal keeps its escape, as focus does (section 3). Neither may start with `~`, so a definition's literal is never itself an alias; an escaped `.~x` does not start with `~` and is accepted. `.alias` does not resolve its own literals. How an alias is resolved is section 2's *Aliases*.
+
+`.alias` takes no argument separator. An `L` containing `.` anywhere, or whose pair has a half starting with `~`, is `missing_operand` before anything is consumed, so the stack keeps both `S` and `L` beneath the error. An `L` with a single literal is `missing_operand` after that literal is consumed: `[S, [gh]] | .alias -> [S, E]`.
+
+```text
+S gh github .alias          defines gh -> github
+S GH GitHub .alias          defines gh -> GitHub
+S company gh github .alias  defines gh -> github; [company] stays on the stack
+S gh .alias                 missing_operand; [S, E]
+S gh . github .alias        missing_operand; [S, [gh, ., github], E]
+S ex ~gh .alias             missing_operand; [S, [ex, ~gh], E]
+```
 
 ## 5. Arguments, rendering, and match ordering
 
@@ -431,11 +483,11 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as an unknown field on an `S`, an invalid alias definition, duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
-| `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax (section 2). |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, or a bare `.rm` naming a multi-variant target without an arity separator. |
+| `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax, or a `.set` or `.rm` literal array holds an alias (section 2). |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, or an `.alias` given a separator, a single literal, or a pair with a half starting with `~`. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.
@@ -505,7 +557,8 @@ company git MyRepo .$
     ["https://github.com/company/MyRepo", "https://github.com/company/{}", "company git",
       ["MyRepo"], {"argDelta": 0}]
   ],
-  "inputs": ["company", "git"]
+  "inputs": ["company", "git"],
+  "args": ["MyRepo"]
 }]
 ```
 
@@ -547,7 +600,8 @@ The first `.set` creates `jira` with an arity-0 variant; the second adds an arit
     ["https://jira.example.com/browse/{}", "https://jira.example.com/browse/{}", "jira",
       [], {"argDelta": -1}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": []
 }]
 ```
 
@@ -560,7 +614,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
       ["PROJ"], {"argDelta": 0}],
     ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 1}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": ["PROJ"]
 }]
 ```
 
@@ -573,7 +628,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
       ["PROJ"], {"argDelta": 1}],
     ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 2}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": ["PROJ", "extra"]
 }]
 ```
 
@@ -602,7 +658,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
     ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
       {"argDelta": -1, "on": "key", "positions": [], "score": 0}]
   ],
-  "inputs": []
+  "inputs": [],
+  "args": []
 }]
 ```
 
@@ -629,7 +686,8 @@ No key contains `browse`, so destination search matches the query against each v
     ["https://jira.example.com/browse/PROJ", "https://jira.example.com/browse/{}", "jira",
       ["PROJ"], {"argDelta": 0, "on": "destination", "positions": [25, 26, 27, 28, 29, 30]}]
   ],
-  "inputs": ["browse"]
+  "inputs": ["browse"],
+  "args": ["PROJ"]
 }]
 ```
 

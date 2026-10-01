@@ -23,10 +23,10 @@ describe('execute — literal accumulation (dsl.md §1)', () => {
     const interp = createInterpreter(envWith({ '.$': identity }));
     const program: Program = [];
     interp.pushToken(program, 'git');
-    interp.pushToken(program, ['S', { targets: {}, focus: [] }]);
+    interp.pushToken(program, ['S', { targets: {}, focus: [], alias: {} }]);
     expect(interp.execute(program)).toEqual([
       ['L', ['git']],
-      ['S', { targets: {}, focus: [] }],
+      ['S', { targets: {}, focus: [], alias: {} }],
     ]);
   });
 });
@@ -95,13 +95,13 @@ describe('execute — operation dispatch (ADR 0005)', () => {
 // real operation: it inspects its operands and only produces a value on a live
 // stack. On a sealed stack (top R or E) it has no operand, so it yields nothing
 // that survives — exactly as a real op's absorbed E' would.
-const state = (focus: readonly string[] = []): State => ['S', { targets: {}, focus }];
+const state = (focus: readonly string[] = []): State => ['S', { targets: {}, focus, alias: {} }];
 const pushR: OpFn = (_interp, stack) => {
   const top = stack[stack.length - 1];
   if (top && (top[0] === 'R' || top[0] === 'E')) {
     return stack;
   }
-  stack.push(['R', { matches: [], inputs: [] }]);
+  stack.push(['R', { matches: [], inputs: [], args: [] }]);
   return stack;
 };
 
@@ -123,9 +123,9 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
     // sealed stack absorbs everything: S1, docs, and the second search's output.
     expect(search).toHaveBeenCalledTimes(2);
     expect(result).toEqual([
-      ['S', { targets: {}, focus: ['a'] }],
+      ['S', { targets: {}, focus: ['a'], alias: {} }],
       ['L', ['git']],
-      ['R', { matches: [], inputs: [] }],
+      ['R', { matches: [], inputs: [], args: [] }],
     ]);
   });
 
@@ -137,7 +137,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
     interp.pushToken(program, ['E', { type: 'unknown_error', description: 'boom' }]);
 
     expect(interp.execute(program)).toEqual([
-      ['S', { targets: {}, focus: [] }],
+      ['S', { targets: {}, focus: [], alias: {} }],
       ['L', ['git']],
       ['E', { type: 'unknown_error', description: 'boom' }],
     ]);
@@ -152,7 +152,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
     interp.pushToken(program, 'trailing');
 
     expect(interp.execute(program)).toEqual([
-      ['S', { targets: {}, focus: [] }],
+      ['S', { targets: {}, focus: [], alias: {} }],
       ['L', ['git']],
       ['E', { type: 'unknown_error', description: 'boom' }],
     ]);

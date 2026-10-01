@@ -1,9 +1,10 @@
 // browser-client.md "Fallback UI and settings" — the page shown when the page-load run did not
-// navigate: the text field seeded with that run's input, live execution of the field's contents
-// on a keystroke debounce, and the result list re-rendered from the register after each run.
-// Live execution is the ordinary run — mutations and bounded history included. Nothing here
-// consults the navigation rule; once the page is shown, navigation is by click, `Ctrl+digit`, or
-// Enter on the selected row, and each of those is the row's own link being followed.
+// navigate: the text field seeded with that run's input, live execution of a plain search on a
+// keystroke debounce, and the result list re-rendered from the register after each run. A
+// nontrivial program (ADR 0015) never runs live: it waits, with no list, until Enter runs it, and
+// a successful run puts the search it ended with back into the field. Nothing here consults the
+// navigation rule; once the page is shown, navigation is by click, `Ctrl+digit`, or Enter on the
+// selected row, and each of those is the row's own link being followed.
 
 import type { Interpreter } from '../dsl/index.ts';
 import { debounce } from '../lib/debounce.ts';
@@ -12,9 +13,11 @@ import { createHelpDialog } from './help.ts';
 import { iconMarkup } from './icons.ts';
 import { tokenize } from './input.ts';
 import { moveSelection, selectedLink, shortcutLink } from './match-list.ts';
-import { renderBareError, renderOutput } from './output.ts';
+import { renderBareError, renderOutput, renderWaiting } from './output.ts';
 import type { StorageArea } from './persistence.ts';
-import { run } from './run.ts';
+import { isNontrivial, searchTokens } from './program.ts';
+import { renderProgram } from './program-view.ts';
+import { compose, load, run } from './run.ts';
 import { createSettingsDialog } from './settings.ts';
 
 export const LIVE_EXECUTION_DEBOUNCE_MS = 60;
@@ -24,14 +27,6 @@ export interface FallbackPage {
   // nothing runs.
   flush(): void;
 }
-
-// browser-client.md "Fallback UI and settings" — a program ending in `.set`, `.rm`, or `.@` that
-// ran to its search (an `R` in the register) has done its work; typing on would only re-run the
-// mutation. `.@` sets the focus, which the results bar now shows, so the field need not keep it.
-const MUTATIONS: ReadonlySet<string> = new Set(['.set', '.rm', '.@']);
-
-const completedMutation = (tokens: readonly string[], env: BrowserEnv): boolean =>
-  MUTATIONS.has(tokens.at(-1) ?? '') && env.terminal?.[0] === 'R';
 
 const isPrintable = (event: KeyboardEvent): boolean =>
   event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey;
@@ -53,7 +48,7 @@ export const mountFallbackPage = (
   field.type = 'text';
   field.autocomplete = 'off';
   field.spellcheck = false;
-  field.value = completedMutation(env.input, env) ? '' : env.input.join(' ');
+  field.value = env.input.join(' ');
 
   const helpControl = doc.createElement('button');
   helpControl.type = 'button';
@@ -95,33 +90,74 @@ export const mountFallbackPage = (
   const output = doc.createElement('div');
   output.className = 'output';
 
+  // ADR 0015 — true while the field holds a nontrivial program that has not run since it was
+  // edited. main.ts never runs one at page load, so a seeded nontrivial program starts waiting.
+  let waiting = isNontrivial(interp, tokenize(field.value));
+
   const render = (): void => {
-    renderOutput(output, env);
+    if (waiting) {
+      renderWaiting(output, env, renderProgram(doc, interp, compose(tokenize(field.value))));
+    } else {
+      renderOutput(output, env);
+    }
   };
 
   // A run throws only when localStorage itself has gone; that ends the page, as at load.
-  const runField = (): void => {
+  const guarded = (step: () => void): void => {
     try {
-      const tokens = tokenize(field.value);
-      run(interp, tokens);
-      if (completedMutation(tokens, env)) {
-        field.value = '';
-      }
+      step();
       render();
     } catch (error: unknown) {
       renderBareError(root, error);
     }
   };
 
+  const runField = (): void => {
+    guarded(() => {
+      run(interp, tokenize(field.value));
+    });
+  };
+
+  // Enter on a waiting program runs it. A run that searched leaves the field holding that search
+  // (dsl.md §4.4: inputs, then the separator and args), so the field and the list agree; a run
+  // that failed keeps the program as typed, beside its error, so it can be corrected.
+  const runWaiting = (): void => {
+    guarded(() => {
+      waiting = false;
+      run(interp, tokenize(field.value));
+      if (env.terminal?.[0] === 'R') {
+        field.value = searchTokens(env.terminal).join(' ');
+      }
+    });
+  };
+
+  // What a settings action re-runs: the field when it is a plain search, otherwise only the
+  // stored world, so a waiting program still waits for Enter.
+  const refresh = (): void => {
+    if (waiting) {
+      guarded(() => {
+        load(interp);
+      });
+    } else {
+      runField();
+    }
+  };
+
   const liveRun = debounce(runField, LIVE_EXECUTION_DEBOUNCE_MS);
 
   field.addEventListener('input', () => {
-    liveRun.schedule();
+    waiting = isNontrivial(interp, tokenize(field.value));
+    if (waiting) {
+      liveRun.cancel();
+      render();
+    } else {
+      liveRun.schedule();
+    }
   });
 
   // browser-client.md "Fallback UI and settings" — after an action the dialog has closed and the
   // page re-runs the field's contents, so the list reflects the new current stack.
-  const settings = createSettingsDialog(doc, interp, storage, runField);
+  const settings = createSettingsDialog(doc, interp, storage, refresh);
   settingsControl.addEventListener('click', () => {
     settings.open();
   });
@@ -146,7 +182,8 @@ export const mountFallbackPage = (
       return;
     }
 
-    const shortcut = shortcutLink(output, event);
+    // A waiting program has no rows: the row shortcuts, the arrows, and Enter-to-open are off.
+    const shortcut = waiting ? undefined : shortcutLink(output, event);
     if (shortcut !== undefined) {
       event.preventDefault();
       shortcut.click();
@@ -159,6 +196,7 @@ export const mountFallbackPage = (
       event.preventDefault();
       field.value = '';
       field.focus();
+      waiting = false;
       runField();
       return;
     }
@@ -173,6 +211,7 @@ export const mountFallbackPage = (
     // The arrows move the selection over the rows already listed; they never touch the debounce,
     // since they do not change the search. A run that lands afterwards resets the selection.
     if (
+      !waiting &&
       (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
       !event.shiftKey &&
       !event.ctrlKey &&
@@ -189,6 +228,10 @@ export const mountFallbackPage = (
     // when the run searched a query (ADR 0009), otherwise none.
     if (event.key === 'Enter' && (event.target === field || !isEditable(event.target))) {
       event.preventDefault();
+      if (waiting) {
+        runWaiting();
+        return;
+      }
       liveRun.flush();
       selectedLink(output)?.click();
       return;

@@ -8,12 +8,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { OutputRegister } from '../browser-env.ts';
 import { renderSetupInstructions, showsSetupInstructions } from '../setup-instructions.ts';
 
-const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [] }];
+const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {} }];
 const oneTarget: OutputRegister['state'] = [
   'S',
-  { targets: { home: ['https://example.com/'] }, focus: [] },
+  { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
 ];
-const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
+const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
 
 describe('showsSetupInstructions ("While the target set is empty … They are not shown when loaded is false")', () => {
   it.each<[name: string, register: OutputRegister, shown: boolean]>([

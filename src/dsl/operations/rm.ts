@@ -1,58 +1,70 @@
 // dsl.md §4.2 — .rm: remove a target by exact key, or one of its variants by arity
 
-import { type OpFn, SEP, type State, type Template } from '../types.ts';
+import {
+  type LiteralArray,
+  type OpFn,
+  SEP,
+  type State,
+  type Template,
+  type ThitherError,
+} from '../types.ts';
 import {
   arityOf,
+  isAlias,
   isOperatorTerm,
   keyOf,
   push,
   resolveEscape,
   splitAtSeparator,
+  takeOperands,
   thitherError,
 } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.rm expects [.., S, L] or [.., S]');
 
 export const rm: OpFn = (_interp, stack) => {
-  const ls = stack.pop();
-
-  if (!ls) {
-    return push(stack, unexpectedStackError);
-  } else if (ls[0] === 'S') {
-    return push(stack, ls);
-  } else if (ls[0] !== 'L') {
-    push(stack, ls);
-    return push(stack, unexpectedStackError);
+  const [matched, operands] = takeOperands(stack, ['S', 'L']);
+  if (matched === 'matched') {
+    // §6 — a failed .rm leaves its input state in place under the error.
+    const [state, ls] = operands;
+    const next = removeTarget(state, ls);
+    return next[0] === 'E' ? push(push(stack, state), next) : push(stack, next);
   }
 
-  const state = stack[stack.length - 1];
+  // [.., S] .rm removes nothing.
+  const [bareMatched, bare] = takeOperands(stack, ['S']);
+  return push(stack, bareMatched === 'matched' ? bare[0] : unexpectedStackError);
+};
 
-  if (state?.[0] !== 'S') {
-    return push(stack, unexpectedStackError);
+const removeTarget = (state: State, ls: LiteralArray): State | ThitherError => {
+  // §4.2 — .rm does not resolve aliases, so any alias in L is refused outright.
+  const typedAlias = ls[1].find(isAlias);
+  if (typedAlias !== undefined) {
+    return thitherError(
+      'invalid_dimension',
+      `${typedAlias} is an alias; .rm does not resolve aliases`,
+    );
   }
 
   const [matching, suffix] = splitAtSeparator(ls[1]);
   const explicit = matching.map(resolveEscape);
   // §4.2 — an empty matching portion never authorizes removal, regardless of focus.
   if (explicit.length === 0) {
-    return stack;
+    return state;
   }
 
   // §4.2 — like .set, .rm names a key, so operator syntax is refused rather than searched.
   const operator = explicit.find(isOperatorTerm);
   if (operator !== undefined) {
-    return push(
-      stack,
-      thitherError('invalid_dimension', `${operator} is search syntax, not a dimension`),
-    );
+    return thitherError('invalid_dimension', `${operator} is search syntax, not a dimension`);
   }
 
   // §4.2 — exact key lookup, no search, no focus. A missing key is a successful no-op.
-  const { targets, focus } = state[1];
+  const { targets, focus, alias } = state[1];
   const key = keyOf(explicit);
   const variants = targets[key];
   if (variants === undefined) {
-    return stack;
+    return state;
   }
 
   const hasSeparator = ls[1].includes(SEP);
@@ -60,12 +72,9 @@ export const rm: OpFn = (_interp, stack) => {
   // §4.2 — no separator removes the whole target, but only when it is unambiguous: a target with
   // more than one variant must be disambiguated by naming the arity with the `. x x x` suffix.
   if (!hasSeparator && variants.length > 1) {
-    return push(
-      stack,
-      thitherError(
-        'missing_operand',
-        `${key} has ${variants.length} variants; name the arity to remove with a separator`,
-      ),
+    return thitherError(
+      'missing_operand',
+      `${key} has ${variants.length} variants; name the arity to remove with a separator`,
     );
   }
 
@@ -86,7 +95,5 @@ export const rm: OpFn = (_interp, stack) => {
     }
   }
 
-  stack.pop();
-  const nextState: State = ['S', { targets: nextTargets, focus }];
-  return push(stack, nextState);
+  return ['S', { targets: nextTargets, focus, alias }];
 };

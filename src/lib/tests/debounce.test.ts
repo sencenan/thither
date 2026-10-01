@@ -71,4 +71,15 @@ describe('debounce', () => {
     vi.advanceTimersByTime(60);
     expect(fn).toHaveBeenCalledTimes(2);
   });
+
+  it('cancel drops a pending call, and a later flush has nothing to run', () => {
+    const fn = vi.fn();
+    const debounced = debounce(fn, 60);
+
+    debounced.schedule();
+    debounced.cancel();
+    vi.advanceTimersByTime(60);
+    debounced.flush();
+    expect(fn).not.toHaveBeenCalled();
+  });
 });
