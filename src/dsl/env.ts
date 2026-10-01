@@ -1,5 +1,6 @@
 import { alias } from './operations/alias.ts';
 import { at } from './operations/at.ts';
+import { merge } from './operations/merge.ts';
 import { rm } from './operations/rm.ts';
 import { search } from './operations/search.ts';
 import { set } from './operations/set.ts';
@@ -12,5 +13,6 @@ export const defaultEnv = (): InterpreterEnv => ({
     ['.@', at],
     ['.$', search],
     ['.alias', alias],
+    ['.merge', merge],
   ]),
 });

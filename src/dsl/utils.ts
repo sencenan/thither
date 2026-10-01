@@ -61,29 +61,31 @@ export type Operands<P extends readonly Sigil[]> = {
 // expect an E operand.
 export type Taken<P extends readonly Sigil[]> =
   | readonly ['matched', Operands<P>]
-  | readonly ['unmatched', ThitherError];
+  | readonly ['unmatched', ThitherError, consumed: readonly StackValue[]];
 
 // dsl.md §6 — take an operation's operands off the top of the stack, matching `pattern` from the
 // top down. Every value that fits is consumed; the first that does not is put back and the match
-// fails with `missing_operand`, the values already taken staying consumed. Pushing the error is
-// left to the caller, which may try another pattern first: try longer patterns first, since a
-// pattern that is the top of another would otherwise always win. On a sealed stack the R or E
-// is put back, so the caller's push of the error is absorbed by `push`.
+// fails with `missing_operand`, the values already taken staying consumed; they are returned
+// bottom first, the same order as matched operands. What goes back with the error is the caller's
+// choice: usually the error alone, though an operation may put a consumed S back beneath it, or
+// try another pattern first. Try longer patterns first, since a pattern that is the top of
+// another would otherwise always win. On a sealed stack the R or E is put back, so the caller's
+// push of the error is absorbed by `push`.
 export function takeOperands<const P extends readonly Sigil[]>(stack: Stack, pattern: P): Taken<P>;
 export function takeOperands(stack: Stack, pattern: readonly Sigil[]): Taken<readonly Sigil[]> {
-  const taken: StackValue[] = [];
+  const consumed: StackValue[] = [];
   for (let index = pattern.length - 1; index >= 0; index--) {
     const value = stack.pop();
     if (value === undefined) {
-      return ['unmatched', missingOperands(pattern)];
+      return ['unmatched', missingOperands(pattern), consumed];
     }
     if (value[0] !== pattern[index]) {
       stack.push(value);
-      return ['unmatched', missingOperands(pattern)];
+      return ['unmatched', missingOperands(pattern), consumed];
     }
-    taken.unshift(value);
+    consumed.unshift(value);
   }
-  return ['matched', taken];
+  return ['matched', consumed];
 }
 
 const missingOperands = (pattern: readonly Sigil[]): ThitherError =>
@@ -116,6 +118,15 @@ export const keyOf = (dims: readonly Dim[]): string => normalizeDimensions(dims)
 
 // dsl.md §1 — a variant's arity is its count of anonymous `{}` placeholders.
 export const arityOf = (template: Template): number => template.split('{}').length - 1;
+
+// dsl.md §4.1 — a variant is addressed by arity: replace the same-arity variant when present,
+// otherwise add it, keeping the list in arity-ascending order.
+export const upsertVariant = (variants: readonly Template[], dest: Template): Template[] => {
+  const arity = arityOf(dest);
+  return [...variants.filter((variant) => arityOf(variant) !== arity), dest].sort(
+    (a, b) => arityOf(a) - arityOf(b),
+  );
+};
 
 // dsl.md §2 — the first standalone separator divides the matching portion from the suffix
 export const splitAtSeparator = (
