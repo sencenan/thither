@@ -3,13 +3,15 @@
 
 /* Dark, terminal / NVIDIA-inspired palette. All colour derives from these four tokens via
    color-mix, so retheming is a one-block change. --bg is the page; surfaces are mixed up from it,
-   muted text mixed down from --fg; --accent is the signature green; --warn the error/amber. */
+   muted text mixed down from --fg; --accent is the signature green; --dest the yellow-green of
+   destination evidence, set apart from the key's green; --warn the error/amber. */
 :root {
   color-scheme: dark;
   --bg: #171a17;
   --fg: #e8ede6;
   --accent: #76b900;
   --arg: #5ccfe6;
+  --dest: #cddc39;
   --count: var(--accent);
   --warn: #ff6b53;
   font:
@@ -269,7 +271,8 @@ body {
   grid-area: score;
 }
 
-/* The evidence: matched characters of the key, and the argument each `{}` was filled with. */
+/* The evidence: matched characters of the key (or, for destination search, of the destination),
+   and the argument each `{}` was filled with. */
 
 .match mark {
   background: none;
@@ -284,7 +287,15 @@ body {
   text-underline-offset: 3px;
 }
 
-.match .destination mark {
+.match .destination mark.matched {
+  font-weight: 700;
+  color: var(--dest);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--dest) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.match .destination mark.argument {
   padding: 0 3px;
   border-radius: 3px;
   font-weight: 600;
@@ -345,6 +356,10 @@ body {
 .output footer .count {
   color: var(--count);
   font-weight: 600;
+}
+
+.output footer .on-destination {
+  color: var(--dest);
 }
 
 .output p {

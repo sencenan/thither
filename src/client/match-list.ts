@@ -42,6 +42,7 @@ const renderSpans = (
 
 const renderRow = (doc: Document, match: Match, index: number): Element => {
   const [destination, template, key, args, hint] = match;
+  const onDestination = hint.on === 'destination';
 
   const badge = doc.createElement('kbd');
   badge.textContent = SHORTCUT_DIGITS[index] ?? '';
@@ -58,7 +59,7 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
   // variant (dsl.md §5) so the row states what was filled in, not only how the URL reads.
   const keyLine = doc.createElement('span');
   keyLine.className = 'key-line';
-  keyLine.append(renderSpans(doc, 'key', keySpans(key, hint.positions)));
+  keyLine.append(renderSpans(doc, 'key', keySpans(key, onDestination ? [] : hint.positions)));
   if (args.length > 0) {
     const applied = doc.createElement('span');
     applied.className = 'args';
@@ -82,7 +83,11 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
   link.append(
     badge,
     keyLine,
-    renderSpans(doc, 'destination', templateSpans(template, args)),
+    renderSpans(
+      doc,
+      'destination',
+      templateSpans(template, args, onDestination ? hint.positions : []),
+    ),
     balance,
     score,
   );
@@ -93,13 +98,19 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
   return row;
 };
 
-const renderFooter = (doc: Document, count: number): Element => {
+const renderFooter = (doc: Document, count: number, onDestination: boolean): Element => {
   const footer = doc.createElement('footer');
   const summary = doc.createElement('span');
   summary.className = 'count';
   summary.textContent =
     `${count} ${count === 1 ? 'match' : 'matches'}` +
     (count > SHORTCUT_DIGITS.length ? ' · shortcuts on the first ten' : '');
+  if (onDestination) {
+    const note = doc.createElement('span');
+    note.className = 'on-destination';
+    note.textContent = ' · on URL';
+    summary.append(note);
+  }
   const hints = doc.createElement('span');
   hints.textContent = KEY_HINTS;
   footer.append(summary, hints);
@@ -122,9 +133,12 @@ export const renderMatchList = (
   const list = doc.createElement('ol');
   list.className = enterArmed ? 'matches enter-armed' : 'matches';
   list.append(...matches.map((match, index) => renderRow(doc, match, index)));
+  // A result is all key matches or all destination matches: destination search runs only when
+  // no key matched (dsl.md §4.4).
+  const onDestination = matches.some((match) => match[4].on === 'destination');
   // The summary sits above the list and sticks to the top of the viewport (style.css), so the
   // count and key hints stay visible while a long list scrolls under it.
-  return [renderFooter(doc, matches.length), list];
+  return [renderFooter(doc, matches.length, onDestination), list];
 };
 
 // The link the nth row opens when clicked; a shortcut or Enter follows the same link.
