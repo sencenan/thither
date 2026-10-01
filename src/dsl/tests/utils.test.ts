@@ -10,7 +10,7 @@ type Sigil = Stack[number][0];
 const s0: State = emptyState();
 const s1: State = ['S', { targets: { git: ['https://github.com/'] }, focus: [], alias: {} }];
 const l: LiteralArray = ['L', ['git']];
-const r: Result = ['R', { matches: [], inputs: [] }];
+const r: Result = ['R', { matches: [], inputs: [], args: [] }];
 const e: ThitherError = ['E', { type: 'unknown_error', description: 'x' }];
 const unmatched = ['unmatched', ['E', expect.objectContaining({ type: 'missing_operand' })]];
 

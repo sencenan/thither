@@ -13,7 +13,7 @@ const oneTarget: OutputRegister['state'] = [
   'S',
   { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
 ];
-const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
+const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
 
 describe('showsSetupInstructions ("While the target set is empty … They are not shown when loaded is false")', () => {
   it.each<[name: string, register: OutputRegister, shown: boolean]>([

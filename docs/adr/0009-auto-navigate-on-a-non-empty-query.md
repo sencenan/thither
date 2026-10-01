@@ -29,6 +29,6 @@ _([ADR 0011](0011-fan-out-variants-client-picks-navigable.md) restates the match
 ## Consequences
 
 - The register's `saved` field goes away entirely: with `changed` gone it had no reader. The register is `terminal` and `loaded`. A `.save` that fails writes its `E(unknown_error)` into `terminal`, replacing the captured `R`, so the client renders the failure through the same path as any other `E`. Bounded history reintroduces structural difference as an internal dedup rule of `.save`, invisible to the client.
-- A URL that both mutates and searches (`<u> a b .set a b` arriving as a pasted link) now redirects. This is the intended power-user behaviour and consistent with `browser-client.md`'s "execute the supplied program as-is; history provides recovery, not authorization".
+- _(Superseded by [ADR 0015](0015-nontrivial-programs-run-on-enter.md): a nontrivial program from a URL now waits for Enter and is never auto-navigated, so this no longer redirects.)_ A URL that both mutates and searches (`<u> a b .set a b` arriving as a pasted link) now redirects. This is the intended power-user behaviour and consistent with `browser-client.md`'s "execute the supplied program as-is; history provides recovery, not authorization".
 - A failed `.save` cannot auto-navigate without a special case: its `E` is the terminal, and the rule only navigates on an `R`.
 - `browser-client.md` "Execution flow" step 4 and its `.save` bullet, `CONTEXT.md`'s **Output register**, and ADR 0007's `.save` bullet are amended to match.

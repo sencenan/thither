@@ -1,15 +1,29 @@
 // browser-client.md "Fallback UI" — what a run leaves behind, rendered. `renderOutput` draws the
 // output register into the region beneath the field: an `E` as its `type` and `description`
 // verbatim, then either the setup instructions (while the target set is empty) or the match
-// list, and the settings-reset hint when the stored data could not be loaded. `renderBareError`
-// is the other page: what an unavailable localStorage leaves, with no execution behind it.
+// list, and the settings-reset hint when the stored data could not be loaded. `renderWaiting`
+// draws a nontrivial program that has not run yet (ADR 0015). `renderBareError` is the other
+// page: what an unavailable localStorage leaves, with no execution behind it.
 
 import type { ThitherError } from '../dsl/index.ts';
 import type { OutputRegister } from './browser-env.ts';
-import { renderMatchList } from './match-list.ts';
+import { type KeyHint, renderKeyHints, renderMatchList } from './match-list.ts';
 import { renderSetupInstructions, showsSetupInstructions } from './setup-instructions.ts';
 
 const RESET_HINT = 'Recover in Settings: revert to an earlier stack, clear, or import one.';
+
+const WAITING_NOTICE = 'Not run yet: a program with operations runs when you press Enter.';
+
+const WAITING_HINTS: readonly KeyHint[] = [
+  [
+    ['key', 'Enter'],
+    ['text', ' run'],
+  ],
+  [
+    ['key', 'Esc'],
+    ['text', ' clear'],
+  ],
+];
 
 export const renderBareError = (root: Element, error: unknown): void => {
   const line = root.ownerDocument.createElement('p');
@@ -37,14 +51,21 @@ const renderFocus = (doc: Document, focus: readonly string[]): Node => {
   return bar;
 };
 
+const renderResetHint = (doc: Document): Node => {
+  const hint = doc.createElement('p');
+  hint.textContent = RESET_HINT;
+  return hint;
+};
+
+// The focus the program would run under, so the user sees what it is prefixed with.
+const focusNodes = (doc: Document, register: OutputRegister): Node[] => {
+  const focus = register.state?.[1].focus ?? [];
+  return focus.length > 0 ? [renderFocus(doc, focus)] : [];
+};
+
 export const renderOutput = (region: Element, register: OutputRegister): void => {
   const doc = region.ownerDocument;
-  const nodes: Node[] = [];
-
-  const focus = register.state?.[1].focus ?? [];
-  if (focus.length > 0) {
-    nodes.push(renderFocus(doc, focus));
-  }
+  const nodes = focusNodes(doc, register);
 
   const { terminal } = register;
   if (terminal?.[0] === 'E') {
@@ -59,9 +80,28 @@ export const renderOutput = (region: Element, register: OutputRegister): void =>
   }
 
   if (!register.loaded) {
-    const hint = doc.createElement('p');
-    hint.textContent = RESET_HINT;
-    nodes.push(hint);
+    nodes.push(renderResetHint(doc));
+  }
+
+  region.replaceChildren(...nodes);
+};
+
+// ADR 0015 — in place of the list, a bar saying the program has not run and how to run it. There
+// are no rows, so nothing can be selected or opened while the program waits.
+export const renderWaiting = (region: Element, register: OutputRegister): void => {
+  const doc = region.ownerDocument;
+  const nodes = focusNodes(doc, register);
+
+  const footer = doc.createElement('footer');
+  footer.className = 'waiting';
+  const notice = doc.createElement('span');
+  notice.className = 'count';
+  notice.textContent = WAITING_NOTICE;
+  footer.append(notice, renderKeyHints(doc, WAITING_HINTS));
+  nodes.push(footer);
+
+  if (!register.loaded) {
+    nodes.push(renderResetHint(doc));
   }
 
   region.replaceChildren(...nodes);

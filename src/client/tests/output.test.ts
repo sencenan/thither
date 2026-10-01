@@ -25,7 +25,7 @@ const oneTarget: OutputRegister['state'] = [
   'S',
   { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
 ];
-const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [] }];
+const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
 
 describe('renderOutput', () => {
   it('renders R.matches as the match list, in the order given', () => {
@@ -51,6 +51,7 @@ describe('renderOutput', () => {
             ],
           ],
           inputs: [],
+          args: [],
         },
       ],
       state: oneTarget,

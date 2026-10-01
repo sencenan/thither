@@ -64,7 +64,7 @@ describe('search operators apply in .$ (dsl.md §3, §4.4)', () => {
     (_op, terms, selects) => {
       const stack = run([state(all), ...terms, '.', '.$']);
       same(selectedKeys(stack), selects);
-      expect(stack[stack.length - 1]?.[1]).toMatchObject({ inputs: terms });
+      expect(stack[stack.length - 1]?.[1]).toMatchObject({ inputs: terms, args: [] });
       expect(stack[0]).toEqual(state(all));
     },
   );

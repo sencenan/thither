@@ -83,6 +83,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: [],
+          args: [],
         },
       ],
     ]);
@@ -110,6 +111,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['company', 'git'],
+          args: ['MyRepo'],
         },
       ],
     ]);
@@ -151,6 +153,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['git'],
+          args: ['thither'],
         },
       ],
     ]);
@@ -203,6 +206,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['jira'],
+          args: [],
         },
       ],
     ]);
@@ -228,6 +232,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ'],
       },
     ]);
 
@@ -252,6 +257,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ', 'extra'],
       },
     ]);
 
@@ -273,6 +279,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['jira'],
+        args: ['PROJ'],
       },
     ]);
   });
@@ -313,6 +320,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: [],
+          args: [],
         },
       ],
     ]);
@@ -351,6 +359,7 @@ describe('dsl.md §7 worked programs', () => {
             ],
           ],
           inputs: ['browse'],
+          args: ['PROJ'],
         },
       ],
     ]);
@@ -376,6 +385,7 @@ describe('dsl.md §7 worked programs', () => {
           ],
         ],
         inputs: ['git'],
+        args: [],
       }),
     ]);
   });
@@ -408,7 +418,7 @@ const alphabet: readonly unknown[] = [
   ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'], alias: {} }],
   ['S', { targets: 'wrong' }],
   ['S', { targets: { a: ['not-a-url'] }, focus: [], alias: {} }],
-  ['R', { matches: [], inputs: [] }],
+  ['R', { matches: [], inputs: [], args: [] }],
   ['R', 'wrong'],
   ['E', { type: 'unknown_error', description: 'boom' }],
   ['E', { type: 'made_up', description: 'boom' }],

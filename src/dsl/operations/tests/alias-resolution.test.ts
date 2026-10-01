@@ -73,7 +73,14 @@ const cases: readonly Case[] = [
     [withDefinitions, '~gh', '~me', '.$'],
     [
       withDefinitions,
-      ['R', { matches: [row('https://github.com/sencenan', ['sencenan'])], inputs: ['github'] }],
+      [
+        'R',
+        {
+          matches: [row('https://github.com/sencenan', ['sencenan'])],
+          inputs: ['github'],
+          args: ['sencenan'],
+        },
+      ],
     ],
   ],
   [
@@ -81,7 +88,14 @@ const cases: readonly Case[] = [
     [withDefinitions, '~gh', '.', '~me', '.$'],
     [
       withDefinitions,
-      ['R', { matches: [row('https://github.com/sencenan', ['sencenan'])], inputs: ['github'] }],
+      [
+        'R',
+        {
+          matches: [row('https://github.com/sencenan', ['sencenan'])],
+          inputs: ['github'],
+          args: ['sencenan'],
+        },
+      ],
     ],
   ],
 

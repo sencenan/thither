@@ -1,5 +1,5 @@
 // browser-client.md "Host operations" — the browser interpreter environment: `defaultEnv()`'s
-// four language operations plus the three host operations (`.load`, `.out`, `.save`) that are
+// five language operations plus the three host operations (`.load`, `.out`, `.save`) that are
 // the whole of the client's persistence (ADR 0005, ADR 0007). Mirrors the core's `defaultEnv`;
 // the caller builds an interpreter from it and reads the env's output register fields
 // (`terminal`/`loaded`/`state`) after each run. It also carries the program input the run was opened

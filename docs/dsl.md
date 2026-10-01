@@ -38,7 +38,7 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `S` | State of the world | `["S", { "targets": T, "focus": [d], "alias": { string: string } }]`. |
 | `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `on`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
-| `R` | Search result | `["R", { "matches": M, "inputs": [d] }]`. |
+| `R` | Search result | `["R", { "matches": M, "inputs": [d], "args": [d] }]`. |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
 
 The `[d]` and `[args]` notation means an array, not necessarily a single element.
@@ -391,6 +391,8 @@ The first two programs each have a best fit — the argDelta-0 row — and can n
 
 `.$` resolves the aliases in `L` before anything else (section 2), so inference, matching, rendering, and `R.inputs` all see the defined literals. `R.inputs` records the user-supplied literals used as matching inputs, in their original spelling after that resolution, excluding focus, the separator, and arguments, whether the key search or destination search found the matches. A failed inferred search still reports the attempted input list, so the result identifies the failed query. A focus-only search has empty `inputs`.
 
+`R.args` records the arguments the search took, in the same accumulated form and order: the suffix after a separator, or the literals inference gave back. A search with no arguments, including one where no prefix matched, has empty `args`. Together, `inputs` and `args` are exactly what the search consumed, so a host can rebuild that search as `inputs`, then `.` and `args` when there are any. A supplied `R` without `args` has none.
+
 ### 4.5 `.alias`
 
 ```text
@@ -555,7 +557,8 @@ company git MyRepo .$
     ["https://github.com/company/MyRepo", "https://github.com/company/{}", "company git",
       ["MyRepo"], {"argDelta": 0}]
   ],
-  "inputs": ["company", "git"]
+  "inputs": ["company", "git"],
+  "args": ["MyRepo"]
 }]
 ```
 
@@ -597,7 +600,8 @@ The first `.set` creates `jira` with an arity-0 variant; the second adds an arit
     ["https://jira.example.com/browse/{}", "https://jira.example.com/browse/{}", "jira",
       [], {"argDelta": -1}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": []
 }]
 ```
 
@@ -610,7 +614,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
       ["PROJ"], {"argDelta": 0}],
     ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 1}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": ["PROJ"]
 }]
 ```
 
@@ -623,7 +628,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
       ["PROJ"], {"argDelta": 1}],
     ["https://jira.example.com", "https://jira.example.com", "jira", [], {"argDelta": 2}]
   ],
-  "inputs": ["jira"]
+  "inputs": ["jira"],
+  "args": ["PROJ", "extra"]
 }]
 ```
 
@@ -652,7 +658,8 @@ Against the same resulting state, `jira PROJ .$` makes the arity-1 variant the b
     ["https://github.com/company/{}", "https://github.com/company/{}", "company git", [],
       {"argDelta": -1, "on": "key", "positions": [], "score": 0}]
   ],
-  "inputs": []
+  "inputs": [],
+  "args": []
 }]
 ```
 
@@ -679,7 +686,8 @@ No key contains `browse`, so destination search matches the query against each v
     ["https://jira.example.com/browse/PROJ", "https://jira.example.com/browse/{}", "jira",
       ["PROJ"], {"argDelta": 0, "on": "destination", "positions": [25, 26, 27, 28, 29, 30]}]
   ],
-  "inputs": ["browse"]
+  "inputs": ["browse"],
+  "args": ["PROJ"]
 }]
 ```
 

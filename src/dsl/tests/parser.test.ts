@@ -321,6 +321,7 @@ describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
         ],
       ],
       inputs: ['Company', 'Git'],
+      args: ['MyRepo'],
     };
     expect(parse(env, frozen(['R', body]))).toEqual(['R', body]);
   });
@@ -338,6 +339,7 @@ describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
         ],
       ],
       inputs: ['browse'],
+      args: [],
     },
   ];
 
@@ -370,9 +372,21 @@ describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
     expect(parse(env, frozen(['R', { matches: [badTemplate], inputs: [] }]))[0]).toBe('E');
   });
 
+  it('§4.4 a supplied R without args has no arguments', () => {
+    expect(parse(env, frozen(['R', { matches: [], inputs: ['git'] }]))).toEqual([
+      'R',
+      { matches: [], inputs: ['git'], args: [] },
+    ]);
+  });
+
+  it('§4.4 an R whose args is not a list of strings is malformed', () => {
+    expect(parse(env, frozen(['R', { matches: [], inputs: [], args: 'PROJ' }]))[0]).toBe('E');
+    expect(parse(env, frozen(['R', { matches: [], inputs: [], args: [1] }]))[0]).toBe('E');
+  });
+
   it('§2 drops unknown fields on the R envelope', () => {
     const token = parse(env, frozen(['R', { matches: [], inputs: [], extra: 1 }]));
-    expect(token).toEqual(['R', { matches: [], inputs: [] }]);
+    expect(token).toEqual(['R', { matches: [], inputs: [], args: [] }]);
   });
 
   it('§2 rejects a malformed Result envelope', () => {

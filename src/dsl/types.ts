@@ -67,6 +67,8 @@ export type Result = readonly [
   {
     readonly matches: Match[];
     readonly inputs: readonly Dim[];
+    // dsl.md §4.4 — the arguments, in accumulated form after alias resolution.
+    readonly args: readonly Literal[];
   },
 ];
 export type ThitherError = readonly [

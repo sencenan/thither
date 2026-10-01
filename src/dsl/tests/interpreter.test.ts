@@ -101,7 +101,7 @@ const pushR: OpFn = (_interp, stack) => {
   if (top && (top[0] === 'R' || top[0] === 'E')) {
     return stack;
   }
-  stack.push(['R', { matches: [], inputs: [] }]);
+  stack.push(['R', { matches: [], inputs: [], args: [] }]);
   return stack;
 };
 
@@ -125,7 +125,7 @@ describe('execute — terminal seal (dsl.md §1 steps 4–5, §7)', () => {
     expect(result).toEqual([
       ['S', { targets: {}, focus: ['a'], alias: {} }],
       ['L', ['git']],
-      ['R', { matches: [], inputs: [] }],
+      ['R', { matches: [], inputs: [], args: [] }],
     ]);
   });
 

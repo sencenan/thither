@@ -132,12 +132,13 @@ const STATE_FIELD_SET: ReadonlySet<string> = new Set(STATE_FIELDS);
 
 const parseResult = (raw: unknown): Result | ThitherError => {
   if (isRecord(raw)) {
-    const { matches, inputs } = raw;
+    // args was added after inputs, so a supplied R without it has no arguments.
+    const { matches, inputs, args = [] } = raw;
 
-    if (isStringArray(inputs) && Array.isArray(matches)) {
+    if (isStringArray(inputs) && isStringArray(args) && Array.isArray(matches)) {
       const parsed = matches.map(parseMatch);
       if (parsed.every((match) => match !== undefined)) {
-        return ['R', { matches: parsed, inputs }];
+        return ['R', { matches: parsed, inputs, args }];
       }
     }
   }

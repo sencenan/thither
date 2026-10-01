@@ -54,7 +54,7 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
   const byKey = keyGroups(targets, query, args);
   const groups = byKey.length > 0 ? byKey : destinationGroups(targets, query, args);
 
-  return ['R', { matches: order(groups), inputs: matching }];
+  return ['R', { matches: order(groups), inputs: matching, args }];
 };
 
 // One selected target's rows, before ordering, and the score it ranks by.

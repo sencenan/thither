@@ -12,6 +12,10 @@ Language syntax and execution rules are specified in [docs/dsl.md](docs/dsl.md).
 The program that embeds the interpreter and composes the programs it runs, such as the browser client or the REPL. The interpreter evaluates exactly what a host gives it and appends nothing.
 _Avoid_: Client (when the REPL is included), runtime, shell
 
+**Nontrivial program**:
+A program containing any operation other than a single `.$` as its last item, such as one that sets, removes, focuses, or defines an alias. Typed into the fallback page, it runs only when the user presses Enter; any other program is a plain search and runs as it is typed.
+_Avoid_: Mutating program, command, write program
+
 **Host operation**:
 An operation a host registers on the interpreter's environment beyond the language's own five, such as the browser client's `.load`, `.out`, and `.save`. It is written into the program like any other operation.
 _Avoid_: Plugin, hook, built-in
