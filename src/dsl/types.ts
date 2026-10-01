@@ -19,8 +19,11 @@ export type Literal = Dim | Separator;
 export type Target = readonly [key: string, variants: readonly Template[]];
 export type TargetSet = { readonly [key: string]: readonly Template[] };
 
+// dsl.md §5 — `on` names what `positions` index: the target's key, or, for a match found by
+// destination search (§4.4), the variant's raw template.
 export interface Hint {
   readonly argDelta: number;
+  readonly on: 'key' | 'destination';
   readonly positions: readonly number[];
   readonly score: number;
 }

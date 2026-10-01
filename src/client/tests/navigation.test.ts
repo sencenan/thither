@@ -38,7 +38,7 @@ const match = (argDelta: number, key = 'home', dest = 'https://example.com/'): M
   dest,
   key,
   [],
-  { argDelta, positions: [], score: 1 },
+  { argDelta, on: 'key', positions: [], score: 1 },
 ];
 
 const register = (over: Partial<OutputRegister>): OutputRegister => ({
@@ -141,6 +141,26 @@ describe('resolveNavigationDestination', () => {
       'an empty query does not navigate, even to a single complete match',
       register({ terminal: ['R', { matches: [match(0)], inputs: [] }] }),
     ],
+    [
+      'destination evidence never navigates, even a single target with a best fit (ADR 0014)',
+      register({
+        terminal: [
+          'R',
+          {
+            matches: [
+              [
+                'https://jira.example.com/browse/PROJ',
+                'https://jira.example.com/browse/{}',
+                'jira',
+                ['PROJ'],
+                { argDelta: 0, on: 'destination', positions: [25], score: 16 },
+              ],
+            ],
+            inputs: ['browse'],
+          },
+        ],
+      }),
+    ],
   ];
 
   for (const [name, reg] of rejected) {
@@ -170,6 +190,22 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
     const { register, destination } = await open(fakeStorage(), []);
     expect(destination).toBeUndefined();
     expect(register.terminal?.[0]).toBe('R');
+  });
+
+  it('a destination-search hit shows the page rather than navigating (ADR 0014)', async () => {
+    const record = JSON.stringify([
+      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [] }]],
+    ]);
+    const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), [
+      'browse',
+      '.',
+      'PROJ',
+    ]);
+    expect(destination).toBeUndefined();
+    expect(register.terminal).toEqual([
+      'R',
+      expect.objectContaining({ matches: [expect.anything()], inputs: ['browse'] }),
+    ]);
   });
 
   it('a plain search with a single complete match navigates', async () => {

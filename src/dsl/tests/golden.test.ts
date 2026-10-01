@@ -73,7 +73,7 @@ describe('dsl.md §7 worked programs', () => {
               'https://github.com/company/{}',
               'company git',
               [],
-              { argDelta: -1, positions: [], score: 0 },
+              { argDelta: -1, on: 'key', positions: [], score: 0 },
             ],
           ],
           inputs: [],
@@ -293,17 +293,54 @@ describe('dsl.md §7 worked programs', () => {
               'https://docs.example.com/',
               'docs',
               [],
-              { argDelta: 0, positions: [], score: 0 },
+              { argDelta: 0, on: 'key', positions: [], score: 0 },
             ],
             [
               'https://github.com/company/{}',
               'https://github.com/company/{}',
               'company git',
               [],
-              { argDelta: -1, positions: [], score: 0 },
+              { argDelta: -1, on: 'key', positions: [], score: 0 },
             ],
           ],
           inputs: [],
+        },
+      ],
+    ]);
+  });
+
+  it('§7 search destinations when no key matches', () => {
+    const state = [
+      'S',
+      {
+        targets: {
+          jira: ['https://jira.example.com', 'https://jira.example.com/browse/{}'],
+          'company git': ['https://github.com/company/{}'],
+        },
+        focus: [],
+      },
+    ];
+    const stack = run([state, 'browse', '.', 'PROJ', '.$']);
+
+    expect(stack).toEqual([
+      state,
+      [
+        'R',
+        {
+          matches: [
+            [
+              'https://jira.example.com/browse/PROJ',
+              'https://jira.example.com/browse/{}',
+              'jira',
+              ['PROJ'],
+              expect.objectContaining({
+                argDelta: 0,
+                on: 'destination',
+                positions: [25, 26, 27, 28, 29, 30],
+              }),
+            ],
+          ],
+          inputs: ['browse'],
         },
       ],
     ]);

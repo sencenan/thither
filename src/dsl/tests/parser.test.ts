@@ -244,12 +244,43 @@ describe('parse — supplied Result (dsl.md §2, §4.4)', () => {
           'https://github.com/company/{}',
           'company git',
           ['MyRepo'],
-          { argDelta: 0, positions: [], score: 0 },
+          { argDelta: 0, on: 'key', positions: [], score: 0 },
         ],
       ],
       inputs: ['Company', 'Git'],
     };
     expect(parse(env, frozen(['R', body]))).toEqual(['R', body]);
+  });
+
+  const withHint = (hint: unknown) => [
+    'R',
+    {
+      matches: [
+        [
+          'https://jira.example.com/browse/{}',
+          'https://jira.example.com/browse/{}',
+          'jira',
+          [],
+          hint,
+        ],
+      ],
+      inputs: ['browse'],
+    },
+  ];
+
+  it('§5 keeps hint.on when it names the destination', () => {
+    const hint = { argDelta: -1, on: 'destination', positions: [25, 26], score: 56 };
+    expect(parse(env, frozen(withHint(hint)))).toEqual(withHint(hint));
+  });
+
+  it('§5 reads a hint without on as a key match, as every R before destination search was', () => {
+    const parsed = parse(env, frozen(withHint({ argDelta: -1, positions: [0], score: 16 })));
+    expect(parsed).toEqual(withHint({ argDelta: -1, on: 'key', positions: [0], score: 16 }));
+  });
+
+  it('§5 rejects a hint whose on is neither key nor destination', () => {
+    const hint = { argDelta: -1, on: 'url', positions: [], score: 0 };
+    expect(parse(env, frozen(withHint(hint)))[0]).toBe('E');
   });
 
   it('§1 rejects a match without the template slot, or whose template is not a destination', () => {

@@ -1,5 +1,5 @@
 import { extendedMatch, Fzf } from 'fzf';
-import type { Dim, Target, TargetSet } from './types.ts';
+import type { Dim, Target, TargetSet, Template } from './types.ts';
 
 // dsl.md §5 — the matcher's evidence for one selected target: its score and the
 // ascending, deduplicated character indices matched within its key.
@@ -31,5 +31,35 @@ export const searchTargets = (targets: TargetSet, query: readonly Dim[]): Select
     .map((result) => ({
       target: result.item,
       score: result.score,
-      positions: [...result.positions].sort((a, b) => a - b),
+      positions: ascending(result.positions),
     }));
+
+// dsl.md §5 — the matcher's evidence for one variant whose raw template matched.
+export interface DestinationSelection {
+  readonly key: string;
+  readonly template: Template;
+  readonly score: number;
+  readonly positions: readonly number[];
+}
+
+// dsl.md §4.4 destination search — the same query, matched against each variant's raw template
+// on its own. Selections come back in target-set order, then variant order within a target.
+export const searchDestinations = (
+  targets: TargetSet,
+  query: readonly Dim[],
+): DestinationSelection[] =>
+  new Fzf(
+    Object.entries(targets).flatMap(([key, variants]) =>
+      variants.map((template) => [key, template] as const),
+    ),
+    { selector: ([, template]) => template, match: extendedMatch, sort: false },
+  )
+    .find(query.join(' '))
+    .map(({ item: [key, template], score, positions }) => ({
+      key,
+      template,
+      score,
+      positions: ascending(positions),
+    }));
+
+const ascending = (positions: Iterable<number>): number[] => [...positions].sort((a, b) => a - b);

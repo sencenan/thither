@@ -20,7 +20,7 @@ beforeEach(() => {
   root = app;
 });
 
-const exact: Hint = { argDelta: 0, positions: [], score: 0 };
+const exact: Hint = { argDelta: 0, on: 'key', positions: [], score: 0 };
 const match = (
   destination: string,
   template: string,
@@ -102,6 +102,50 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(destination?.textContent).toBe('https://example.com/thither/tree/{}');
     expect(texts('mark.argument', destination ?? root)).toEqual(['thither']);
     expect(texts('.placeholder', destination ?? root)).toEqual(['{}']);
+  });
+
+  it('a destination-search row marks its positions in the destination, and none in the key', () => {
+    render([
+      match(
+        'https://jira.example.com/browse/PROJ',
+        'https://jira.example.com/browse/{}',
+        'jira',
+        ['PROJ'],
+        { on: 'destination', positions: [25, 26, 27, 28, 29, 30], score: 152 },
+      ),
+    ]);
+
+    const destination = root.querySelector('.destination');
+    expect(destination?.textContent).toBe('https://jira.example.com/browse/PROJ');
+    expect(texts('mark.matched', destination ?? root)).toEqual(['browse']);
+    expect(texts('mark.argument', destination ?? root)).toEqual(['PROJ']);
+    expect(root.querySelectorAll('.key mark')).toHaveLength(0);
+  });
+
+  it('a key row marks its positions in the key, and none in the destination', () => {
+    render([
+      match('https://example.com/', 'https://example.com/', 'home', [], { positions: [0, 1] }),
+    ]);
+
+    expect(texts('.key mark')).toEqual(['ho']);
+    expect(root.querySelectorAll('.destination mark.matched')).toHaveLength(0);
+  });
+
+  it('the summary bar says when the result came from destination search', () => {
+    render([
+      match('https://jira.example.com', 'https://jira.example.com', 'jira', [], {
+        on: 'destination',
+        positions: [8, 9, 10, 11],
+      }),
+    ]);
+
+    expect(texts('footer .on-destination')).toEqual([' · on URL']);
+  });
+
+  it('the summary bar carries no destination note for key matches', () => {
+    render(numbered(2));
+
+    expect(root.querySelector('footer .on-destination')).toBeNull();
   });
 
   it.each([

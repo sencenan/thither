@@ -66,8 +66,12 @@ The variant of a selected target whose arity equals the number of supplied argum
 _Avoid_: Selected variant, default variant
 
 **Matching evidence**:
-The record of why a target matched, carried by every match: which characters of its key matched, and how strongly the target matched overall. It exists so a result can be explained without matching again, and it is not an instruction about how to display anything.
+The record of why a match was found, carried by every match: what was matched against (the key, or the variant's destination template), which of its characters matched, and how strongly. It exists so a result can be explained without matching again, and it is not an instruction about how to display anything.
 _Avoid_: Highlights, match metadata
+
+**Destination search**:
+The second pass of a search, run only when the query selects no target by key: the same query is matched against each variant's destination template instead. Its matches carry destination evidence and are never navigated to directly.
+_Avoid_: Fallback search, URL search
 
 **Match set**:
 A collection of matches, including those with missing arguments.

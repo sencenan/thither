@@ -142,3 +142,59 @@ describe('templateSpans ("rendering the match’s destination template with its 
     },
   );
 });
+
+// dsl.md §4.4 destination search: `hint.positions` index the raw template, `{}` included.
+describe('templateSpans with destination evidence ("Highlight those characters in the destination")', () => {
+  it.each([
+    [
+      'positions in the template text are marked',
+      'https://jira.example.com/browse/{}',
+      [],
+      [25, 26, 27, 28, 29, 30],
+      [
+        ['text', 'https://jira.example.com/'],
+        ['matched', 'browse'],
+        ['text', '/'],
+        ['placeholder', '{}'],
+      ],
+    ],
+    [
+      'positions after a filled slot index the raw template, not the rendered destination',
+      'https://q.example/{}/browse',
+      ['a-long-argument'],
+      [21, 22, 23, 24, 25, 26],
+      [
+        ['text', 'https://q.example/'],
+        ['argument', 'a-long-argument'],
+        ['text', '/'],
+        ['matched', 'browse'],
+      ],
+    ],
+    [
+      'a position inside a filled slot is not marked: the argument keeps its styling',
+      'https://example.com/{}',
+      ['x'],
+      [19, 20, 21],
+      [
+        ['text', 'https://example.com'],
+        ['matched', '/'],
+        ['argument', 'x'],
+      ],
+    ],
+    [
+      'a position inside an unfilled slot is not marked: the placeholder stays a placeholder',
+      'https://example.com/{}/tree',
+      [],
+      [20, 21, 23],
+      [
+        ['text', 'https://example.com/'],
+        ['placeholder', '{}'],
+        ['text', '/'],
+        ['matched', 't'],
+        ['text', 'ree'],
+      ],
+    ],
+  ])('%s', (_name, template, args, positions, spans) => {
+    expect(templateSpans(template, args, positions)).toEqual(spans);
+  });
+});

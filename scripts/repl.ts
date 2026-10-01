@@ -74,22 +74,27 @@ const showState = (value: StackValue | undefined): string => {
   ].join('\n');
 };
 
-// Highlight the matched positions inside the target's searchable string (dsl.md §5 evidence).
-const evidence = (key: string, positions: readonly number[]): string => {
+// Highlight the matched positions inside what they index (dsl.md §5 evidence): the key, or, for a
+// destination-search match, the variant's raw template.
+const evidence = (text: string, positions: readonly number[]): string => {
   const hit = new Set(positions);
-  return [...key].map((ch, i) => (hit.has(i) ? underline(ch) : dim(ch))).join('');
+  return [...text].map((ch, i) => (hit.has(i) ? underline(ch) : dim(ch))).join('');
 };
 
 const showMatch = (match: Match, i: number, unique: boolean): string => {
   const [dest, template, key, args, hint] = match;
   const complete = hint.argDelta >= 0;
   const marker = complete ? green('●') : yellow('○');
-  const nav = unique && complete ? green('  ← navigate') : '';
+  const nav = unique && complete && hint.on === 'key' ? green('  ← navigate') : '';
   const balance =
     hint.argDelta === 0 ? '' : dim(` argDelta ${hint.argDelta > 0 ? '+' : ''}${hint.argDelta}`);
   return [
     `  ${dim(String(i + 1))} ${marker} ${complete ? dest : yellow(dest)}${nav}`,
-    `      ${evidence(key, hint.positions)}${dim(`  score ${hint.score}`)}${balance}${
+    `      ${
+      hint.on === 'destination'
+        ? `${dim(key)}  ${evidence(template, hint.positions)}`
+        : evidence(key, hint.positions)
+    }${dim(`  score ${hint.score}`)}${balance}${
       args.length ? dim(`  args ${JSON.stringify(args)} into ${template}`) : ''
     }`,
   ].join('\n');
@@ -101,6 +106,9 @@ const showTop = (top: StackValue | undefined): void => {
     console.log(dim(`inputs ${JSON.stringify(inputs)}`));
     if (matches.length === 0) {
       console.log(yellow('  no matches'));
+    }
+    if (matches.some((m) => m[4].on === 'destination')) {
+      console.log(dim('  on URL'));
     }
     for (const [i, m] of matches.entries()) {
       console.log(showMatch(m, i, matches.length === 1));

@@ -1,6 +1,6 @@
 // dsl.md §4.4, §5 — .$: search with boundary inference, render arguments, order matches
 
-import { type Selection, searchTargets } from '../selector.ts';
+import { type Selection, searchDestinations, searchTargets } from '../selector.ts';
 import {
   type Dim,
   type Hint,
@@ -45,7 +45,8 @@ export const search: OpFn = (_interp, stack) => {
   return push(stack, resultFor(state, top[1]));
 };
 
-// dsl.md §4.4 — resolve L into matching inputs and arguments, then §5 render and order.
+// dsl.md §4.4 — resolve L into matching inputs and arguments, then §5 render and order. When no
+// key matches, destination search runs the same query against each variant's template instead.
 const resultFor = (state: State, literals: readonly Literal[]): Result => {
   const { targets, focus } = state[1];
   const { matching, args } = inferBoundary(literals, targets, focus);
@@ -53,25 +54,63 @@ const resultFor = (state: State, literals: readonly Literal[]): Result => {
   // §3 — focus then the explicit terms, in typed order: the query is fzf's, operators and all.
   const query = [...focus, ...matching.map(resolveEscape)];
 
-  // §5 (ADR 0013) — each selected target becomes a contiguous group of variant rows; groups are
-  // ordered by score descending, then by key length ascending (the shortest/exact key leads, since
-  // fzf's score ignores a key's unmatched tail), then by representative-destination length, and
-  // finally by target-set order (a stable sort over the selection order).
-  const groups = searchTargets(targets, query).map((selection) => {
-    const rows = orderVariants(matchesFor(selection, args));
-    return {
-      score: selection.score,
-      keyLength: selection.target[0].length,
-      destLength: representativeDest(rows).length,
-      rows,
-    };
-  });
-  const matches = [...groups]
+  const byKey = keyGroups(targets, query, args);
+  const groups = byKey.length > 0 ? byKey : destinationGroups(targets, query, args);
+
+  return ['R', { matches: order(groups), inputs: matching }];
+};
+
+// One selected target's rows, before ordering, and the score it ranks by.
+interface Group {
+  readonly key: string;
+  readonly score: number;
+  readonly rows: readonly Match[];
+}
+
+// §4.4 (ADR 0011) — a key-selected target yields one row per variant, all sharing its evidence.
+const keyGroups = (targets: TargetSet, query: readonly Dim[], args: readonly Literal[]): Group[] =>
+  searchTargets(targets, query).map(({ target: [key, variants], score, positions }) => ({
+    key,
+    score,
+    rows: variants.map((template) => toMatch(key, template, args, { on: 'key', positions, score })),
+  }));
+
+// §4.4 (ADR 0014) — destination search yields a row only for each variant whose template matched,
+// grouped by target in target-set order; the target ranks by its best variant's score.
+const destinationGroups = (
+  targets: TargetSet,
+  query: readonly Dim[],
+  args: readonly Literal[],
+): Group[] => {
+  const rowsByKey = new Map<string, Match[]>();
+  for (const { key, template, score, positions } of searchDestinations(targets, query)) {
+    const row = toMatch(key, template, args, { on: 'destination', positions, score });
+    rowsByKey.set(key, [...(rowsByKey.get(key) ?? []), row]);
+  }
+  return [...rowsByKey].map(([key, rows]) => ({
+    key,
+    score: Math.max(...rows.map((row) => row[4].score)),
+    rows,
+  }));
+};
+
+// §5 (ADR 0013) — each target becomes a contiguous run of variant rows; targets are ordered by
+// score descending, then by key length ascending (the shortest/exact key leads, since fzf's score
+// ignores a key's unmatched tail), then by representative-destination length, and finally by
+// target-set order (a stable sort over the selection order).
+const order = (groups: readonly Group[]): Match[] =>
+  groups
+    .map((group) => {
+      const rows = orderVariants(group.rows);
+      return {
+        score: group.score,
+        keyLength: group.key.length,
+        destLength: representativeDest(rows).length,
+        rows,
+      };
+    })
     .sort((a, b) => b.score - a.score || a.keyLength - b.keyLength || a.destLength - b.destLength)
     .flatMap((group) => group.rows);
-
-  return ['R', { matches, inputs: matching }];
-};
 
 interface Boundary {
   // Verbatim matching literals; original spelling doubles as R.inputs.
@@ -103,7 +142,8 @@ const inferBoundary = (
     length--;
   }
 
-  // No prefix matched anything: report the whole attempt as inputs, with no arguments.
+  // No prefix matched anything: every literal is matching input, for destination search too.
+  // `R.inputs` then reports the whole attempt, with no arguments.
   if (length === 0) {
     return { matching: literals, args: [] };
   }
@@ -129,32 +169,20 @@ const addsEvidence = (before: readonly Selection[], after: readonly Selection[])
   });
 };
 
-// dsl.md §4.4 (ADR 0011) — for one selected target, every variant yields a row. The best fit (a
-// variant whose arity equals the argument count) is not singled out here: it is simply the
+// dsl.md §5 — render the template and record the argument balance for one variant. The best fit
+// (a variant whose arity equals the argument count) is not singled out here: it is simply the
 // argDelta === 0 row, which orderVariants leads with and the client navigates to.
-const matchesFor = (selection: Selection, args: readonly Literal[]): Match[] => {
-  const [key, variants] = selection.target;
-  return variants.map((template) => toMatch(selection, key, template, args));
-};
-
-// dsl.md §5 — render the template and record the argument balance for one variant.
 // §2 — an escaped argument is *used* here, so one leading dot is removed before substitution;
 // `m.args` reports the same resolved spelling, while `R.inputs` keeps the accumulated form.
 const toMatch = (
-  selection: Selection,
   key: string,
   template: Template,
   args: readonly Literal[],
+  evidence: Omit<Hint, 'argDelta'>,
 ): Match => {
   const placeholders = arityOf(template);
   const applied = args.slice(0, Math.min(args.length, placeholders)).map(resolveEscape);
-
-  const hint: Hint = {
-    argDelta: args.length - placeholders,
-    positions: selection.positions,
-    score: selection.score,
-  };
-
+  const hint: Hint = { argDelta: args.length - placeholders, ...evidence };
   return [render(template, applied), template, key, applied, hint];
 };
 
