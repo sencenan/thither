@@ -146,6 +146,8 @@ export const createSettingsDialog = (
   interp: Interpreter,
   storage: StorageArea,
   onAction: () => void,
+  // The release tag the page was published from; absent in dev and local builds.
+  version?: string,
 ): SettingsDialog => {
   const dialog = doc.createElement('dialog');
   dialog.className = 'settings';
@@ -160,7 +162,14 @@ export const createSettingsDialog = (
   close.addEventListener('click', () => dialog.close());
 
   const header = doc.createElement('header');
-  header.append(title, close);
+  header.append(title);
+  if (version !== undefined) {
+    const versionTag = doc.createElement('span');
+    versionTag.className = 'version';
+    versionTag.textContent = version;
+    header.append(versionTag);
+  }
+  header.append(close);
 
   const historyHeading = doc.createElement('h3');
   historyHeading.textContent = 'History · newest first';
