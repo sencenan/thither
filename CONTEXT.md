@@ -91,6 +91,10 @@ The matches produced by a search together with the user-supplied dimensions used
 **State of the world**:
 The collection of available targets together with the current focus and the alias definitions.
 
+**Merge**:
+Combining two states of the world into one: their targets and alias definitions are united, the later state winning wherever both define a variant of the same arity or the same short form, and the focus is the later state's alone.
+_Avoid_: Union, combine, import
+
 **Focus**:
 Search terms stored exactly as typed and implicitly prepended to the search query; target-setting and removal never consult it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
 

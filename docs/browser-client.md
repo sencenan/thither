@@ -43,7 +43,7 @@ Once the fallback page is shown, remove the consumed input from the URL with `hi
 
 The core exposes an **interpreter**, built from an environment (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)):
 
-- `defaultEnv()`: an environment preloaded with the language's five operations (`.set`, `.rm`, `.@`, `.$`, `.alias`). A client may register further symbols on `env.symbols` before building the interpreter.
+- `defaultEnv()`: an environment preloaded with the language's six operations (`.set`, `.rm`, `.@`, `.$`, `.alias`, `.merge`). A client may register further symbols on `env.symbols` before building the interpreter.
 - `createInterpreter(env)`: bind an environment, producing an interpreter.
 - `emptyState()`: the state value with no targets, empty focus, and no alias definitions. `[emptyState()]` is the stack a client persists before its first execution.
 

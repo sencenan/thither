@@ -1,8 +1,7 @@
 // dsl.md §4.1 — .set: insert or update a target by exact key
 
-import type { LiteralArray, OpFn, State, Template, ThitherError } from '../types.ts';
+import type { LiteralArray, OpFn, State, ThitherError } from '../types.ts';
 import {
-  arityOf,
   isAlias,
   isOperatorTerm,
   isTemplate,
@@ -12,6 +11,7 @@ import {
   splitAtSeparator,
   takeOperands,
   thitherError,
+  upsertVariant,
 } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.set expects [.., S, L]');
@@ -63,13 +63,4 @@ const setTarget = (state: State, ls: LiteralArray): State | ThitherError => {
   const variants = existing === undefined ? [dest] : upsertVariant(existing, dest);
 
   return ['S', { targets: { ...targets, [key]: variants }, focus, alias }];
-};
-
-// §4.1 — a variant is addressed by arity: replace the same-arity variant when present, otherwise
-// add it, keeping the list in arity-ascending order.
-const upsertVariant = (variants: readonly Template[], dest: Template): Template[] => {
-  const arity = arityOf(dest);
-  return [...variants.filter((variant) => arityOf(variant) !== arity), dest].sort(
-    (a, b) => arityOf(a) - arityOf(b),
-  );
 };

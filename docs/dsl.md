@@ -59,7 +59,7 @@ Terminal rules take priority over the rest.
 | `[K]`, top is not `L` | `x` | `[K, [x]]` | Start a literal array; also applies to an empty stack. |
 | `[K]` | `S` | `[K, S]` | Push state separately. |
 | `[K]` | `R` | `[K, R]` | Push result and stop. |
-| `[K]` | `E` | `[K, E]` | Push an explicit error and stop without unwinding. |
+| `[K]` | `E` | `[K, E]` | Push an explicit error and stop; nothing is taken off the stack. |
 | `[K, S, L]` | `.set` | `[K, S']` | No target with the resulting key appends one; an existing target replaces or gains the variant of the destination's arity. |
 | `[K, S, L]` | `.rm` | `[K, S']` | Remove the target with the exact key, or with a separator only its variant of the arity the suffix length names; a multi-variant target without a separator, no explicit dimensions, or no such key is a no-op or error. |
 | `[K, S]` | `.rm` | `[K, S]` | No explicit dimensions: leave state unchanged. |
@@ -68,7 +68,8 @@ Terminal rules take priority over the rest.
 | `[K, S, L]` | `.$` | `[K, S, R]` | Search, render matches, and stop. |
 | `[K, S]` | `.$` | `[K, S, R]` | Search using focus alone; empty focus selects all targets. Stop. |
 | `[K, S, L]` | `.alias` | `[K, S']` or `[K, S', L']` | Define an alias: the last two literals of `L` are its short form and literal; the literals before them stay as `L'`. A separator in `L`, or a single literal, is an error. |
-| Any invalid stack or operands | Operation | Unwind, then push `E` | Preserve the nearest working state; see section 6. |
+| `[K, S1, S2]` | `.merge` | `[K, S']` | Merge `S2` into `S1`: targets and alias definitions united, `S2` winning conflicts; focus is `S2`'s. |
+| Any invalid stack or operands | Operation | Push what the operation puts back, then `E` | A failed operation never loses a state it took; see section 6. |
 
 Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or deduplicate `L`: that would destroy argument spelling, ordering, and the boundary inferred by search.
 
@@ -83,8 +84,8 @@ Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or dedu
 1. Build the program by appending parsed items in order. An unparsable item becomes an `E` value at that position; earlier items remain executable.
 2. The interpreter appends nothing. A host that wants a search to close every program appends the **operation** `.$` itself, along with any host operations of its own (see [ADR 0007](adr/0007-hosts-compose-the-program.md)). An escaped literal `..$` is not an operation.
 3. Start with an empty data stack and evaluate left to right.
-4. Stop when an `R` or explicit `E` reaches the top, discarding the rest of the program. Pushing an explicit `E` does not unwind the stack.
-5. Stop on a generated evaluation error after applying the unwinding of section 6.
+4. Stop when an `R` or explicit `E` reaches the top, discarding the rest of the program. Pushing an explicit `E` takes nothing off the stack.
+5. Stop on a generated evaluation error, leaving the stack as section 6 describes.
 
 `.$` may occur earlier in a valid program; its result terminates evaluation, so later values never execute. The specification describes the final stack, without prescribing a host-language return type.
 
@@ -106,6 +107,8 @@ Supported operations are:
 .rm     remove a target by exact key
 .@      replace or clear focus
 .$      search and produce a result
+.alias  define an alias
+.merge  merge two states into one
 ```
 
 Ordinary literals retain their spelling and order. URL literals and templates accumulate exactly like dimensions, so a URL-valued argument needs no escaping. A string token is trimmed; one that is empty after trimming, or still contains whitespace, is not a single literal and parses to `parse_error`. The core never splits it.
@@ -130,7 +133,7 @@ A leading `.~` escapes an alias the same way: the token is an ordinary literal k
 .~     -> literal .~     (resolves to ~)
 ```
 
-Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the five above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
+Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the six above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
 The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them: `.$` takes the suffix as arguments, `.rm` reads only its length, and `.set` and `.@` ignore it.
 
@@ -245,7 +248,7 @@ An empty explicit query searches on focus alone; empty focus with no explicit in
 
 ## 4. Operations
 
-Each operation except `.alias`, which takes no separator (section 4.5), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
+Each operation except `.alias`, which takes no separator (section 4.5), and `.merge`, which takes no literal array (section 4.6), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
 
 ### 4.1 `.set`
 
@@ -415,6 +418,32 @@ S gh . github .alias        missing_operand; [S, [gh, ., github], E]
 S ex ~gh .alias             missing_operand; [S, [ex, ~gh], E]
 ```
 
+### 4.6 `.merge`
+
+```text
+[K, S1, S2] | .merge -> [K, S']
+```
+
+Merge two states into one: `S2`, the top, into `S1`. `S'` holds:
+
+- **Targets**: every target of either state. A key only one state holds keeps its variants. A key both hold has `S1`'s variants with each of `S2`'s added as `.set` adds a destination (section 4.1): `S2`'s variant replaces `S1`'s of the same arity, the rest are kept, and the list stays in arity-ascending order.
+- **Target-set order**: `S1`'s targets keep their order, a key both hold included; `S2`'s other targets follow, in `S2`'s order.
+- **Focus**: `S2`'s, exactly as stored, even when empty. The two focuses are never combined.
+- **Alias definitions**: every definition of either state; `S2`'s wins a short form both define.
+
+With `S1` holding `jira: [https://jira.a.com, https://jira.a.com/browse/{}]` and `S2` holding `jira: [https://jira.b.com/{}, https://jira.b.com/{}/{}]`, `S'` holds `jira: [https://jira.a.com, https://jira.b.com/{}, https://jira.b.com/{}/{}]`.
+
+`.merge` takes no literal array and resolves no aliases. Both operands are valid states, so their merge is too, and `.merge` fails only on its operands: anything but two states on top of the stack is `missing_operand`. A state it took goes back beneath the error; a value that is not a state where one is expected stays where it is (section 6).
+
+```text
+S1 S2 .merge         [S']
+S .merge             [S, E]
+x S .merge           [[x], S, E]
+S1 x S2 .merge       [S1, [x], S2, E]
+S x .merge           [S, [x], E]
+S1 S2 x .merge       [S1, S2, [x], E]
+```
+
 ## 5. Arguments, rendering, and match ordering
 
 Rendering is per variant. Each anonymous `{}` in a variant requires one argument, in left-to-right order. Each supplied argument is one literal, preserving its original spelling and case. For a variant of arity `P` and `A` supplied arguments:
@@ -477,7 +506,7 @@ A direct-navigation candidate is a **single selected target** — every match in
 
 ## 6. Errors and state preservation
 
-An operation with no matching stack rule or a failed operand validation emits an evaluation error. An explicit `E` value is not such a failure: push it and stop without unwinding, so `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
+An operation with no matching stack rule or a failed operand validation emits an evaluation error. An explicit `E` value is not such a failure: push it and stop, taking nothing off the stack, so `[S, L]` followed by an explicit `E` becomes `[S, L, E]`.
 
 Every error carries a machine-readable `type` from this closed vocabulary, plus a human-readable `description`. The vocabulary is discriminated by **phase**: failures raised while parsing one item are `parse_error` or `missing_operation`, and the remaining types name failures raised while evaluating an operation.
 
@@ -487,7 +516,7 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
 | `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
 | `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax, or a `.set` or `.rm` literal array holds an alias (section 2). |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, or an `.alias` given a separator, a single literal, or a pair with a half starting with `~`. |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, an `.alias` given a separator, a single literal, or a pair with a half starting with `~`, or a `.merge` without two states on top of the stack. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.
@@ -503,18 +532,22 @@ https://example.com/{} git .set                 # no state anywhere on the stack
 
 Hosts display `type` and `description` without interpreting the type value. Adding a new `type` is a specification change, not an implementation detail. A supplied `E` must carry a `type` drawn from this vocabulary and a string `description`; unlike a generated error it may also carry extra diagnostic fields, which are preserved. An `E` whose `type` falls outside the vocabulary fails validation and parses to `parse_error`, so an error produced by another version does not round-trip unchanged.
 
-### Unwinding
+### Taking operands
 
-On a generated evaluation error, pop stack elements until the nearest valid `S` reaches the top or the stack empties, preserve that `S` and everything below it, push `E`, and stop. Unwinding does not inspect or rewrite values below the retained state.
+An operation takes its operands off the top of the stack, matching each value, top down, against the operand it expects in that exact position. A value that fits is consumed. Taking stops at the first value that does not fit, which stays where it is, as does everything beneath it; nothing beneath the taken values is inspected or rewritten.
+
+On a generated evaluation error, whether its operands did not all fit or the ones it took failed validation, the operation decides which of the values it took to put back beneath the `E`, then pushes `E` and stops. Usually it puts back nothing, and the consumed values are dropped. An operation that took a state may put it back, and every operation of this specification puts back, unchanged, any state it took, so none of them loses a state by failing. An operation may say it puts back more, as `.alias` keeps its `L` when given a separator (section 4.5).
 
 ```text
-[S0, L0, S1, L1] -> [S0, L0, S1, E]
-[L]              -> [E]
+[S0, L0, S1, L1] | .set (invalid destination) -> [S0, L0, S1, E]   L1 dropped, S1 put back
+[L]              | .set                       -> [E]               L taken, no S beneath it
+[S, L]           | .merge                     -> [S, L, E]         L does not fit and stays
+[S1, L, S2]      | .merge                     -> [S1, L, S2, E]    S2 taken, then put back
 ```
 
-Operations must preserve their input state until they have succeeded: a `.set` whose destination fails validation must not consume or partially modify `S` before emitting its error.
+A state is put back exactly as it was taken: a `.set` whose destination fails validation must not partially modify `S` before emitting its error.
 
-Earlier successful operations are **not rolled back**. The retained state is the nearest working state at the point of failure, not the initial state. Suppose the original focus is `[personal]`:
+Earlier successful operations are **not rolled back**. The state put back is the working state at the point of failure, not the initial state. Suppose the original focus is `[personal]`:
 
 ```text
 S company .@ .@ example.com/{} git .set
@@ -522,7 +555,7 @@ S company .@ .@ example.com/{} git .set
 
 The first `.@` sets focus, the second clears it, and `.set` then fails with `invalid_destination` because `example.com/{}` has no scheme. The error stack retains the state with cleared focus.
 
-A parse failure behaves like any other `E` in the stream: items before it have already executed, and pushing it stops evaluation without unwinding. A program whose first item is unparsable evaluates to `[E]`.
+A parse failure behaves like any other `E` in the stream: items before it have already executed, and pushing it stops evaluation, taking nothing off the stack. A program whose first item is unparsable evaluates to `[E]`.
 
 ## 7. Worked programs
 

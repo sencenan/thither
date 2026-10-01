@@ -1,5 +1,5 @@
 // dsl.md §6 — operations take their operands off the top of the stack: what fits is consumed, the
-// first value that does not is put back, and the caller decides whether to push the error.
+// first value that does not is put back, and the caller decides what to push back with the error.
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { LiteralArray, Result, Stack, State, ThitherError } from '../types.ts';
@@ -12,7 +12,11 @@ const s1: State = ['S', { targets: { git: ['https://github.com/'] }, focus: [], 
 const l: LiteralArray = ['L', ['git']];
 const r: Result = ['R', { matches: [], inputs: [], args: [] }];
 const e: ThitherError = ['E', { type: 'unknown_error', description: 'x' }];
-const unmatched = ['unmatched', ['E', expect.objectContaining({ type: 'missing_operand' })]];
+const unmatched = (...consumed: Stack) => [
+  'unmatched',
+  ['E', expect.objectContaining({ type: 'missing_operand' })],
+  consumed,
+];
 
 describe('takeOperands', () => {
   it.each<[string, Stack, readonly Sigil[], unknown, Stack]>([
@@ -25,19 +29,33 @@ describe('takeOperands', () => {
       [s0],
     ],
     ['§6 [.., S] takes the S alone', [s0], ['S'], ['matched', [s0]], []],
-    ['§6 an empty stack takes nothing', [], ['S', 'L'], unmatched, []],
-    ['§6 a top that does not fit is put back', [s0], ['S', 'L'], unmatched, [s0]],
-    ['§6 [L] takes the L, then finds no S: [L] -> [E]', [l], ['S', 'L'], unmatched, []],
+    ['§6 an empty stack takes nothing', [], ['S', 'L'], unmatched(), []],
+    ['§6 a top that does not fit is put back', [s0], ['S', 'L'], unmatched(), [s0]],
+    ['§6 [L] takes the L, then finds no S: [L] -> [E]', [l], ['S', 'L'], unmatched(l), []],
     [
       '§6 a consumed L stays consumed when the S beneath is missing',
       [l, l],
       ['S', 'L'],
-      unmatched,
+      unmatched(l),
       [l],
     ],
-    ['§1 a sealing R on top is put back', [s0, r], ['S', 'L'], unmatched, [s0, r]],
-    ['§1 a sealing E on top is put back', [s0, e], ['S'], unmatched, [s0, e]],
-    ['§1 an R under the L is put back', [r, l], ['S', 'L'], unmatched, [r]],
+    [
+      '§6 a consumed S is reported, so the operation can put it back',
+      [l, s0],
+      ['S', 'S'],
+      unmatched(s0),
+      [l],
+    ],
+    [
+      '§6 consumed values are reported bottom first, the order of matched operands',
+      [s0, s1],
+      ['L', 'S', 'S'],
+      unmatched(s0, s1),
+      [],
+    ],
+    ['§1 a sealing R on top is put back', [s0, r], ['S', 'L'], unmatched(), [s0, r]],
+    ['§1 a sealing E on top is put back', [s0, e], ['S'], unmatched(), [s0, e]],
+    ['§1 an R under the L is put back', [r, l], ['S', 'L'], unmatched(l), [r]],
     [
       'a pattern may expect an E: the E is matched, not mistaken for a failure',
       [e],
@@ -56,6 +74,7 @@ describe('takeOperands', () => {
     expect(takeOperands([], ['S', 'L'])).toEqual([
       'unmatched',
       ['E', { type: 'missing_operand', description: 'expected [.., S, L]' }],
+      [],
     ]);
   });
 
