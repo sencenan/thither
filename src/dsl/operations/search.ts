@@ -151,6 +151,7 @@ const toMatch = (
 
   const hint: Hint = {
     argDelta: args.length - placeholders,
+    on: 'key',
     positions: selection.positions,
     score: selection.score,
   };

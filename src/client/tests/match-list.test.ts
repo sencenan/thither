@@ -20,7 +20,7 @@ beforeEach(() => {
   root = app;
 });
 
-const exact: Hint = { argDelta: 0, positions: [], score: 0 };
+const exact: Hint = { argDelta: 0, on: 'key', positions: [], score: 0 };
 const match = (
   destination: string,
   template: string,

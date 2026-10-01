@@ -38,7 +38,7 @@ const match = (argDelta: number, key = 'home', dest = 'https://example.com/'): M
   dest,
   key,
   [],
-  { argDelta, positions: [], score: 1 },
+  { argDelta, on: 'key', positions: [], score: 1 },
 ];
 
 const register = (over: Partial<OutputRegister>): OutputRegister => ({
