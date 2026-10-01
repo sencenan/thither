@@ -47,6 +47,46 @@ export const push = (stack: Stack, value: StackValue): Stack => {
   }
 };
 
+type Sigil = StackValue[0];
+type ValueOf<K extends Sigil> = Extract<StackValue, readonly [K, unknown]>;
+
+// Written bottom to top, the way dsl.md notates a stack: ['S', 'L'] is [.., S, L].
+export type Operands<P extends readonly Sigil[]> = {
+  readonly [I in keyof P]: P[I] extends Sigil ? ValueOf<P[I]> : never;
+};
+
+// The match is tagged rather than told apart from the error by shape, so a pattern may itself
+// expect an E operand.
+export type Taken<P extends readonly Sigil[]> =
+  | readonly ['matched', Operands<P>]
+  | readonly ['unmatched', ThitherError];
+
+// dsl.md §6 — take an operation's operands off the top of the stack, matching `pattern` from the
+// top down. Every value that fits is consumed; the first that does not is put back and the match
+// fails with `missing_operand`, the values already taken staying consumed. Pushing the error is
+// left to the caller, which may try another pattern first: try longer patterns first, since a
+// pattern that is the top of another would otherwise always win. On a sealed stack the R or E
+// is put back, so the caller's push of the error is absorbed by `push`.
+export function takeOperands<const P extends readonly Sigil[]>(stack: Stack, pattern: P): Taken<P>;
+export function takeOperands(stack: Stack, pattern: readonly Sigil[]): Taken<readonly Sigil[]> {
+  const taken: StackValue[] = [];
+  for (let index = pattern.length - 1; index >= 0; index--) {
+    const value = stack.pop();
+    if (value === undefined) {
+      return ['unmatched', missingOperands(pattern)];
+    }
+    if (value[0] !== pattern[index]) {
+      stack.push(value);
+      return ['unmatched', missingOperands(pattern)];
+    }
+    taken.unshift(value);
+  }
+  return ['matched', taken];
+}
+
+const missingOperands = (pattern: readonly Sigil[]): ThitherError =>
+  thitherError('missing_operand', `expected [.., ${pattern.join(', ')}]`);
+
 // The core omits the DOM lib, which drops `URL`'s type with it; see
 // docs/code-standards.md "Layout" on universal platform globals.
 declare const URL: { parse(url: string): unknown | null };

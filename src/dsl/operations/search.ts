@@ -13,36 +13,32 @@ import {
   type TargetSet,
   type Template,
 } from '../types.ts';
-import { arityOf, push, resolveEscape, splitAtSeparator, thitherError } from '../utils.ts';
+import {
+  arityOf,
+  push,
+  resolveEscape,
+  splitAtSeparator,
+  takeOperands,
+  thitherError,
+} from '../utils.ts';
 
 const missingOperand = thitherError('missing_operand', '.$ expects [.., S, L] or [.., S]');
 
+// The state stays under the result: [K, S, L] -> [K, S, R] and [K, S] -> [K, S, R].
 export const search: OpFn = (_interp, stack) => {
-  const top = stack.pop();
+  const [matched, operands] = takeOperands(stack, ['S', 'L']);
+  if (matched === 'matched') {
+    const [state, ls] = operands;
+    return push(push(stack, state), resultFor(state, ls[1]));
+  }
 
-  if (!top) {
+  // Searching on focus alone.
+  const [bareMatched, bare] = takeOperands(stack, ['S']);
+  if (bareMatched === 'unmatched') {
     return push(stack, missingOperand);
   }
-
-  // [K, S] | .$ -> [K, S, R]: search on focus alone.
-  if (top[0] === 'S') {
-    push(stack, top);
-    return push(stack, resultFor(top, []));
-  }
-
-  // Not a shape .$ consumes: put it back untouched and fail.
-  if (top[0] !== 'L') {
-    push(stack, top);
-    return push(stack, missingOperand);
-  }
-
-  // [K, S, L] | .$ -> [K, S, R]: the state stays, the literal array is consumed.
-  const state = stack[stack.length - 1];
-  if (state?.[0] !== 'S') {
-    return push(stack, missingOperand);
-  }
-
-  return push(stack, resultFor(state, top[1]));
+  const [state] = bare;
+  return push(push(stack, state), resultFor(state, []));
 };
 
 // dsl.md §4.4 — resolve L into matching inputs and arguments, then §5 render and order. When no
