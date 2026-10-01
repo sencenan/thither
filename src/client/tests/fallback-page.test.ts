@@ -338,6 +338,26 @@ describe('a completed mutation empties the field ("a program ending in `.set` or
     expect(field.value).toBe('');
   });
 
+  it('a live .alias that ran to its search clears the field, like .set, .rm, and .@', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'h home .alias');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual(['https://example.com/']);
+  });
+
+  it('an .alias that errored keeps its text, so it can be corrected', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'h .alias');
+    vi.advanceTimersByTime(60);
+
+    expect(field.value).toBe('h .alias');
+    expect(root.textContent).toContain('missing_operand');
+  });
+
   it.each([
     ['a search', 'home'],
     ['a mutation followed by a search', 'https://example.com/ home .set home'],

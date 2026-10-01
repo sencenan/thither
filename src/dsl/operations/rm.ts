@@ -10,6 +10,7 @@ import {
 } from '../types.ts';
 import {
   arityOf,
+  isAlias,
   isOperatorTerm,
   keyOf,
   push,
@@ -36,6 +37,15 @@ export const rm: OpFn = (_interp, stack) => {
 };
 
 const removeTarget = (state: State, ls: LiteralArray): State | ThitherError => {
+  // §4.2 — .rm does not resolve aliases, so any alias in L is refused outright.
+  const typedAlias = ls[1].find(isAlias);
+  if (typedAlias !== undefined) {
+    return thitherError(
+      'invalid_dimension',
+      `${typedAlias} is an alias; .rm does not resolve aliases`,
+    );
+  }
+
   const [matching, suffix] = splitAtSeparator(ls[1]);
   const explicit = matching.map(resolveEscape);
   // §4.2 — an empty matching portion never authorizes removal, regardless of focus.

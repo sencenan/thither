@@ -1,6 +1,6 @@
-// dsl.md §4.5 — .alias: store an alias in the state
+// dsl.md §4.5 — .alias: store an alias definition in the state
 
-import { type OpFn, SEP } from '../types.ts';
+import { ALIAS, type OpFn, SEP } from '../types.ts';
 import { push, takeOperands, thitherError } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.alias expects [.., S, L]');
@@ -28,8 +28,18 @@ export const alias: OpFn = (_interp, stack) => {
     return push(stack, thitherError('missing_operand', '.alias needs a short form and a literal'));
   }
 
+  // §4.5 — neither half may start with `~`: a definition's literal is never itself an alias. Like the
+  // separator, this fails before anything is consumed.
+  if (short.startsWith(ALIAS) || literal.startsWith(ALIAS)) {
+    push(push(stack, state), ls);
+    return push(
+      stack,
+      thitherError('missing_operand', `.alias short form and literal cannot start with ${ALIAS}`),
+    );
+  }
+
   // §4.5 — the short form is lowercased, otherwise both are kept exactly as accumulated.
-  const aliases = { ...state[1].alias, [short.toLowerCase()]: literal };
-  push(stack, ['S', { ...state[1], alias: aliases }]);
+  const definitions = { ...state[1].alias, [short.toLowerCase()]: literal };
+  push(stack, ['S', { ...state[1], alias: definitions }]);
   return rest.length > 0 ? push(stack, ['L', rest]) : stack;
 };

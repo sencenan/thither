@@ -1,4 +1,6 @@
 import {
+  ALIAS,
+  ALIAS_ESCAPE,
   type Dim,
   type ErrorType,
   type Literal,
@@ -125,7 +127,6 @@ export const splitAtSeparator = (
     : [literals.slice(0, separator), literals.slice(separator + 1)];
 };
 
-// dsl.md §2 — one leading dot is removed when an escaped literal is used
 // dsl.md §3 — fzf's extended-search operators, mirrored from the library's `parseTerms`: a
 // standalone `|` is OR; a leading `!`, `'` or `^` and a trailing `$` (on anything but a bare `$`)
 // decorate a term. Stripping them the way fzf does leaves the text the term matches on.
@@ -150,5 +151,24 @@ export const isOperatorTerm = (term: string): boolean =>
 export const isOperatorOnly = (term: string): boolean =>
   term !== OR_TERM && stripOperators(term).length === 0;
 
+// dsl.md §2 — one leading dot is removed when an escaped literal is used
 export const resolveEscape = (literal: Literal): Dim =>
-  literal.startsWith(SEP_ESCAPE) ? literal.slice(1) : literal;
+  literal.startsWith(SEP_ESCAPE) || literal.startsWith(ALIAS_ESCAPE) ? literal.slice(1) : literal;
+
+// dsl.md §2 — an alias is `~` followed by a short form; a bare `~` has none and is plain text.
+export const isAlias = (literal: Literal): boolean =>
+  literal.startsWith(ALIAS) && literal.length > ALIAS.length;
+
+// dsl.md §2 — replace each alias that has a definition with the definition's literal, once: that
+// literal is not itself resolved again. An alias with no definition stays as typed. Own keys only,
+// so `~constructor` cannot reach Object.prototype.
+export const resolveAliases = (state: State, literals: readonly Literal[]): Literal[] => {
+  const { alias } = state[1];
+  return literals.map((literal) => {
+    if (!isAlias(literal)) {
+      return literal;
+    }
+    const short = literal.slice(ALIAS.length).toLowerCase();
+    return Object.hasOwn(alias, short) ? (alias[short] ?? literal) : literal;
+  });
+};

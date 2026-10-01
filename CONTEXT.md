@@ -85,14 +85,19 @@ The matches produced by a search together with the user-supplied dimensions used
 ### State and focus
 
 **State of the world**:
-The collection of available targets together with the current focus and the aliases.
+The collection of available targets together with the current focus and the alias definitions.
 
 **Focus**:
 Search terms stored exactly as typed and implicitly prepended to the search query; target-setting and removal never consult it. Focus supplies matching context, not an exact namespace or access-control boundary, and since it is only ever search input it may carry search operators and is never normalized.
 
 **Alias**:
-A short literal that stands for another literal wherever it is typed: as search input, a dimension, or an argument. Aliases are part of the state of the world, keyed by their lowercased short form.
-_Avoid_: Constant, macro, shortcut
+A literal written as `~` followed by a short form, standing for the literal its alias definition gives when typed in focus-setting or search, whether as a search term or an argument; never in target-setting or removal. An alias with no definition is an ordinary literal.
+_Avoid_: Alias reference, variable, macro
+
+**Alias definition**:
+A short form paired with the literal its alias stands for, part of the state of the world, at most one for each lowercased short form.
+_Avoid_: Constant, shortcut
+
 
 ### Navigation
 

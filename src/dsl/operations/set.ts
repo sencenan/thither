@@ -3,6 +3,7 @@
 import type { LiteralArray, OpFn, State, Template, ThitherError } from '../types.ts';
 import {
   arityOf,
+  isAlias,
   isOperatorTerm,
   isTemplate,
   keyOf,
@@ -28,6 +29,15 @@ export const set: OpFn = (_interp, stack) => {
 };
 
 const setTarget = (state: State, ls: LiteralArray): State | ThitherError => {
+  // §4.1 — .set does not resolve aliases, so any alias in L is refused outright.
+  const typedAlias = ls[1].find(isAlias);
+  if (typedAlias !== undefined) {
+    return thitherError(
+      'invalid_dimension',
+      `${typedAlias} is an alias; .set does not resolve aliases`,
+    );
+  }
+
   const [dest, ...dims] = ls[1];
   if (!dest || !isTemplate(dest)) {
     return thitherError('invalid_destination', `${dest} is not a valid URL`);

@@ -1,4 +1,4 @@
-// dsl.md §4.5 — .alias: store an alias in the state
+// dsl.md §4.5 — .alias: store an alias definition in the state
 
 import { describe, expect, it } from 'vitest';
 import { defaultEnv } from '../../env.ts';
@@ -26,7 +26,7 @@ const cases: readonly Case[] = [
     [state(three, [], { gh: 'github', doc: 'docs' })],
   ],
   [
-    '§4.5 targets, focus, and the other aliases are left as they were',
+    '§4.5 targets, focus, and the other alias definitions are left as they were',
     [state(three, ['company'], { doc: 'docs' }), 'gh', 'github', '.alias'],
     [state(three, ['company'], { doc: 'docs', gh: 'github' })],
   ],
@@ -68,6 +68,26 @@ const cases: readonly Case[] = [
     '§4.5 a leading separator fails the same way',
     [state(three), '.', 'gh', 'github', '.alias'],
     [state(three), ['L', ['.', 'gh', 'github']], error('missing_operand')],
+  ],
+  [
+    '§4.5 a short form starting with ~ fails before anything is consumed',
+    [state(three), 'x', '~gh', 'github', '.alias'],
+    [state(three), ['L', ['x', '~gh', 'github']], error('missing_operand')],
+  ],
+  [
+    '§4.5 a literal starting with ~ fails the same way: a defined literal is never itself an alias',
+    [state(three), 'ex', '~gh', '.alias'],
+    [state(three), ['L', ['ex', '~gh']], error('missing_operand')],
+  ],
+  [
+    '§4.5 a bare ~ counts too',
+    [state(three), 'ex', '~', '.alias'],
+    [state(three), ['L', ['ex', '~']], error('missing_operand')],
+  ],
+  [
+    '§4.5 an escaped .~x does not start with ~, so it may be either half',
+    [state(three), '.~a', '.~b', '.alias'],
+    [state(three, [], { '.~a': '.~b' })],
   ],
   [
     '§6 [S] .alias has no literal array',

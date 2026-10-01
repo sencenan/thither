@@ -5,6 +5,8 @@ export type Template = string;
 
 export const SEP = '.' as const;
 export const SEP_ESCAPE = '..';
+export const ALIAS = '~';
+export const ALIAS_ESCAPE = '.~';
 export type Separator = typeof SEP;
 
 export type Op = string;

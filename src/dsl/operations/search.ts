@@ -16,6 +16,7 @@ import {
 import {
   arityOf,
   push,
+  resolveAliases,
   resolveEscape,
   splitAtSeparator,
   takeOperands,
@@ -29,7 +30,7 @@ export const search: OpFn = (_interp, stack) => {
   const [matched, operands] = takeOperands(stack, ['S', 'L']);
   if (matched === 'matched') {
     const [state, ls] = operands;
-    return push(push(stack, state), resultFor(state, ls[1]));
+    return push(push(stack, state), resultFor(state, resolveAliases(state, ls[1])));
   }
 
   // Searching on focus alone.
@@ -109,7 +110,7 @@ const order = (groups: readonly Group[]): Match[] =>
     .flatMap((group) => group.rows);
 
 interface Boundary {
-  // Verbatim matching literals; original spelling doubles as R.inputs.
+  // Matching literals as accumulated, after alias resolution; their spelling doubles as R.inputs.
   readonly matching: readonly Literal[];
   // Arguments in accumulated form; escapes are resolved at rendering, spelling and case kept.
   readonly args: readonly Literal[];

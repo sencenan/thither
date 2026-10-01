@@ -41,6 +41,16 @@ describe('parse — string tokens (dsl.md §2)', () => {
     expect(token[1]).toMatchObject({ type: 'missing_operation' });
   });
 
+  it('§2 an escaped .~ token is a literal, not an operation, kept as accumulated', () => {
+    expect(parse(env, '.~gh')).toEqual(['l', '.~gh']);
+    expect(parse(env, '.~')).toEqual(['l', '.~']);
+  });
+
+  it('§2 an alias parses as an ordinary literal; operations resolve it', () => {
+    expect(parse(env, '~gh')).toEqual(['l', '~gh']);
+    expect(parse(env, '~')).toEqual(['l', '~']);
+  });
+
   it('§1 an ordinary literal keeps its original spelling and case', () => {
     expect(parse(env, 'Company')).toEqual(['l', 'Company']);
     expect(parse(env, 'MyRepo')).toEqual(['l', 'MyRepo']);
@@ -228,6 +238,19 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
     expect(token).toEqual(['S', { targets: {}, focus: ['company'], alias: { gh: 'git' } }]);
   });
 
+  it('§2 an escaped literal is a valid defined literal: .~x does not start with ~', () => {
+    const token = parse(env, frozen(['S', { alias: { ex: '.~gh' } }]));
+    expect(token).toEqual(['S', { targets: {}, focus: [], alias: { ex: '.~gh' } }]);
+  });
+
+  it('§2/§4.1 a target key may carry a dimension starting with ~, as an escaped .set stores it', () => {
+    const token = parse(env, frozen(['S', { targets: { '~x': ['https://x.example/'] } }]));
+    expect(token).toEqual([
+      'S',
+      { targets: { '~x': ['https://x.example/'] }, focus: [], alias: {} },
+    ]);
+  });
+
   it('§2 an unknown field on the S envelope makes the state invalid', () => {
     const token = parse(env, frozen(['S', { targets: {}, focus: [], note: 'x' }]));
     expect(token).toEqual([
@@ -241,7 +264,13 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
     ['null', null],
     ['a string', 'gh'],
     ['a non-string value', { gh: 1 }],
-  ])('§2 an alias map that is %s makes the state invalid', (_name, alias) => {
+    ['a short form starting with ~', { '~gh': 'github' }],
+    ['a literal starting with ~', { ex: '~gh' }],
+    ['a bare ~ literal', { ex: '~' }],
+    ['an empty short form', { '': 'github' }],
+    ['a separator literal', { gh: '.' }],
+    ['a whitespace-bearing literal', { gh: 'git hub' }],
+  ])('§2 alias definitions given as %s make the state invalid', (_name, alias) => {
     const token = parse(env, frozen(['S', { targets: {}, focus: [], alias }]));
     expect(token[0]).toBe('E');
     expect(token[1]).toMatchObject({ type: 'parse_error' });

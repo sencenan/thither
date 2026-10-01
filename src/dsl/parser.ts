@@ -1,4 +1,6 @@
 import {
+  ALIAS,
+  ALIAS_ESCAPE,
   type Dim,
   type ErrorType,
   ErrorTypes,
@@ -88,7 +90,7 @@ const parseState = (raw: unknown): Token => {
   }
 
   const { targets = {}, focus = [], alias = {} } = raw;
-  if (!isRecord(targets) || !isFocusList(focus) || !isAliasMap(alias)) {
+  if (!isRecord(targets) || !isFocusList(focus) || !isAliasDefinitions(alias)) {
     return createParseError('malformed State');
   }
 
@@ -218,9 +220,19 @@ const isFocusList = (value: unknown): value is Dim[] => {
   );
 };
 
-const isAliasMap = (value: unknown): value is Record<string, string> => {
-  return isRecord(value) && Object.values(value).every((it) => typeof it === 'string');
+// dsl.md §2 — alias definitions hold what .alias could have stored: each short form and literal a
+// single literal (non-empty, whitespace-free, not the separator) that does not start with `~`.
+const isAliasDefinitions = (value: unknown): value is Record<string, string> => {
+  return (
+    isRecord(value) &&
+    Object.entries(value).every(([short, literal]) => {
+      return typeof literal === 'string' && isAliasLiteral(short) && isAliasLiteral(literal);
+    })
+  );
 };
+
+const isAliasLiteral = (value: string): boolean =>
+  value.length > 0 && !/\s/.test(value) && !isSeparator(value) && !value.startsWith(ALIAS);
 
 const isStringArray = (value: unknown): value is string[] => {
   return Array.isArray(value) && value.every((member) => typeof member === 'string');
@@ -244,7 +256,12 @@ const isDimList = (value: unknown): value is Literal[] => {
 };
 
 const isOp = (value: string): value is Op => {
-  return value.startsWith(SEP) && !value.startsWith(SEP_ESCAPE) && !isSeparator(value);
+  return (
+    value.startsWith(SEP) &&
+    !value.startsWith(SEP_ESCAPE) &&
+    !value.startsWith(ALIAS_ESCAPE) &&
+    !isSeparator(value)
+  );
 };
 
 const isErrorType = (value: unknown): value is ErrorType => {

@@ -3,7 +3,7 @@
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { LiteralArray, Result, Stack, State, ThitherError } from '../types.ts';
-import { emptyState, takeOperands } from '../utils.ts';
+import { emptyState, resolveAliases, resolveEscape, takeOperands } from '../utils.ts';
 
 type Sigil = Stack[number][0];
 
@@ -68,5 +68,49 @@ describe('takeOperands', () => {
     const [state, error] = operands;
     expectTypeOf(state).toEqualTypeOf<State>();
     expectTypeOf(error).toEqualTypeOf<ThitherError>();
+  });
+});
+
+describe('resolveAliases', () => {
+  const aliased: State = [
+    'S',
+    { targets: {}, focus: [], alias: { gh: 'github', dot: '..set', re: '~gh' } },
+  ];
+
+  it.each<[string, readonly string[], readonly string[]]>([
+    ['§2 an alias with a definition becomes the defined literal', ['~gh'], ['github']],
+    ['§2 the short form is looked up lowercased', ['~GH'], ['github']],
+    ['§2 an alias with no definition stays as typed, case included', ['~Zz'], ['~Zz']],
+    ['§2 a bare ~ is not an alias', ['~'], ['~']],
+    ['§2 an escaped .~gh is not an alias', ['.~gh'], ['.~gh']],
+    ['§2 the literal is not resolved again: its escape is kept', ['~dot'], ['..set']],
+    [
+      '§2 resolution is one level, even for a defined literal that looks like an alias',
+      ['~re'],
+      ['~gh'],
+    ],
+    [
+      '§2 only aliases change; order and other literals are kept',
+      ['a', '~gh', '.', 'b'],
+      ['a', 'github', '.', 'b'],
+    ],
+    [
+      '§2 an inherited Object property is not a definition',
+      ['~constructor', '~__proto__'],
+      ['~constructor', '~__proto__'],
+    ],
+  ])('%s', (_name, literals, resolved) => {
+    expect(resolveAliases(aliased, literals)).toEqual(resolved);
+  });
+});
+
+describe('resolveEscape', () => {
+  it.each([
+    ['§2 ..x is the text .x', '..x', '.x'],
+    ['§2 .~x is the text ~x', '.~x', '~x'],
+    ['§2 .~ is the text ~', '.~', '~'],
+    ['§2 an unescaped literal is unchanged', '~x', '~x'],
+  ])('%s', (_name, literal, text) => {
+    expect(resolveEscape(literal)).toBe(text);
   });
 });

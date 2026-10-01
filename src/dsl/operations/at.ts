@@ -1,7 +1,7 @@
 // dsl.md §4.3 — .@: replace or clear focus
 
 import type { Dim, OpFn, State } from '../types.ts';
-import { push, splitAtSeparator, takeOperands, thitherError } from '../utils.ts';
+import { push, resolveAliases, splitAtSeparator, takeOperands, thitherError } from '../utils.ts';
 
 const unexpectedStackError = thitherError('missing_operand', '.@ expects [.., S, L] or [.., S]');
 
@@ -11,8 +11,9 @@ export const at: OpFn = (_interp, stack) => {
     const [state, ls] = operands;
     // §4.3/§3 — focus is the matching portion exactly as accumulated: no normalization, escapes
     // resolved only on use, and operators are legal because focus is only ever a search prefix.
+    // Aliases are resolved before it is stored, so focus never holds one.
     const [matching] = splitAtSeparator(ls[1]);
-    return push(stack, withFocus(state, [...matching]));
+    return push(stack, withFocus(state, resolveAliases(state, matching)));
   }
 
   const [bareMatched, bare] = takeOperands(stack, ['S']);
