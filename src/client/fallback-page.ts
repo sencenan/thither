@@ -41,6 +41,8 @@ export const mountFallbackPage = (
   interp: Interpreter,
   env: BrowserEnv,
   storage: StorageArea,
+  // The release tag the page was published from, shown in Settings; absent in dev and local builds.
+  version?: string,
 ): FallbackPage => {
   const doc = root.ownerDocument;
 
@@ -157,7 +159,7 @@ export const mountFallbackPage = (
 
   // browser-client.md "Fallback UI and settings" — after an action the dialog has closed and the
   // page re-runs the field's contents, so the list reflects the new current stack.
-  const settings = createSettingsDialog(doc, interp, storage, refresh);
+  const settings = createSettingsDialog(doc, interp, storage, refresh, version);
   settingsControl.addEventListener('click', () => {
     settings.open();
   });

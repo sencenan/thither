@@ -17,6 +17,10 @@ import { renderBareError } from './output.ts';
 import { isNontrivial } from './program.ts';
 import { load, run } from './run.ts';
 
+// The release tag, or null outside a tag build; vite.config.ts `define`s it at build time.
+declare const __THITHER_VERSION__: string | null;
+const version = __THITHER_VERSION__ ?? 'dev';
+
 const root = document.querySelector('#app');
 
 if (root !== null) {
@@ -29,7 +33,7 @@ if (root !== null) {
     if (isNontrivial(interp, env.input)) {
       load(interp);
       history.replaceState(null, '', stripInput(location.href));
-      mountFallbackPage(root, interp, env, localStorage);
+      mountFallbackPage(root, interp, env, localStorage, version);
       return;
     }
 
@@ -39,7 +43,7 @@ if (root !== null) {
       .then((destination) => location.replace(destination))
       .catch(() => {
         history.replaceState(null, '', stripInput(location.href));
-        mountFallbackPage(root, interp, env, localStorage);
+        mountFallbackPage(root, interp, env, localStorage, version);
       });
   };
 

@@ -345,3 +345,24 @@ describe('the history limit ("accepts nonnegative integers; 0 retains only the c
     },
   );
 });
+
+describe('the release tag ("the Settings modal shows it beside its title")', () => {
+  it('a tag build shows its tag in the header', () => {
+    const storage = fakeStorage();
+    const interp = createInterpreter(createBrowserEnv(storage));
+    const dialog = createSettingsDialog(document, interp, storage, vi.fn(), 'v1.2.3');
+    host.appendChild(dialog.element);
+
+    dialog.open();
+
+    expect(dialog.element.querySelector('header .version')?.textContent).toBe('v1.2.3');
+  });
+
+  it('a dev or local build shows no version', () => {
+    const { dialog } = mount(fakeStorage());
+
+    dialog.open();
+
+    expect(dialog.element.querySelector('header .version')).toBeNull();
+  });
+});

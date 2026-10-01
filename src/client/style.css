@@ -537,6 +537,17 @@ dialog.settings h2 {
   font-size: 16px;
 }
 
+/* The release tag sits just after the title; the close button keeps the far end. */
+dialog.settings header .version {
+  margin: 0 auto 0 10px;
+  color: color-mix(in srgb, var(--fg) 40%, transparent);
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
 dialog.settings h3 {
   margin: 0 0 6px;
   font-size: 12px;

@@ -42,6 +42,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
+        env:
+          # Stamps the page with the tag it was published from. A manual dispatch from a branch
+          # has no tag, so it stamps nothing rather than the branch name.
+          THITHER_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
