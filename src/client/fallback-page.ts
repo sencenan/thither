@@ -16,7 +16,8 @@ import { moveSelection, selectedLink, shortcutLink } from './match-list.ts';
 import { renderBareError, renderOutput, renderWaiting } from './output.ts';
 import type { StorageArea } from './persistence.ts';
 import { isNontrivial, searchTokens } from './program.ts';
-import { load, run } from './run.ts';
+import { renderProgram } from './program-view.ts';
+import { compose, load, run } from './run.ts';
 import { createSettingsDialog } from './settings.ts';
 
 export const LIVE_EXECUTION_DEBOUNCE_MS = 60;
@@ -95,7 +96,7 @@ export const mountFallbackPage = (
 
   const render = (): void => {
     if (waiting) {
-      renderWaiting(output, env);
+      renderWaiting(output, env, renderProgram(doc, interp, compose(tokenize(field.value))));
     } else {
       renderOutput(output, env);
     }

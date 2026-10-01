@@ -12,7 +12,7 @@ import { renderSetupInstructions, showsSetupInstructions } from './setup-instruc
 
 const RESET_HINT = 'Recover in Settings: revert to an earlier stack, clear, or import one.';
 
-const WAITING_NOTICE = 'Not run yet: a program with operations runs when you press Enter.';
+const WAITING_NOTICE = 'Not run yet — press Enter to run';
 
 const WAITING_HINTS: readonly KeyHint[] = [
   [
@@ -86,9 +86,9 @@ export const renderOutput = (region: Element, register: OutputRegister): void =>
   region.replaceChildren(...nodes);
 };
 
-// ADR 0015 — in place of the list, a bar saying the program has not run and how to run it. There
-// are no rows, so nothing can be selected or opened while the program waits.
-export const renderWaiting = (region: Element, register: OutputRegister): void => {
+// ADR 0015 — in place of the list, a bar saying the program has not run and how to run it, then
+// the program itself. There are no rows, so nothing can be selected or opened while it waits.
+export const renderWaiting = (region: Element, register: OutputRegister, program: Node): void => {
   const doc = region.ownerDocument;
   const nodes = focusNodes(doc, register);
 
@@ -98,7 +98,7 @@ export const renderWaiting = (region: Element, register: OutputRegister): void =
   notice.className = 'count';
   notice.textContent = WAITING_NOTICE;
   footer.append(notice, renderKeyHints(doc, WAITING_HINTS));
-  nodes.push(footer);
+  nodes.push(footer, program);
 
   if (!register.loaded) {
     nodes.push(renderResetHint(doc));

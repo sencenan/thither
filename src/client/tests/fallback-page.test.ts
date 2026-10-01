@@ -350,6 +350,27 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     expect(waitingNotice()).toBe('');
   });
 
+  it('while it waits, the body shows the whole program it would run, token by token', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'https://example.com/x x .set');
+
+    const program = [...root.querySelectorAll('.output ol.program li.token')].map(
+      (chip) => chip.textContent,
+    );
+    expect(program).toEqual(['.load', 'https://example.com/x', 'x', '.set', '.$', '.out', '.save']);
+    expect(root.querySelector('.output ol.program li.operation')?.textContent).toBe('.load');
+  });
+
+  it('the program view follows the field as it is edited', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    type(field, 'home .rm');
+    type(field, 'home .rm .s');
+
+    expect(root.querySelector('.output ol.program li.error')?.textContent).toBe('.s');
+  });
+
   it('Enter runs it; a run with nothing left to search empties the field and lists every target', () => {
     const storage = fakeStorage();
     const { field } = open(storage, []);

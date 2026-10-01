@@ -401,6 +401,49 @@ body {
   margin-right: 6px;
 }
 
+/* A waiting program (ADR 0015): its tokens as chips, coloured by what the parser made of each. */
+
+.output ol.program {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 16px 16px;
+  list-style: none;
+}
+
+.program .token {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-radius: 4px;
+  font:
+    13px ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+
+.program .operation {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  font-weight: 700;
+}
+
+.program .separator {
+  color: color-mix(in srgb, var(--fg) 55%, transparent);
+  border-style: dashed;
+}
+
+.program .alias {
+  color: var(--arg);
+  border-color: color-mix(in srgb, var(--arg) 55%, transparent);
+}
+
+.program .error {
+  color: var(--warn);
+  border-color: var(--warn);
+  border-style: dashed;
+}
+
 .setup {
   padding: 16px;
 }
