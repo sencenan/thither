@@ -3,7 +3,7 @@
 // on a keystroke debounce, and the result list re-rendered from the register after each run.
 // Live execution is the ordinary run — mutations and bounded history included. Nothing here
 // consults the navigation rule; once the page is shown, navigation is by click, `Ctrl+digit`, or
-// Enter on a row, and each of those is the row's own link being followed.
+// Enter on the selected row, and each of those is the row's own link being followed.
 
 import type { Interpreter } from '../dsl/index.ts';
 import { debounce } from '../lib/debounce.ts';
@@ -11,7 +11,7 @@ import type { BrowserEnv } from './browser-env.ts';
 import { createHelpDialog } from './help.ts';
 import { iconMarkup } from './icons.ts';
 import { tokenize } from './input.ts';
-import { rowLink, shortcutLink } from './match-list.ts';
+import { moveSelection, selectedLink, shortcutLink } from './match-list.ts';
 import { renderBareError, renderOutput } from './output.ts';
 import type { StorageArea } from './persistence.ts';
 import { run } from './run.ts';
@@ -137,11 +137,6 @@ export const mountFallbackPage = (
     field.focus();
   });
 
-  // A query was searched (ADR 0009's test) when `R.inputs` is non-empty: then Enter opens the
-  // first row; after a bare `<url> home .set` it only commits and lists.
-  const searchedQuery = (): boolean =>
-    env.terminal?.[0] === 'R' && env.terminal[1].inputs.length > 0;
-
   // One listener on the document, so the shortcuts work whether or not the field has focus. It
   // outlives the page once `renderBareError` has replaced it, so a detached field releases the
   // keyboard; while the settings dialog is open the keyboard is the dialog's. Focus moves during
@@ -168,12 +163,34 @@ export const mountFallbackPage = (
       return;
     }
 
+    // Tab is blocked so focus never lands on a row link, where Enter would mean a different row
+    // from the selected one. Inside an open dialog the guard above has already let it through.
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      return;
+    }
+
+    // The arrows move the selection over the rows already listed; they never touch the debounce,
+    // since they do not change the search. A run that lands afterwards resets the selection.
+    if (
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      (event.target === field || !isEditable(event.target))
+    ) {
+      event.preventDefault();
+      moveSelection(output, event.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+
+    // The flush may re-render, which resets the selection to the new list's default: the first row
+    // when the run searched a query (ADR 0009), otherwise none.
     if (event.key === 'Enter' && (event.target === field || !isEditable(event.target))) {
       event.preventDefault();
       liveRun.flush();
-      if (searchedQuery()) {
-        rowLink(output, 0)?.click();
-      }
+      selectedLink(output)?.click();
       return;
     }
 

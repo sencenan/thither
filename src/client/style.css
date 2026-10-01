@@ -158,6 +158,11 @@ body {
   padding: 0;
 }
 
+/* Arrow keys scroll the selected row into view; the margin keeps it below the sticky summary bar. */
+.match {
+  scroll-margin-top: 48px;
+}
+
 .match + .match {
   border-top: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
 }
@@ -175,8 +180,13 @@ body {
   text-decoration: none;
 }
 
-.match > a:hover,
-.match > a:focus-visible {
+/* Hover and selection are independent: Enter opens the selected row, so only it carries the accent
+   bar; a hovered row gets the tint alone. */
+.match > a:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.match.selected > a {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   box-shadow: inset 2px 0 0 var(--accent);
 }
@@ -329,13 +339,6 @@ body {
   color: color-mix(in srgb, var(--warn) 85%, var(--fg));
 }
 
-/* Enter opens the first row: show it as the active target by default, but stand down as soon as the
-   pointer is over the list so only the hovered row is highlighted. */
-.matches.enter-armed:not(:hover) > .match:first-child > a {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
 /* The result summary sits above the list and sticks to the top of the viewport, so the count and
    key hints stay visible while a long list scrolls under it. */
 .output footer {
@@ -351,6 +354,22 @@ body {
     12px system-ui,
     sans-serif;
   color: color-mix(in srgb, var(--fg) 55%, transparent);
+}
+
+.output footer .hints kbd {
+  display: inline-block;
+  min-width: 1.6em;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--bg) 92%, var(--fg) 8%);
+  font: inherit;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.output footer .hints kbd + kbd {
+  margin-left: 2px;
 }
 
 .output footer .count {

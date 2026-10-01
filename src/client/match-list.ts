@@ -3,7 +3,8 @@
 // the shortcut digit, the key with its matched characters, the destination as the template
 // filled slot by slot, the argument balance, and the score; above the list a summary bar with the
 // count and the key hints, sticky so it stays in view while a long list scrolls. The list also
-// answers which row a shortcut names, so the digit ↔ row mapping lives in one place.
+// holds the selected row — the one Enter opens, moved by the arrow keys — and answers which row a
+// shortcut names, so the digit ↔ row mapping lives in one place.
 
 import type { Match } from '../dsl/index.ts';
 import { type KeySpan, keySpans, type TemplateSpan, templateSpans } from './match-spans.ts';
@@ -11,7 +12,32 @@ import { type KeySpan, keySpans, type TemplateSpan, templateSpans } from './matc
 // The first ten rows carry `Ctrl+1`–`Ctrl+9`, then `Ctrl+0`; the rest have no shortcut and an
 // empty badge.
 const SHORTCUT_DIGITS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
-const KEY_HINTS = 'Enter opens the first match of a query · Ctrl+1–9, Ctrl+0 open a row';
+
+// Each hint is a run of key chips and plain text, so the bar reads as keyboard shortcuts.
+type HintPart = readonly ['key' | 'text', string];
+const KEY_HINTS: readonly (readonly HintPart[])[] = [
+  [
+    ['key', '\u2191'],
+    ['key', '\u2193'],
+    ['text', ' select'],
+  ],
+  [
+    ['key', 'Enter'],
+    ['text', ' open'],
+  ],
+  [
+    ['key', 'Ctrl'],
+    ['text', '+'],
+    ['key', '1\u20130'],
+    ['text', ' open row'],
+  ],
+  [
+    ['key', 'Esc'],
+    ['text', ' clear'],
+  ],
+];
+
+const SELECTED = 'selected';
 
 const balanceLabel = (argDelta: number): string => {
   if (argDelta === 0) {
@@ -112,17 +138,31 @@ const renderFooter = (doc: Document, count: number, onDestination: boolean): Ele
     summary.append(note);
   }
   const hints = doc.createElement('span');
-  hints.textContent = KEY_HINTS;
+  hints.className = 'hints';
+  KEY_HINTS.forEach((hint, index) => {
+    if (index > 0) {
+      hints.append(' \u00b7 ');
+    }
+    for (const [kind, text] of hint) {
+      if (kind === 'key') {
+        const chip = doc.createElement('kbd');
+        chip.textContent = text;
+        hints.appendChild(chip);
+      } else {
+        hints.append(text);
+      }
+    }
+  });
   footer.append(summary, hints);
   return footer;
 };
 
-// `enterArmed` is true when Enter would open the first row (the run searched a query). It marks the
-// list so CSS can show the first row as the Enter target while nothing is hovered.
+// `selectFirst` is true when the run searched a query (ADR 0009's test): the first row starts
+// selected, so Enter opens it. Otherwise nothing is selected until an arrow key picks a row.
 export const renderMatchList = (
   doc: Document,
   matches: readonly Match[],
-  enterArmed = false,
+  selectFirst = false,
 ): readonly Node[] => {
   if (matches.length === 0) {
     const empty = doc.createElement('p');
@@ -131,8 +171,11 @@ export const renderMatchList = (
   }
 
   const list = doc.createElement('ol');
-  list.className = enterArmed ? 'matches enter-armed' : 'matches';
+  list.className = 'matches';
   list.append(...matches.map((match, index) => renderRow(doc, match, index)));
+  if (selectFirst) {
+    list.firstElementChild?.classList.add(SELECTED);
+  }
   // A result is all key matches or all destination matches: destination search runs only when
   // no key matched (dsl.md §4.4).
   const onDestination = matches.some((match) => match[4].on === 'destination');
@@ -144,6 +187,28 @@ export const renderMatchList = (
 // The link the nth row opens when clicked; a shortcut or Enter follows the same link.
 export const rowLink = (region: Element, index: number): HTMLAnchorElement | undefined =>
   region.querySelectorAll<HTMLAnchorElement>('li.match > a')[index];
+
+// The link Enter opens: the selected row's, or undefined while nothing is selected.
+export const selectedLink = (region: Element): HTMLAnchorElement | undefined =>
+  region.querySelector<HTMLAnchorElement>(`li.match.${SELECTED} > a`) ?? undefined;
+
+// Moves the selection one row down (`1`) or up (`-1`), stopping at either end. With nothing
+// selected, down selects the first row and up does nothing. The row is scrolled into view; its
+// scroll margin (style.css) keeps it clear of the sticky summary bar.
+export const moveSelection = (region: Element, step: 1 | -1): void => {
+  const rows = [...region.querySelectorAll('li.match')];
+  const current = rows.findIndex((row) => row.classList.contains(SELECTED));
+  if (current === -1 && step === -1) {
+    return;
+  }
+  const next = rows[current === -1 ? 0 : Math.min(Math.max(current + step, 0), rows.length - 1)];
+  if (next === undefined) {
+    return;
+  }
+  rows[current]?.classList.remove(SELECTED);
+  next.classList.add(SELECTED);
+  next.scrollIntoView({ block: 'nearest' });
+};
 
 // browser-client.md "Fallback UI and settings" — the row a `Ctrl+digit` names, read by `code` so
 // the numpad counts and a shifted or dead-key layout cannot change the digit; undefined for any
