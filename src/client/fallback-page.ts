@@ -12,10 +12,10 @@ import type { BrowserEnv } from './browser-env.ts';
 import { createHelpDialog } from './help.ts';
 import { iconMarkup } from './icons.ts';
 import { tokenize } from './input.ts';
-import { moveSelection, selectedLink, shortcutLink } from './match-list.ts';
+import { moveSelection, selectedKey, selectedLink, shortcutLink } from './match-list.ts';
 import { renderBareError, renderOutput, renderWaiting } from './output.ts';
 import type { StorageArea } from './persistence.ts';
-import { isNontrivial, searchTokens } from './program.ts';
+import { isNontrivial, keyTokens, searchTokens } from './program.ts';
 import { renderProgram } from './program-view.ts';
 import { compose, load, run } from './run.ts';
 import { createSettingsDialog } from './settings.ts';
@@ -227,6 +227,30 @@ export const mountFallbackPage = (
     ) {
       event.preventDefault();
       moveSelection(output, event.key === 'ArrowDown' ? 1 : -1);
+      return;
+    }
+
+    // Right puts the selected row's key into the field, ready for an operation such as `.rm` to be
+    // typed after it. In the field it acts only with the caret at the end, where it would otherwise
+    // do nothing, so moving the caret through the text is untouched.
+    const key = waiting ? undefined : selectedKey(output);
+    if (
+      key !== undefined &&
+      event.key === 'ArrowRight' &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      (event.target === field
+        ? field.selectionStart === field.value.length && field.selectionEnd === field.value.length
+        : !isEditable(event.target))
+    ) {
+      event.preventDefault();
+      liveRun.cancel();
+      field.value = keyTokens(key).join(' ');
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+      runField();
       return;
     }
 

@@ -35,6 +35,10 @@ const USAGE: ReadonlyArray<readonly [string, string]> = [
     'Run',
     'A program with an operation (.set, .rm, .@, .alias) does not run as you type: it waits, showing each token it will run, until you press Enter. The field then keeps only the search it ended with. A plain search runs as you type.',
   ],
+  [
+    'Edit key',
+    'Press \u2192 to put the selected row\u2019s dimensions into the field, ready to type .rm or another operation after them.',
+  ],
   ['Clear', 'Press Escape to empty the field and start over.'],
   [
     'thither',

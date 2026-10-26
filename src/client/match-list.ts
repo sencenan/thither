@@ -24,6 +24,10 @@ const KEY_HINTS: readonly KeyHint[] = [
     ['text', ' select'],
   ],
   [
+    ['key', '\u2192'],
+    ['text', ' edit key'],
+  ],
+  [
     ['key', 'Enter'],
     ['text', ' open'],
   ],
@@ -122,6 +126,7 @@ const renderRow = (doc: Document, match: Match, index: number): Element => {
 
   const row = doc.createElement('li');
   row.className = hint.argDelta < 0 ? 'match incomplete' : 'match';
+  row.dataset.key = key;
   row.appendChild(link);
   return row;
 };
@@ -197,6 +202,10 @@ export const rowLink = (region: Element, index: number): HTMLAnchorElement | und
 // The link Enter opens: the selected row's, or undefined while nothing is selected.
 export const selectedLink = (region: Element): HTMLAnchorElement | undefined =>
   region.querySelector<HTMLAnchorElement>(`li.match.${SELECTED} > a`) ?? undefined;
+
+// The key of the selected row's target, or undefined while nothing is selected.
+export const selectedKey = (region: Element): string | undefined =>
+  region.querySelector<HTMLElement>(`li.match.${SELECTED}`)?.dataset.key;
 
 // Moves the selection one row down (`1`) or up (`-1`), stopping at either end. With nothing
 // selected, down selects the first row and up does nothing. The row is scrolled into view; its

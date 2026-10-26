@@ -11,6 +11,7 @@ import {
   moveSelection,
   renderMatchList,
   rowLink,
+  selectedKey,
   selectedLink,
   shortcutLink,
 } from '../match-list.ts';
@@ -249,13 +250,14 @@ describe('renderMatchList ("Each row shows the target’s key, its destination, 
     expect(texts('footer .hints kbd')).toEqual([
       '\u2191',
       '\u2193',
+      '\u2192',
       'Enter',
       'Ctrl',
       '1\u20130',
       'Esc',
     ]);
     expect(root.querySelector('footer .hints')?.textContent).toBe(
-      '\u2191\u2193 select \u00b7 Enter open \u00b7 Ctrl+1\u20130 open row \u00b7 Esc clear',
+      '\u2191\u2193 select \u00b7 \u2192 edit key \u00b7 Enter open \u00b7 Ctrl+1\u20130 open row \u00b7 Esc clear',
     );
   });
 
@@ -296,6 +298,15 @@ describe('selection ("At most one row is selected, and Enter opens it")', () => 
 
     root.replaceChildren(...renderMatchList(document, numbered(3), true));
     expect(selectedLink(root)?.getAttribute('href')).toBe('https://example.com/0');
+  });
+
+  it('selectedKey is the selected row\u2019s key, or undefined while nothing is selected', () => {
+    render(numbered(3));
+    expect(selectedKey(root)).toBeUndefined();
+
+    moveSelection(root, 1);
+    moveSelection(root, 1);
+    expect(selectedKey(root)).toBe('target 1');
   });
 
   it('"with no row selected, Down selects the first row and Up does nothing"', () => {
