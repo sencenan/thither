@@ -703,6 +703,80 @@ describe('the arrows ("The Up and Down arrows move the selection one row, whethe
   });
 });
 
+describe('Right ("Right puts the selected row\u2019s key into the field")', () => {
+  const right = (target: EventTarget, init: KeyboardEventInit = {}): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'ArrowRight',
+      code: 'ArrowRight',
+      ...init,
+    });
+    target.dispatchEvent(event);
+    return event;
+  };
+
+  it('replaces the field with the selected row\u2019s key and runs it at once', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: elevenTargetsRecord }), ['t0']);
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+
+    const event = right(field);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(field.value).toBe('t02');
+    expect(field.selectionStart).toBe(3);
+    expect(links()).toEqual(['https://example.com/t02']);
+  });
+
+  it('so typing .rm after it and pressing Enter removes that target', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['ho']);
+
+    right(field);
+    type(field, `${field.value} .rm`);
+    keydown(field, { key: 'Enter' });
+
+    expect(field.value).toBe('');
+    expect(links()).not.toContain('https://example.com/');
+  });
+
+  it('works with the field blurred, and focuses it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['ho']);
+    field.blur();
+
+    right(document.body);
+
+    expect(field.value).toBe('home');
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('is left to the field while the caret is not at the end', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['ho']);
+    field.setSelectionRange(0, 0);
+
+    const event = right(field);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(field.value).toBe('ho');
+  });
+
+  it('does nothing while no row is selected', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), []);
+
+    const event = right(field);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(field.value).toBe('');
+  });
+
+  it('Shift+Right is left to the field', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: oneTargetRecord }), ['ho']);
+
+    right(field, { shiftKey: true });
+
+    expect(field.value).toBe('ho');
+  });
+});
+
 describe('Tab ("Tab is blocked on the page while no dialog is open")', () => {
   const tab = (target: EventTarget, shiftKey = false): KeyboardEvent => {
     const event = new KeyboardEvent('keydown', {

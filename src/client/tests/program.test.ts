@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { createInterpreter, type Result } from '../../dsl/index.ts';
 import { createBrowserEnv } from '../browser-env.ts';
 import type { StorageArea } from '../persistence.ts';
-import { isNontrivial, searchTokens } from '../program.ts';
+import { isNontrivial, keyTokens, searchTokens } from '../program.ts';
 
 const noStorage: StorageArea = {
   getItem: () => null,
@@ -31,6 +31,21 @@ describe('isNontrivial', () => {
     ['dsl.md §6 a half-typed .s is a missing_operation, not an operation', ['x', '.s'], false],
   ])('%s', (_name, tokens, nontrivial) => {
     expect(isNontrivial(interp, tokens)).toBe(nontrivial);
+  });
+});
+
+describe('keyTokens', () => {
+  it.each<[string, string, readonly string[]]>([
+    ['dsl.md \u00a73 a key splits into its dimensions', 'company git', ['company', 'git']],
+    ['dsl.md \u00a72 a dimension stored from ..git is escaped again', '.git x', ['..git', 'x']],
+    ['dsl.md \u00a72 a dimension stored from .~x is escaped again', '~x', ['.~x']],
+    ['dsl.md \u00a72 a bare ~ is plain text and stays as it is', '~', ['~']],
+  ])('%s', (_name, key, tokens) => {
+    expect(keyTokens(key)).toEqual(tokens);
+  });
+
+  it('dsl.md \u00a72 the tokens parse as literals, never as an operation', () => {
+    expect(isNontrivial(interp, keyTokens('.rm .set'))).toBe(false);
   });
 });
 

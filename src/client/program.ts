@@ -17,6 +17,16 @@ export const isNontrivial = (interp: Interpreter, tokens: readonly string[]): bo
       isOperation(interp, token) && !(token === '.$' && index === tokens.length - 1),
   );
 
+// dsl.md §2 — a key's dimensions as field tokens. A dimension stored from an escaped literal
+// (`..git` → `.git`, `.~x` → `~x`) is escaped again, so the field names that key and never runs an
+// operation or resolves an alias.
+export const keyTokens = (key: string): readonly string[] =>
+  key
+    .split(' ')
+    .map((dim) =>
+      dim.startsWith('.') || (dim.startsWith('~') && dim.length > 1) ? `.${dim}` : dim,
+    );
+
 // dsl.md §4.4 — `inputs` and `args` are exactly what the search consumed, so the search is
 // rebuilt as the inputs, then the separator and the arguments when there are any.
 export const searchTokens = (result: Result): readonly string[] => {
