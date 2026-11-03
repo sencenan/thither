@@ -121,7 +121,7 @@ describe('browser env host operations', () => {
     // ADR 0008 changed the persisted shape (targets: array -> keyed object) with no migration; an
     // existing record parses to parse_error and is reset by hand rather than silently converted.
     const oldShape = JSON.stringify([
-      [['S', { targets: [[['home'], 'https://example.com/']], focus: [], alias: {} }]],
+      [['S', { targets: [[['home'], 'https://example.com/']], focus: [], alias: {}, todo: [] }]],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: oldShape });
     const { register } = runClient(storage, ['home']);
@@ -185,7 +185,12 @@ describe('browser env host operations', () => {
 
     expect(register.state).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      {
+        targets: { 'company git': ['https://github.com/company/{}'] },
+        focus: [],
+        alias: {},
+        todo: [],
+      },
     ]);
   });
 
@@ -237,11 +242,53 @@ describe('browser env host operations', () => {
   });
 });
 
+describe('a todo run (dsl.md §4.7, §4.8; ADR 0017)', () => {
+  const a = 'https://a.com';
+
+  it('.out pops the D into the register and .save persists the changed state', () => {
+    const storage = fakeStorage();
+    const { register, stack } = runClient(storage, [a, '.todo']);
+
+    expect(register.terminal).toEqual(['D', { todo: [a] }]);
+    expect(register.state?.[1].todo).toEqual([a]);
+    expect(stack).toEqual([['S', { targets: {}, focus: [], alias: {}, todo: [a] }]]);
+    expect(record(storage)).toEqual([
+      [emptyState()],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [a] }]],
+    ]);
+  });
+
+  it('.done persists the removal', () => {
+    const storage = fakeStorage();
+    runClient(storage, [a, '.todo']);
+    const { register } = runClient(storage, [a, '.done']);
+
+    expect(register.terminal).toEqual(['D', { todo: [] }]);
+    expect(record(storage)).toEqual([
+      [emptyState()],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [a] }]],
+      [emptyState()],
+    ]);
+  });
+
+  it('a failed .todo persists nothing', () => {
+    const storage = fakeStorage();
+    runClient(storage, []);
+    const before = record(storage);
+
+    const { register } = runClient(storage, ['https://a.com/{}', '.todo']);
+
+    expect(register.terminal?.[0]).toBe('E');
+    expect(record(storage)).toEqual(before);
+  });
+});
+
 // browser-client.md "Persistence" / "Bounded history" — `thither.stacks.v1` is oldest-first with the
 // current stack last; `.save` maintains it with structural-difference dedup and front eviction.
-// browser-client.md "Host operations" — `.save` persists only a run that reached its search: an `R` in
-// the register proves `.$` consumed the literals, so the stored stack is always one `.load` can read.
-describe('.save persists only when the register holds an R', () => {
+// browser-client.md "Host operations" — `.save` persists only a run that reached its search or a todo
+// operation: an `R` or a `D` in the register proves `.$`, `.todo`, or `.done` consumed the literals,
+// so the stored stack is always one `.load` can read.
+describe('.save persists only when the register holds an R or a D', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
 
   it('a run ending in an unbound operation persists nothing, and the next run still loads', () => {
@@ -286,7 +333,7 @@ describe('.save persists only when the register holds an R', () => {
 
     expect(record(storage)).toEqual([
       [emptyState()],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 });
@@ -295,7 +342,7 @@ describe('bounded history', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
   const stateWith = (targets: Record<string, readonly string[]>) => [
     'S',
-    { targets, focus: [], alias: {} },
+    { targets, focus: [], alias: {}, todo: [] },
   ];
   const A = stateWith({});
   const B = stateWith({ home: ['https://example.com/'] });
@@ -416,7 +463,7 @@ describe('bounded history', () => {
 describe('settings actions on the history', () => {
   const stateWith = (targets: Record<string, readonly string[]>) => [
     'S',
-    { targets, focus: [], alias: {} },
+    { targets, focus: [], alias: {}, todo: [] },
   ];
   const A = stateWith({ home: ['https://example.com/'] });
   const B = stateWith({ git: ['https://github.com/{}'] });
@@ -553,7 +600,10 @@ describe('settings record', () => {
 // root built, for every run of the page.
 describe('createBrowserEnv base', () => {
   it('carries the base state it is given', () => {
-    const base = ['S', { targets: { thither: ['https://x/'] }, focus: [], alias: {} }] as const;
+    const base = [
+      'S',
+      { targets: { thither: ['https://x/'] }, focus: [], alias: {}, todo: [] },
+    ] as const;
     expect(createBrowserEnv(fakeStorage(), [], base).base).toBe(base);
   });
 

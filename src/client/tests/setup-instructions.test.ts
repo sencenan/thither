@@ -9,13 +9,13 @@ import type { State } from '../../dsl/index.ts';
 import type { OutputRegister } from '../browser-env.ts';
 import { renderSetupInstructions, showsSetupInstructions } from '../setup-instructions.ts';
 
-const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {} }];
+const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {}, todo: [] }];
 const oneTarget: OutputRegister['state'] = [
   'S',
-  { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
+  { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] },
 ];
 const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
-const noBase: State = ['S', { targets: {}, focus: [], alias: {} }];
+const noBase: State = ['S', { targets: {}, focus: [], alias: {}, todo: [] }];
 
 describe('showsSetupInstructions ("While the target set is empty … They are not shown when loaded is false")', () => {
   it.each<[name: string, register: OutputRegister, shown: boolean]>([
@@ -51,12 +51,12 @@ describe('showsSetupInstructions ("While the target set is empty … They are no
   // The client base state's targets are not the user's, so they do not end the empty state.
   const base: State = [
     'S',
-    { targets: { thither: ['https://host.example/'] }, focus: [], alias: {} },
+    { targets: { thither: ['https://host.example/'] }, focus: [], alias: {}, todo: [] },
   ];
   const withBase = (targets: State[1]['targets']): OutputRegister => ({
     loaded: true,
     terminal: everyTarget,
-    state: ['S', { targets, focus: [], alias: {} }],
+    state: ['S', { targets, focus: [], alias: {}, todo: [] }],
   });
 
   it.each<[name: string, register: OutputRegister, shown: boolean]>([

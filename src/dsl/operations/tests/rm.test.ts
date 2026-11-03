@@ -28,6 +28,11 @@ const jira0: TargetSpec = [['jira'], 'https://jira.example.com'];
 const jira1: TargetSpec = [['jira'], 'https://jira.example.com/browse/{}'];
 
 const cases: readonly Case[] = [
+  [
+    '§4.2 the todo list is kept',
+    [state([[['x'], 'https://x.com']], [], {}, ['https://a.com']), 'x', '.rm'],
+    [state([], [], {}, ['https://a.com'])],
+  ],
   // whole-target removal (exact key, single variant)
   [
     '§4.2 removes the target with the exact key',

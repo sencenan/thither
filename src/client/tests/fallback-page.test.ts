@@ -43,7 +43,7 @@ const fakeStorage = (
 };
 
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
 ]);
 
 // `t01` … `t11`, each to `https://example.com/tNN`, in target-set order.
@@ -60,6 +60,7 @@ const elevenTargetsRecord = JSON.stringify([
         ),
         focus: [],
         alias: {},
+        todo: [],
       },
     ],
   ],
@@ -157,8 +158,8 @@ describe('the Settings control ("Provide a Settings control on the page, opening
   });
 
   const twoDeepRecord = JSON.stringify([
-    [['S', { targets: {}, focus: [], alias: {} }]],
-    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+    [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
   ]);
 
   it('"After an action the modal closes and the page re-runs the field\'s current contents": a revert shows the reverted stack', () => {
@@ -185,7 +186,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     expect(root.textContent).toContain('No custom targets yet');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 
@@ -392,8 +393,8 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     expect(waitingNotice()).toBe('');
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 
@@ -483,7 +484,12 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
 
   it('the waiting page still shows the stored focus, loaded without running the program', () => {
     const focused = JSON.stringify([
-      [['S', { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {} }]],
+      [
+        [
+          'S',
+          { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {}, todo: [] },
+        ],
+      ],
     ]);
     open(fakeStorage({ [STACKS_KEY]: focused }), ['home', '.rm']);
 
@@ -492,8 +498,8 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
 
   it('a settings action re-renders the stored world but does not run the waiting program', () => {
     const twoDeep = JSON.stringify([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: twoDeep });
     const { field } = open(storage, []);
@@ -505,7 +511,7 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     expect(field.value).toBe('https://example.com/x x .set');
     expect(waitingNotice()).toContain('press Enter');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 });
@@ -777,6 +783,114 @@ describe('Right ("Right puts the selected row\u2019s key into the field")', () =
   });
 });
 
+describe('the todo view ("A run that ends in a D shows the todo view")', () => {
+  const a = 'https://a.example/';
+  const b = 'https://b.example/';
+  const todoRecord = (todo: readonly string[]) =>
+    JSON.stringify([
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo }]],
+    ]);
+  const summary = (): string => root.querySelector('.output footer .count')?.textContent ?? '';
+  const viewLabel = (): string =>
+    root.querySelector('.output footer.todo-view .view-label')?.textContent ?? '';
+  const right = (target: EventTarget): void => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }),
+    );
+  };
+
+  it('Enter on .todo empties the field and lists the todo items in stored order', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: todoRecord([a]) });
+    const { field } = open(storage, []);
+
+    type(field, `${b} .todo`);
+    enter(field);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual([a, b]);
+    expect(summary()).toBe('2 items');
+    expect(viewLabel()).toBe('Todo list');
+  });
+
+  it('.todo alone shows the list without changing it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a]) }), ['.todo']);
+
+    enter(field);
+
+    expect(links()).toEqual([a]);
+    expect(summary()).toBe('1 item');
+  });
+
+  it('an empty todo list says so, with an example', () => {
+    const { field } = open(fakeStorage(), ['.todo']);
+
+    enter(field);
+
+    expect(links()).toEqual([]);
+    expect(viewLabel()).toBe('Todo list');
+    expect(root.querySelector('.output .todo-empty')?.textContent).toContain(
+      'https://example.com .todo',
+    );
+  });
+
+  it('hides the setup instructions', () => {
+    const { field } = open(fakeStorage(), ['.todo']);
+
+    enter(field);
+
+    expect(root.querySelector('.setup')).toBeNull();
+  });
+
+  it('starts with no row selected; Down selects one, and Enter opens it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) }), ['.todo']);
+    enter(field);
+    expect(root.querySelector('li.selected')).toBeNull();
+
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    enter(field);
+
+    expect(location.href).toBe(b);
+  });
+
+  it('Ctrl+1 opens the first todo item', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) }), ['.todo']);
+    enter(field);
+
+    keydown(field, { key: '1', code: 'Digit1', ctrlKey: true });
+
+    expect(location.href).toBe(a);
+  });
+
+  it('Right puts the selected URL into the field, so .done can be typed after it', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) });
+    const { field } = open(storage, ['.todo']);
+    enter(field);
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+
+    right(field);
+    expect(field.value).toBe(a);
+    expect(viewLabel()).toBe('');
+
+    type(field, `${field.value} .done`);
+    enter(field);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual([b]);
+  });
+
+  it('is never navigated from at page load: .todo from the URL waits for Enter', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, [a, '.todo']);
+
+    expect(waitingNotice()).not.toBe('');
+    enter(field);
+
+    expect(location.href).toBe(PAGE);
+    expect(links()).toEqual([a]);
+  });
+});
+
 describe('Tab ("Tab is blocked on the page while no dialog is open")', () => {
   const tab = (target: EventTarget, shiftKey = false): KeyboardEvent => {
     const event = new KeyboardEvent('keydown', {
@@ -927,7 +1041,12 @@ describe('shortcuts ("navigation shortcuts Ctrl+1 through Ctrl+9, then Ctrl+0 fo
       [
         [
           'S',
-          { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+          {
+            targets: { 'company git': ['https://github.com/company/{}'] },
+            focus: [],
+            alias: {},
+            todo: [],
+          },
         ],
       ],
     ]);
@@ -963,8 +1082,8 @@ describe('Enter ("Enter opens the first row when the run searched a query … a 
     expect(location.href).toBe(PAGE);
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 

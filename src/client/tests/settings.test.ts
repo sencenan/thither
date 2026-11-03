@@ -30,7 +30,7 @@ const fakeStorage = (initial: Record<string, string> = {}): StorageArea => {
 
 const state = (targets: Record<string, readonly string[]>) => [
   'S',
-  { targets, focus: [], alias: {} },
+  { targets, focus: [], alias: {}, todo: [] },
 ];
 
 // Oldest first: no targets, then `home`, then `home` + `docs` (the current stack).

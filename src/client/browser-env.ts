@@ -14,6 +14,7 @@ import type {
   Stack,
   State,
   ThitherError,
+  TodoList,
 } from '../dsl/index.ts';
 import { defaultEnv, emptyState } from '../dsl/index.ts';
 import { readHistory, type StorageArea, writeCurrentStack } from './persistence.ts';
@@ -21,7 +22,7 @@ import { readHistory, type StorageArea, writeCurrentStack } from './persistence.
 // The client-held slot the host operations write and the client reads after execution.
 // Cleared at the start of each run by `.load`.
 export interface OutputRegister {
-  terminal?: Result | ThitherError | undefined;
+  terminal?: Result | TodoList | ThitherError | undefined;
   loaded: boolean;
   // The world as the run left it: the `S` on top after `.out`, so a mutation the user's tokens
   // made is already in it. After a failed `.load`, it is the state beneath the error, if any:
@@ -43,9 +44,12 @@ const parseError = (description: string): ThitherError => [
   { type: 'parse_error', description },
 ];
 
-// A stored value is always an array from JSON; parse resolves it to S/R/E (or a parse_error E).
-const isStackValue = (token: Program[number] | undefined): token is State | Result | ThitherError =>
-  token !== undefined && (token[0] === 'S' || token[0] === 'R' || token[0] === 'E');
+// A stored value is always an array from JSON; parse resolves it to S/R/D/E (or a parse_error E).
+const isStackValue = (
+  token: Program[number] | undefined,
+): token is State | Result | TodoList | ThitherError =>
+  token !== undefined &&
+  (token[0] === 'S' || token[0] === 'R' || token[0] === 'D' || token[0] === 'E');
 
 export const createBrowserEnv = (
   storage: StorageArea,
@@ -92,11 +96,11 @@ export const createBrowserEnv = (
     return stack;
   };
 
-  // browser-client.md "Host operations" — pop the run's terminal (R or E) into the register,
+  // browser-client.md "Host operations" — pop the run's terminal (R, D, or E) into the register,
   // then record the S left on top. Not a general pop: any other top value is left in place.
   const out: OpFn = (_interp, stack) => {
     const top = stack[stack.length - 1];
-    if (top !== undefined && (top[0] === 'R' || top[0] === 'E')) {
+    if (top !== undefined && (top[0] === 'R' || top[0] === 'D' || top[0] === 'E')) {
       stack.pop();
       env.terminal = top;
     }
@@ -108,14 +112,15 @@ export const createBrowserEnv = (
   };
 
   // browser-client.md "Host operations" — persist the stack as it stands, but only for a run that
-  // reached its search: the `R` in the register proves `.$` consumed the literals, so what is
-  // stored is always a stack `.load` can read. A run that ended in an `E`, or has not searched
+  // reached its search or a todo operation: the `R` in the register proves `.$` consumed the
+  // literals, and a `D` proves the same of `.todo` or `.done`, so what is stored is always a stack
+  // `.load` can read. A run that ended in an `E`, or has not searched
   // yet, persists nothing. The record is re-read by the write rather than carried from `.load`:
   // the run is synchronous, so nothing intervenes, and `persistence.ts`'s settings actions write
   // without any `.load` at all. A failed write leaves its `E` on the stack; it becomes the run's
-  // terminal in place of the `R`, so the client never treats the execution as persisted.
+  // terminal in place of the `R` or `D`, so the client never treats the execution as persisted.
   const save: OpFn = (_interp, stack) => {
-    if (env.terminal?.[0] === 'R') {
+    if (env.terminal?.[0] === 'R' || env.terminal?.[0] === 'D') {
       writeCurrentStack(storage, stack);
       const top = stack[stack.length - 1];
       if (top !== undefined && top[0] === 'E') {

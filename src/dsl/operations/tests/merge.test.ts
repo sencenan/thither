@@ -75,6 +75,26 @@ const cases: readonly Case[] = [
     [state([], [], { gh: 'GitHub', doc: 'docs', me: 'sencenan' })],
   ],
 
+  // todo list
+  [
+    "§4.6 todo lists are concatenated: the lower state's items, then the top state's",
+    [
+      state([], [], {}, ['https://a.com', 'https://b.com']),
+      state([], [], {}, ['https://c.com']),
+      '.merge',
+    ],
+    [state([], [], {}, ['https://a.com', 'https://b.com', 'https://c.com'])],
+  ],
+  [
+    '§4.6 a URL both hold stays at its first occurrence',
+    [
+      state([], [], {}, ['https://a.com', 'https://b.com']),
+      state([], [], {}, ['https://b.com', 'https://c.com', 'https://a.com']),
+      '.merge',
+    ],
+    [state([], [], {}, ['https://a.com', 'https://b.com', 'https://c.com'])],
+  ],
+
   // the untouched prefix
   [
     "§4.6 only the top two states are merged: [K, S1, S2] .merge -> [K, S']",

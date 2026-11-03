@@ -11,7 +11,18 @@ import { type KeySpan, keySpans, type TemplateSpan, templateSpans } from './matc
 
 // The first ten rows carry `Ctrl+1`–`Ctrl+9`, then `Ctrl+0`; the rest have no shortcut and an
 // empty badge.
-const SHORTCUT_DIGITS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
+export const SHORTCUT_DIGITS: readonly string[] = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '0',
+];
 
 // Each hint is a run of key chips and plain text, so the bar reads as keyboard shortcuts.
 type HintPart = readonly ['key' | 'text', string];

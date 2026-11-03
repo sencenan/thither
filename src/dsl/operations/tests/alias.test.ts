@@ -9,6 +9,11 @@ import { type Case, error, explicitError, runWith, state, testInterp, three } fr
 const run = runWith({ '.alias': alias });
 
 const cases: readonly Case[] = [
+  [
+    '§4.5 the todo list is kept',
+    [state([], [], {}, ['https://a.com']), 'gh', 'github', '.alias'],
+    [state([], [], { gh: 'github' }, ['https://a.com'])],
+  ],
   // store
   [
     '§4.5 [S, L(a, b)] maps a to b',

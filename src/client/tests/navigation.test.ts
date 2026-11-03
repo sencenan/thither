@@ -180,7 +180,7 @@ describe('resolveNavigationDestination', () => {
 
 // A record whose current stack holds one complete, single-match target.
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
 ]);
 
 // As main.ts performs it: run, then ask the register where to go. The destination is
@@ -194,6 +194,12 @@ const open = async (storage: StorageArea, tokens: readonly string[]) => {
 };
 
 describe('the run, end to end (browser-client.md "Execution flow")', () => {
+  it('a todo list never navigates, even holding a single URL (ADR 0017)', async () => {
+    const { register, destination } = await open(fakeStorage(), ['https://a.com', '.todo']);
+    expect(register.terminal).toEqual(['D', { todo: ['https://a.com'] }]);
+    expect(destination).toBeUndefined();
+  });
+
   it('a first empty run yields an R and no destination', async () => {
     const { register, destination } = await open(fakeStorage(), []);
     expect(destination).toBeUndefined();
@@ -202,7 +208,17 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('a destination-search hit shows the page rather than navigating (ADR 0014)', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { jira: ['https://jira.example.com/browse/{}'] }, focus: [], alias: {} }]],
+      [
+        [
+          'S',
+          {
+            targets: { jira: ['https://jira.example.com/browse/{}'] },
+            focus: [],
+            alias: {},
+            todo: [],
+          },
+        ],
+      ],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), [
       'browse',
@@ -263,7 +279,7 @@ describe('the run, end to end (browser-client.md "Execution flow")', () => {
 
   it('an incomplete single match is listed but not navigated to', async () => {
     const record = JSON.stringify([
-      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [], alias: {} }]],
+      [['S', { targets: { docs: ['https://example.com/{}'] }, focus: [], alias: {}, todo: [] }]],
     ]);
     const { register, destination } = await open(fakeStorage({ [STACKS_KEY]: record }), ['docs']);
 

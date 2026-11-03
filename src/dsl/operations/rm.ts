@@ -60,7 +60,7 @@ const removeTarget = (state: State, ls: LiteralArray): State | ThitherError => {
   }
 
   // §4.2 — exact key lookup, no search, no focus. A missing key is a successful no-op.
-  const { targets, focus, alias } = state[1];
+  const { targets } = state[1];
   const key = keyOf(explicit);
   const variants = targets[key];
   if (variants === undefined) {
@@ -95,5 +95,5 @@ const removeTarget = (state: State, ls: LiteralArray): State | ThitherError => {
     }
   }
 
-  return ['S', { targets: nextTargets, focus, alias }];
+  return ['S', { ...state[1], targets: nextTargets }];
 };

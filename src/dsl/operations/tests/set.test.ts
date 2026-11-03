@@ -27,6 +27,11 @@ const jira01: TargetSpec = [
 ];
 
 const cases: readonly Case[] = [
+  [
+    '§4.1 the todo list is kept',
+    [state([], [], {}, ['https://a.com']), 'https://x.com', 'x', '.set'],
+    [state([[['x'], 'https://x.com']], [], {}, ['https://a.com'])],
+  ],
   // operand extraction
   [
     '§4.1 the first literal is the destination; the separator and its suffix play no part',

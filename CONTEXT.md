@@ -25,7 +25,7 @@ The state of the world the browser client places beneath the stored state in eve
 _Avoid_: Default state, seed state, built-in state
 
 **Output register**:
-The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R` or `E`, the state of the world the run left behind, and facts about the run such as whether the stored record loaded. The host reads the register, never the returned stack.
+The host-held slot that host operations write to and that the host reads after execution: the run's terminal `R`, `D`, or `E`, the state of the world the run left behind, and facts about the run such as whether the stored record loaded. The host reads the register, never the returned stack.
 _Avoid_: Result variable, side channel
 
 ### Targets and matching
@@ -93,10 +93,10 @@ The matches produced by a search together with the user-supplied dimensions used
 ### State and focus
 
 **State of the world**:
-The collection of available targets together with the current focus and the alias definitions.
+The collection of available targets together with the current focus, the alias definitions, and the todo list.
 
 **Merge**:
-Combining two states of the world into one: their targets and alias definitions are united, the later state winning wherever both define a variant of the same arity or the same short form, and the focus is the later state's alone.
+Combining two states of the world into one: their targets and alias definitions are united, the later state winning wherever both define a variant of the same arity or the same short form; their todo lists are concatenated, a URL both hold kept at its first place; and the focus is the later state's alone.
 _Avoid_: Union, combine, import
 
 **Focus**:
@@ -110,6 +110,16 @@ _Avoid_: Alias reference, variable, macro
 A short form paired with the literal its alias stands for, part of the state of the world, at most one for each lowercased short form.
 _Avoid_: Constant, shortcut
 
+
+### Todo list
+
+**Todo item**:
+A URL kept to visit later: an explicit scheme, no `{}` placeholder, stored and compared exactly as typed. It has no dimensions and is never matched by search.
+_Avoid_: Task, bookmark, reading-list entry
+
+**Todo list**:
+The todo items of a state of the world, in the order they were added, with no URL twice. `.todo` appends to it or shows it, and `.done` removes from it; both end the run with the todo list as a `D`, which a client shows in place of a result. Finishing an item removes it; there is no done state.
+_Avoid_: Task list, reading list, queue
 
 ### Navigation
 

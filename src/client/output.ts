@@ -2,7 +2,7 @@
 // output register into the region beneath the field: an `E` as its `type` and `description`
 // verbatim, then the match list's summary bar, the setup instructions (while the target set holds
 // no target beyond the client base state's), and the list's rows, and the settings-reset hint when
-// the stored data could not be loaded. `renderWaiting`
+// the stored data could not be loaded; a `D` as the todo view instead of the list. `renderWaiting`
 // draws a nontrivial program that has not run yet (ADR 0015). `renderBareError` is the other
 // page: what an unavailable localStorage leaves, with no execution behind it.
 
@@ -10,6 +10,7 @@ import type { State, ThitherError } from '../dsl/index.ts';
 import type { OutputRegister } from './browser-env.ts';
 import { type KeyHint, renderKeyHints, renderMatchList } from './match-list.ts';
 import { renderSetupInstructions, showsSetupInstructions } from './setup-instructions.ts';
+import { renderTodoList } from './todo-list.ts';
 
 const RESET_HINT = 'Recover in Settings: revert to an earlier stack, clear, or import one.';
 
@@ -71,6 +72,17 @@ export const renderOutput = (region: Element, register: OutputRegister, base: St
   const { terminal } = register;
   if (terminal?.[0] === 'E') {
     nodes.push(renderError(doc, terminal));
+  }
+
+  // A run that ended in a `D` shows the todo view in place of the list, without the setup
+  // instructions (ADR 0017).
+  if (terminal?.[0] === 'D') {
+    nodes.push(...renderTodoList(doc, terminal[1].todo));
+    if (!register.loaded) {
+      nodes.push(renderResetHint(doc));
+    }
+    region.replaceChildren(...nodes);
+    return;
   }
 
   // Beside the instructions the list shows only the client base state's targets, so with no

@@ -1,9 +1,11 @@
 import { alias } from './operations/alias.ts';
 import { at } from './operations/at.ts';
+import { done } from './operations/done.ts';
 import { merge } from './operations/merge.ts';
 import { rm } from './operations/rm.ts';
 import { search } from './operations/search.ts';
 import { set } from './operations/set.ts';
+import { todo } from './operations/todo.ts';
 import type { InterpreterEnv, Op, OpFn } from './types.ts';
 
 export const defaultEnv = (): InterpreterEnv => ({
@@ -14,5 +16,7 @@ export const defaultEnv = (): InterpreterEnv => ({
     ['.$', search],
     ['.alias', alias],
     ['.merge', merge],
+    ['.todo', todo],
+    ['.done', done],
   ]),
 });

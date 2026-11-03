@@ -34,6 +34,7 @@ export const createInterpreter = (env: InterpreterEnv): Interpreter => {
 
           case 'S':
           case 'R':
+          case 'D':
           case 'E':
             push(stack, token);
         }

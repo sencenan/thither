@@ -4,6 +4,7 @@ import {
   type Dim,
   type ErrorType,
   type Literal,
+  type LiteralArray,
   SEP,
   SEP_ESCAPE,
   type Stack,
@@ -11,9 +12,10 @@ import {
   type State,
   type Template,
   type ThitherError,
+  type TodoList,
 } from './types.ts';
 
-export const emptyState = (): State => ['S', { targets: {}, focus: [], alias: {} }];
+export const emptyState = (): State => ['S', { targets: {}, focus: [], alias: {}, todo: [] }];
 
 export const thitherError = (
   type: ErrorType,
@@ -21,7 +23,7 @@ export const thitherError = (
   fields?: Record<string, unknown>,
 ): ThitherError => ['E', { type, description, ...fields }];
 
-// dsl.md §1 — the terminal seal: nothing lands on top of R or E; literals merge into L
+// dsl.md §1 — the terminal seal: nothing lands on top of R, D, or E; literals merge into L
 export const push = (stack: Stack, value: StackValue): Stack => {
   const top = stack[stack.length - 1];
 
@@ -35,6 +37,7 @@ export const push = (stack: Stack, value: StackValue): Stack => {
 
   switch (topSigil) {
     case 'R':
+    case 'D':
     case 'E':
       return stack;
 
@@ -118,6 +121,29 @@ export const keyOf = (dims: readonly Dim[]): string => normalizeDimensions(dims)
 
 // dsl.md §1 — a variant's arity is its count of anonymous `{}` placeholders.
 export const arityOf = (template: Template): number => template.split('{}').length - 1;
+
+// dsl.md §2 — a todo item is a URL: a valid template with no `{}`, taken verbatim.
+export const isTodoItem = (value: string): value is Template =>
+  value === value.trim() && arityOf(value) === 0 && isTemplate(value);
+
+// dsl.md §4.7, §4.8 — the operand of .todo and .done: exactly one literal, a todo item. An
+// alias or an escaped literal is no URL, so neither needs a rule of its own.
+export const todoItemOf = (op: string, ls: LiteralArray): Template | ThitherError => {
+  const [item, ...rest] = ls[1];
+  if (item === undefined || rest.length > 0) {
+    return thitherError('missing_operand', `${op} takes exactly one URL`);
+  }
+  return isTodoItem(item)
+    ? item
+    : thitherError('invalid_destination', `${item} is not a URL without {}`);
+};
+
+export const withTodo = (state: State, todo: readonly Template[]): State => [
+  'S',
+  { ...state[1], todo },
+];
+
+export const todoListOf = (state: State): TodoList => ['D', { todo: state[1].todo }];
 
 // dsl.md §4.1 — a variant is addressed by arity: replace the same-arity variant when present,
 // otherwise add it, keeping the list in arity-ascending order.
