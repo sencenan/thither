@@ -791,6 +791,8 @@ describe('the todo view ("A run that ends in a D shows the todo view")', () => {
       [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo }]],
     ]);
   const summary = (): string => root.querySelector('.output footer .count')?.textContent ?? '';
+  const viewLabel = (): string =>
+    root.querySelector('.output footer.todo-view .view-label')?.textContent ?? '';
   const right = (target: EventTarget): void => {
     target.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }),
@@ -806,7 +808,8 @@ describe('the todo view ("A run that ends in a D shows the todo view")', () => {
 
     expect(field.value).toBe('');
     expect(links()).toEqual([a, b]);
-    expect(summary()).toBe('2 todos');
+    expect(summary()).toBe('2 items');
+    expect(viewLabel()).toBe('Todo list');
   });
 
   it('.todo alone shows the list without changing it', () => {
@@ -815,7 +818,7 @@ describe('the todo view ("A run that ends in a D shows the todo view")', () => {
     enter(field);
 
     expect(links()).toEqual([a]);
-    expect(summary()).toBe('1 todo');
+    expect(summary()).toBe('1 item');
   });
 
   it('an empty todo list says so, with an example', () => {
@@ -824,6 +827,7 @@ describe('the todo view ("A run that ends in a D shows the todo view")', () => {
     enter(field);
 
     expect(links()).toEqual([]);
+    expect(viewLabel()).toBe('Todo list');
     expect(root.querySelector('.output .todo-empty')?.textContent).toContain(
       'https://example.com .todo',
     );
@@ -866,6 +870,7 @@ describe('the todo view ("A run that ends in a D shows the todo view")', () => {
 
     right(field);
     expect(field.value).toBe(a);
+    expect(viewLabel()).toBe('');
 
     type(field, `${field.value} .done`);
     enter(field);

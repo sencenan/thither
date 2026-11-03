@@ -33,12 +33,19 @@ const TODO_HINTS: readonly KeyHint[] = [
   ],
 ];
 
+// The bar names the view, so a todo list is never read as a search result.
 const renderFooter = (doc: Document, count: number): Element => {
   const footer = doc.createElement('footer');
+  footer.className = 'todo-view';
+  const label = doc.createElement('span');
+  label.className = 'view-label';
+  label.textContent = 'Todo list';
   const summary = doc.createElement('span');
   summary.className = 'count';
-  summary.textContent = `${count} ${count === 1 ? 'todo' : 'todos'}`;
-  footer.append(summary, renderKeyHints(doc, TODO_HINTS));
+  summary.textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
+  const title = doc.createElement('span');
+  title.append(label, summary);
+  footer.append(title, renderKeyHints(doc, TODO_HINTS));
   return footer;
 };
 
