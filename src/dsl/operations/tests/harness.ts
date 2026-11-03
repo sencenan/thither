@@ -32,12 +32,13 @@ export const state = (
   specs: readonly TargetSpec[],
   focus: readonly string[] = [],
   alias: Readonly<Record<string, string>> = {},
+  todo: readonly Template[] = [],
 ): State => {
   const targets: Record<string, readonly Template[]> = {};
   for (const [dims, ...variants] of specs) {
     targets[keyOf(dims)] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
-  return ['S', { targets, focus, alias }];
+  return ['S', { targets, focus, alias, todo }];
 };
 
 export const error = (type: string) => ['E', expect.objectContaining({ type })];

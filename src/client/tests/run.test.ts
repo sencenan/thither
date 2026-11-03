@@ -40,7 +40,7 @@ describe('run', () => {
   it('a search leaves the R in the register, with the tokens as the query', () => {
     const storage = fakeStorage({
       [STACKS_KEY]: JSON.stringify([
-        [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+        [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
       ]),
     });
     const env = createBrowserEnv(storage);
@@ -62,8 +62,8 @@ describe('run', () => {
 
     const record: unknown = JSON.parse(storage.getItem(STACKS_KEY) ?? 'null');
     expect(record).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 
@@ -84,7 +84,12 @@ describe('run', () => {
 describe('load', () => {
   it('records the stored state without searching or saving', () => {
     const record = JSON.stringify([
-      [['S', { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {} }]],
+      [
+        [
+          'S',
+          { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {}, todo: [] },
+        ],
+      ],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: record });
     const env = createBrowserEnv(storage);
@@ -136,27 +141,32 @@ describe('the client base state', () => {
   });
 
   it('the stored targets follow the base target, and the stored focus is kept', () => {
-    const storage = fakeStorage(stored({ targets: { home }, focus: ['h'], alias: {} }));
+    const storage = fakeStorage(stored({ targets: { home }, focus: ['h'], alias: {}, todo: [] }));
     const env = createBrowserEnv(storage, [], base);
     run(createInterpreter(env), env.base, []);
 
-    expect(env.state).toEqual(['S', { targets: { thither, home }, focus: ['h'], alias: {} }]);
+    expect(env.state).toEqual([
+      'S',
+      { targets: { thither, home }, focus: ['h'], alias: {}, todo: [] },
+    ]);
   });
 
   it('the merged state is what the run saves', () => {
-    const storage = fakeStorage(stored({ targets: { home }, focus: [], alias: {} }));
+    const storage = fakeStorage(stored({ targets: { home }, focus: [], alias: {}, todo: [] }));
     const env = createBrowserEnv(storage, [], base);
     run(createInterpreter(env), env.base, []);
 
     expect(currentState(storage)).toEqual([
       'S',
-      { targets: { thither, home }, focus: [], alias: {} },
+      { targets: { thither, home }, focus: [], alias: {}, todo: [] },
     ]);
   });
 
   it('a stored thither target overrides the base one', () => {
     const mine = ['https://mine.example/'];
-    const storage = fakeStorage(stored({ targets: { thither: mine }, focus: [], alias: {} }));
+    const storage = fakeStorage(
+      stored({ targets: { thither: mine }, focus: [], alias: {}, todo: [] }),
+    );
     const env = createBrowserEnv(storage, [], base);
     run(createInterpreter(env), env.base, []);
 
@@ -164,23 +174,29 @@ describe('the client base state', () => {
   });
 
   it('a removed thither target is merged in again by the next run', () => {
-    const storage = fakeStorage(stored({ targets: { home }, focus: [], alias: {} }));
+    const storage = fakeStorage(stored({ targets: { home }, focus: [], alias: {}, todo: [] }));
     const env = createBrowserEnv(storage, [], base);
     const interp = createInterpreter(env);
 
     run(interp, env.base, ['thither', '.rm']);
-    expect(currentState(storage)).toEqual(['S', { targets: { home }, focus: [], alias: {} }]);
+    expect(currentState(storage)).toEqual([
+      'S',
+      { targets: { home }, focus: [], alias: {}, todo: [] },
+    ]);
 
     run(interp, env.base, []);
     expect(env.state?.[1].targets).toEqual({ thither, home });
   });
 
   it('load merges the stored state into the base state too', () => {
-    const storage = fakeStorage(stored({ targets: { home }, focus: ['h'], alias: {} }));
+    const storage = fakeStorage(stored({ targets: { home }, focus: ['h'], alias: {}, todo: [] }));
     const env = createBrowserEnv(storage, [], base);
     load(createInterpreter(env), env.base);
 
-    expect(env.state).toEqual(['S', { targets: { thither, home }, focus: ['h'], alias: {} }]);
+    expect(env.state).toEqual([
+      'S',
+      { targets: { thither, home }, focus: ['h'], alias: {}, todo: [] },
+    ]);
   });
 
   it('an unreadable record still fails the run, leaving the base state in the register', () => {
@@ -193,7 +209,9 @@ describe('the client base state', () => {
   });
 
   it('without a base state the env merges onto an empty one', () => {
-    const env = createBrowserEnv(fakeStorage(stored({ targets: { home }, focus: [], alias: {} })));
+    const env = createBrowserEnv(
+      fakeStorage(stored({ targets: { home }, focus: [], alias: {}, todo: [] })),
+    );
     run(createInterpreter(env), env.base, []);
 
     expect(env.state?.[1].targets).toEqual({ home });

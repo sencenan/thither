@@ -26,7 +26,7 @@ describe('baseState', () => {
   ])('%s', (_name, pageUrl, destination) => {
     expect(baseState(pageUrl)).toEqual([
       'S',
-      { targets: { thither: [destination] }, focus: [], alias: {} },
+      { targets: { thither: [destination] }, focus: [], alias: {}, todo: [] },
     ]);
   });
 

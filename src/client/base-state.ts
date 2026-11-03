@@ -9,5 +9,5 @@ export const baseState = (pageUrl: string): State => {
   const page = new URL(pageUrl);
   page.search = '';
   page.hash = '';
-  return ['S', { targets: { thither: [page.href] }, focus: [], alias: {} }];
+  return ['S', { targets: { thither: [page.href] }, focus: [], alias: {}, todo: [] }];
 };

@@ -19,17 +19,27 @@ describe('execute resumes from a caller-supplied stack', () => {
 
     expect(stack[0]).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      {
+        targets: { 'company git': ['https://github.com/company/{}'] },
+        focus: [],
+        alias: {},
+        todo: [],
+      },
     ]);
     expect(stack[1]?.[0]).toBe('R');
-    expect(persisted).toEqual([['S', { targets: {}, focus: [], alias: {} }]]);
+    expect(persisted).toEqual([['S', { targets: {}, focus: [], alias: {}, todo: [] }]]);
   });
 });
 
 describe('the public surface holds the browser-client.md contract', () => {
   const state = [
     'S',
-    { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+    {
+      targets: { 'company git': ['https://github.com/company/{}'] },
+      focus: [],
+      alias: {},
+      todo: [],
+    },
   ];
 
   it('§2 a whitespace-bearing token is an E in the stream: earlier items execute, then it stops', () => {
@@ -57,7 +67,7 @@ describe('the public surface holds the browser-client.md contract', () => {
 describe('dsl.md §7 worked programs', () => {
   it('§7 create and search', () => {
     const stack = run([
-      ['S', { targets: {}, focus: [], alias: {} }],
+      ['S', { targets: {}, focus: [], alias: {}, todo: [] }],
       'https://github.com/company/{}',
       'company',
       'git',
@@ -68,7 +78,12 @@ describe('dsl.md §7 worked programs', () => {
     expect(stack).toEqual([
       [
         'S',
-        { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+        {
+          targets: { 'company git': ['https://github.com/company/{}'] },
+          focus: [],
+          alias: {},
+          todo: [],
+        },
       ],
       [
         'R',
@@ -92,7 +107,12 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 navigate with inferred arguments', () => {
     const state = [
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      {
+        targets: { 'company git': ['https://github.com/company/{}'] },
+        focus: [],
+        alias: {},
+        todo: [],
+      },
     ];
     const stack = run([state, 'company', 'git', 'MyRepo', '.$']);
 
@@ -127,6 +147,7 @@ describe('dsl.md §7 worked programs', () => {
         },
         focus: [],
         alias: {},
+        todo: [],
       },
     ];
     const stack = run([state, 'git', '.', 'thither', '.$']);
@@ -162,7 +183,7 @@ describe('dsl.md §7 worked programs', () => {
   it('§7 variants of one target', () => {
     // Two .set programs build one target with an arity-0 and an arity-1 variant.
     const created = run([
-      ['S', { targets: {}, focus: [], alias: {} }],
+      ['S', { targets: {}, focus: [], alias: {}, todo: [] }],
       'https://jira.example.com',
       'jira',
       '.set',
@@ -178,6 +199,7 @@ describe('dsl.md §7 worked programs', () => {
         },
         focus: [],
         alias: {},
+        todo: [],
       },
     ];
     expect(created).toEqual([state]);
@@ -264,7 +286,7 @@ describe('dsl.md §7 worked programs', () => {
     // Removing the arity-1 variant leaves the arity-0 variant, and jira PROJ then navigates.
     const removed = run([state, 'jira', '.', 'x', '.rm']);
     expect(removed).toEqual([
-      ['S', { targets: { jira: ['https://jira.example.com'] }, focus: [], alias: {} }],
+      ['S', { targets: { jira: ['https://jira.example.com'] }, focus: [], alias: {}, todo: [] }],
     ]);
     expect(run([removed[0], 'jira', 'PROJ', '.$'])[1]).toEqual([
       'R',
@@ -294,6 +316,7 @@ describe('dsl.md §7 worked programs', () => {
         },
         focus: [],
         alias: {},
+        todo: [],
       },
     ];
     const stack = run([state, '.$']);
@@ -336,6 +359,7 @@ describe('dsl.md §7 worked programs', () => {
         },
         focus: [],
         alias: {},
+        todo: [],
       },
     ];
     const stack = run([state, 'browse', '.', 'PROJ', '.$']);
@@ -365,9 +389,27 @@ describe('dsl.md §7 worked programs', () => {
     ]);
   });
 
+  it('§7 keep and finish a todo item', () => {
+    const rfc = 'https://example.com/rfc';
+    const kept = run([['S', { targets: {}, focus: [] }], rfc, '.todo', '.$']);
+
+    expect(kept).toEqual([
+      ['S', { targets: {}, focus: [], alias: {}, todo: [rfc] }],
+      ['D', { todo: [rfc] }],
+    ]);
+
+    expect(run([kept[0], rfc, '.done', '.$'])).toEqual([
+      ['S', { targets: {}, focus: [], alias: {}, todo: [] }],
+      ['D', { todo: [] }],
+    ]);
+  });
+
   it('§7 stop at the first result', () => {
-    const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [], alias: {} }];
-    const s1 = ['S', { targets: { docs: ['https://docs.example.com/'] }, focus: [], alias: {} }];
+    const s0 = ['S', { targets: { git: ['https://github.com/'] }, focus: [], alias: {}, todo: [] }];
+    const s1 = [
+      'S',
+      { targets: { docs: ['https://docs.example.com/'] }, focus: [], alias: {}, todo: [] },
+    ];
     const stack = run([s0, 'git', '.$', s1, 'docs', '.$']);
 
     expect(stack).toHaveLength(2);
@@ -402,7 +444,10 @@ const alphabet: readonly unknown[] = [
   '.set',
   '.rm',
   '.@',
+  '.todo',
+  '.done',
   '.nope',
+  'https://example.com/',
   '',
   ' ',
   '{}',
@@ -414,12 +459,15 @@ const alphabet: readonly unknown[] = [
   'Ünïcödé',
   '$&',
   '["S", {"targets": {}, "focus": [], "alias": {}}]',
-  ['S', { targets: {}, focus: [], alias: {} }],
-  ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'], alias: {} }],
+  ['S', { targets: {}, focus: [], alias: {}, todo: [] }],
+  ['S', { targets: { a: ['https://a/{}'] }, focus: ['a'], alias: {}, todo: [] }],
   ['S', { targets: 'wrong' }],
-  ['S', { targets: { a: ['not-a-url'] }, focus: [], alias: {} }],
+  ['S', { targets: { a: ['not-a-url'] }, focus: [], alias: {}, todo: [] }],
   ['R', { matches: [], inputs: [], args: [] }],
   ['R', 'wrong'],
+  ['D', { todo: ['https://a/'] }],
+  ['D', { todo: ['https://a/{}'] }],
+  ['S', { todo: ['https://a/', 'https://a/'] }],
   ['E', { type: 'unknown_error', description: 'boom' }],
   ['E', { type: 'made_up', description: 'boom' }],
   ['L', ['a']],

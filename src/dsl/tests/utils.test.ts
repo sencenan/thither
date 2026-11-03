@@ -8,7 +8,10 @@ import { emptyState, resolveAliases, resolveEscape, takeOperands } from '../util
 type Sigil = Stack[number][0];
 
 const s0: State = emptyState();
-const s1: State = ['S', { targets: { git: ['https://github.com/'] }, focus: [], alias: {} }];
+const s1: State = [
+  'S',
+  { targets: { git: ['https://github.com/'] }, focus: [], alias: {}, todo: [] },
+];
 const l: LiteralArray = ['L', ['git']];
 const r: Result = ['R', { matches: [], inputs: [], args: [] }];
 const e: ThitherError = ['E', { type: 'unknown_error', description: 'x' }];
@@ -93,7 +96,7 @@ describe('takeOperands', () => {
 describe('resolveAliases', () => {
   const aliased: State = [
     'S',
-    { targets: {}, focus: [], alias: { gh: 'github', dot: '..set', re: '~gh' } },
+    { targets: {}, focus: [], alias: { gh: 'github', dot: '..set', re: '~gh' }, todo: [] },
   ];
 
   it.each<[string, readonly string[], readonly string[]]>([

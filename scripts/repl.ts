@@ -198,7 +198,7 @@ const command = (line: string): boolean => {
       break;
     case ':seed':
       history.push(stack);
-      stack = [['S', { targets: { ...seed }, focus: [], alias: {} }]];
+      stack = [['S', { targets: { ...seed }, focus: [], alias: {}, todo: [] }]];
       console.log(showState(stack[0]));
       break;
     case ':reset':

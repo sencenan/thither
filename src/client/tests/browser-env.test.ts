@@ -121,7 +121,7 @@ describe('browser env host operations', () => {
     // ADR 0008 changed the persisted shape (targets: array -> keyed object) with no migration; an
     // existing record parses to parse_error and is reset by hand rather than silently converted.
     const oldShape = JSON.stringify([
-      [['S', { targets: [[['home'], 'https://example.com/']], focus: [], alias: {} }]],
+      [['S', { targets: [[['home'], 'https://example.com/']], focus: [], alias: {}, todo: [] }]],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: oldShape });
     const { register } = runClient(storage, ['home']);
@@ -185,7 +185,12 @@ describe('browser env host operations', () => {
 
     expect(register.state).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      {
+        targets: { 'company git': ['https://github.com/company/{}'] },
+        focus: [],
+        alias: {},
+        todo: [],
+      },
     ]);
   });
 
@@ -286,7 +291,7 @@ describe('.save persists only when the register holds an R', () => {
 
     expect(record(storage)).toEqual([
       [emptyState()],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 });
@@ -295,7 +300,7 @@ describe('bounded history', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
   const stateWith = (targets: Record<string, readonly string[]>) => [
     'S',
-    { targets, focus: [], alias: {} },
+    { targets, focus: [], alias: {}, todo: [] },
   ];
   const A = stateWith({});
   const B = stateWith({ home: ['https://example.com/'] });
@@ -416,7 +421,7 @@ describe('bounded history', () => {
 describe('settings actions on the history', () => {
   const stateWith = (targets: Record<string, readonly string[]>) => [
     'S',
-    { targets, focus: [], alias: {} },
+    { targets, focus: [], alias: {}, todo: [] },
   ];
   const A = stateWith({ home: ['https://example.com/'] });
   const B = stateWith({ git: ['https://github.com/{}'] });
@@ -553,7 +558,10 @@ describe('settings record', () => {
 // root built, for every run of the page.
 describe('createBrowserEnv base', () => {
   it('carries the base state it is given', () => {
-    const base = ['S', { targets: { thither: ['https://x/'] }, focus: [], alias: {} }] as const;
+    const base = [
+      'S',
+      { targets: { thither: ['https://x/'] }, focus: [], alias: {}, todo: [] },
+    ] as const;
     expect(createBrowserEnv(fakeStorage(), [], base).base).toBe(base);
   });
 

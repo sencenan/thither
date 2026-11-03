@@ -10,7 +10,7 @@ import type { State } from '../../dsl/index.ts';
 import type { OutputRegister } from '../browser-env.ts';
 import { renderBareError, renderOutput as renderOutputOver } from '../output.ts';
 
-const noBase: State = ['S', { targets: {}, focus: [], alias: {} }];
+const noBase: State = ['S', { targets: {}, focus: [], alias: {}, todo: [] }];
 const renderOutput = (region: Element, register: OutputRegister): void =>
   renderOutputOver(region, register, noBase);
 
@@ -25,10 +25,10 @@ beforeEach(() => {
   root = app;
 });
 
-const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {} }];
+const emptySet: OutputRegister['state'] = ['S', { targets: {}, focus: [], alias: {}, todo: [] }];
 const oneTarget: OutputRegister['state'] = [
   'S',
-  { targets: { home: ['https://example.com/'] }, focus: [], alias: {} },
+  { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] },
 ];
 const everyTarget: OutputRegister['terminal'] = ['R', { matches: [], inputs: [], args: [] }];
 
@@ -73,7 +73,12 @@ describe('renderOutput', () => {
   describe('the focus bar ("the current focus, the dimensions added to every search")', () => {
     const focused: OutputRegister['state'] = [
       'S',
-      { targets: { home: ['https://example.com/'] }, focus: ['company', '!archived'], alias: {} },
+      {
+        targets: { home: ['https://example.com/'] },
+        focus: ['company', '!archived'],
+        alias: {},
+        todo: [],
+      },
     ];
 
     it('shows the current focus above the results when focus is non-empty', () => {
@@ -137,7 +142,7 @@ describe('renderOutput', () => {
     });
 
     it('a target set holding only the client base state shows the instructions, then the list', () => {
-      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {} }];
+      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {}, todo: [] }];
       const terminal: OutputRegister['terminal'] = [
         'R',
         {
@@ -159,7 +164,7 @@ describe('renderOutput', () => {
     });
 
     it('a search matching nothing in the base state lists no matches beneath the instructions', () => {
-      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {} }];
+      const base: State = ['S', { targets: { thither: [PAGE] }, focus: [], alias: {}, todo: [] }];
       renderOutputOver(root, { loaded: true, terminal: everyTarget, state: base }, base);
 
       const text = root.textContent ?? '';

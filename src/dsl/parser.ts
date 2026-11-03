@@ -16,6 +16,7 @@ import {
   type State,
   type Template,
   type ThitherError,
+  type TodoList,
   type Token,
 } from './types.ts';
 import {
@@ -23,6 +24,7 @@ import {
   isOperatorOnly,
   isOperatorTerm,
   isTemplate,
+  isTodoItem,
   keyOf,
   thitherError,
 } from './utils.ts';
@@ -71,6 +73,8 @@ export const parse = (env: InterpreterEnv, raw: unknown): Token => {
         return parseState(body);
       case 'R':
         return parseResult(body);
+      case 'D':
+        return parseTodoList(body);
       case 'E':
         return parseError(body);
     }
@@ -89,8 +93,13 @@ const parseState = (raw: unknown): Token => {
     return createParseError(`unknown State field ${unknownField}`);
   }
 
-  const { targets = {}, focus = [], alias = {} } = raw;
-  if (!isRecord(targets) || !isFocusList(focus) || !isAliasDefinitions(alias)) {
+  const { targets = {}, focus = [], alias = {}, todo = [] } = raw;
+  if (
+    !isRecord(targets) ||
+    !isFocusList(focus) ||
+    !isAliasDefinitions(alias) ||
+    !isTodoItems(todo)
+  ) {
     return createParseError('malformed State');
   }
 
@@ -124,10 +133,10 @@ const parseState = (raw: unknown): Token => {
     normalized[key] = [...variants].sort((a, b) => arityOf(a) - arityOf(b));
   }
 
-  return ['S', { targets: normalized, focus: [...focus], alias: { ...alias } }];
+  return ['S', { targets: normalized, focus: [...focus], alias: { ...alias }, todo: [...todo] }];
 };
 
-const STATE_FIELDS: (keyof State[1])[] = ['targets', 'focus', 'alias'];
+const STATE_FIELDS: (keyof State[1])[] = ['targets', 'focus', 'alias', 'todo'];
 const STATE_FIELD_SET: ReadonlySet<string> = new Set(STATE_FIELDS);
 
 const parseResult = (raw: unknown): Result | ThitherError => {
@@ -145,6 +154,18 @@ const parseResult = (raw: unknown): Result | ThitherError => {
 
   return createParseError('malformed Result');
 };
+
+// dsl.md §2 — a D carries only its todo list, validated as S's is; unknown fields are dropped.
+const parseTodoList = (raw: unknown): TodoList | ThitherError => {
+  if (isRecord(raw) && isTodoItems(raw.todo)) {
+    return ['D', { todo: [...raw.todo] }];
+  }
+  return createParseError('malformed todo list');
+};
+
+// dsl.md §2 — todo items are placeholder-free URLs, none twice.
+const isTodoItems = (value: unknown): value is Template[] =>
+  isStringArray(value) && value.every(isTodoItem) && new Set(value).size === value.length;
 
 const parseError = (err: unknown): Token => {
   if (

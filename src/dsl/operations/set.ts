@@ -57,10 +57,10 @@ const setTarget = (state: State, ls: LiteralArray): State | ThitherError => {
 
   // §4.1 — exact key lookup, no search, no focus. A missing key inserts; an existing key gains
   // or replaces the variant of the destination's arity, keeping its position and other variants.
-  const { targets, focus, alias } = state[1];
+  const { targets } = state[1];
   const key = keyOf(explicit);
   const existing = targets[key];
   const variants = existing === undefined ? [dest] : upsertVariant(existing, dest);
 
-  return ['S', { targets: { ...targets, [key]: variants }, focus, alias }];
+  return ['S', { ...state[1], targets: { ...targets, [key]: variants } }];
 };

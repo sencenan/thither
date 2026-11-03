@@ -9,6 +9,11 @@ import { type Case, error, explicitError, runWith, state, testInterp, three } fr
 const run = runWith({ '.@': at, '.set': set });
 
 const cases: readonly Case[] = [
+  [
+    '§4.3 the todo list is kept',
+    [state([], [], {}, ['https://a.com']), 'git', '.@'],
+    [state([], ['git'], {}, ['https://a.com'])],
+  ],
   // replace
   [
     '§4.3 stores the matching portion verbatim: no normalization, typed order and case kept',

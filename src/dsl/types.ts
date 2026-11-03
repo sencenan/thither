@@ -59,8 +59,12 @@ export type State = readonly [
     readonly targets: TargetSet;
     readonly focus: readonly Dim[];
     readonly alias: Record<string, string>;
+    // dsl.md §1 — the todo list: placeholder-free URLs, in the order added, none twice.
+    readonly todo: readonly Template[];
   },
 ];
+
+export type TodoList = readonly ['D', { readonly todo: readonly Template[] }];
 
 export type Result = readonly [
   'R',
@@ -85,12 +89,12 @@ export type OpToken = ['o', Op];
 
 // program types, what can be part of a program
 
-export type Token = State | Result | ThitherError | LiteralToken | OpToken;
+export type Token = State | Result | TodoList | ThitherError | LiteralToken | OpToken;
 export type Program = Token[];
 
 // stack types, what can be in the data stack
 
-export type StackValue = State | Result | ThitherError | LiteralArray;
+export type StackValue = State | Result | TodoList | ThitherError | LiteralArray;
 export type Stack = StackValue[];
 
 // evaluation types

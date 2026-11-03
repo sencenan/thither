@@ -57,7 +57,10 @@ describe('renderProgram', () => {
   // browser-client.md "Fallback UI and settings" — the client base state is a supplied S, shown
   // as one chip with its JSON on hover.
   it('a state value is one S chip, its JSON on hover', () => {
-    const base: State = ['S', { targets: { thither: ['https://x/'] }, focus: [], alias: {} }];
+    const base: State = [
+      'S',
+      { targets: { thither: ['https://x/'] }, focus: [], alias: {}, todo: [] },
+    ];
     const chip = renderProgram(document, interp, [base, '.load']).querySelector('li.token');
     expect(chip?.textContent).toBe('S');
     expect(chip?.className).toBe('token state');

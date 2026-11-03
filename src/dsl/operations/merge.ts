@@ -23,7 +23,8 @@ export const merge: OpFn = (_interp, stack) => {
 
 // §4.6 — the lower state's targets keep their order and the top state's new keys follow; a key in
 // both gains the top state's variants as .set would. Alias definitions unite, the top state
-// winning a short form both define, and focus is the top state's.
+// winning a short form both define, and focus is the top state's. Todo lists concatenate, a URL
+// both hold kept at its first occurrence.
 const mergeStates = (below: State, above: State): State => {
   const targets: Record<string, readonly Template[]> = { ...below[1].targets };
   for (const [key, variants] of Object.entries(above[1].targets)) {
@@ -37,6 +38,7 @@ const mergeStates = (below: State, above: State): State => {
       targets,
       focus: above[1].focus,
       alias: { ...below[1].alias, ...above[1].alias },
+      todo: [...new Set([...below[1].todo, ...above[1].todo])],
     },
   ];
 };

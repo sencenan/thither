@@ -16,5 +16,6 @@ export type {
   TargetSet,
   Template,
   ThitherError,
+  TodoList,
 } from './types.ts';
 export { emptyState } from './utils.ts';

@@ -43,7 +43,7 @@ const fakeStorage = (
 };
 
 const oneTargetRecord = JSON.stringify([
-  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+  [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
 ]);
 
 // `t01` … `t11`, each to `https://example.com/tNN`, in target-set order.
@@ -60,6 +60,7 @@ const elevenTargetsRecord = JSON.stringify([
         ),
         focus: [],
         alias: {},
+        todo: [],
       },
     ],
   ],
@@ -157,8 +158,8 @@ describe('the Settings control ("Provide a Settings control on the page, opening
   });
 
   const twoDeepRecord = JSON.stringify([
-    [['S', { targets: {}, focus: [], alias: {} }]],
-    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+    [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+    [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
   ]);
 
   it('"After an action the modal closes and the page re-runs the field\'s current contents": a revert shows the reverted stack', () => {
@@ -185,7 +186,7 @@ describe('the Settings control ("Provide a Settings control on the page, opening
 
     expect(root.textContent).toContain('No custom targets yet');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 
@@ -392,8 +393,8 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     expect(waitingNotice()).toBe('');
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 
@@ -483,7 +484,12 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
 
   it('the waiting page still shows the stored focus, loaded without running the program', () => {
     const focused = JSON.stringify([
-      [['S', { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {} }]],
+      [
+        [
+          'S',
+          { targets: { home: ['https://example.com/'] }, focus: ['company'], alias: {}, todo: [] },
+        ],
+      ],
     ]);
     open(fakeStorage({ [STACKS_KEY]: focused }), ['home', '.rm']);
 
@@ -492,8 +498,8 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
 
   it('a settings action re-renders the stored world but does not run the waiting program', () => {
     const twoDeep = JSON.stringify([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
     const storage = fakeStorage({ [STACKS_KEY]: twoDeep });
     const { field } = open(storage, []);
@@ -505,7 +511,7 @@ describe('a nontrivial program waits for Enter (ADR 0015)', () => {
     expect(field.value).toBe('https://example.com/x x .set');
     expect(waitingNotice()).toContain('press Enter');
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 });
@@ -927,7 +933,12 @@ describe('shortcuts ("navigation shortcuts Ctrl+1 through Ctrl+9, then Ctrl+0 fo
       [
         [
           'S',
-          { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+          {
+            targets: { 'company git': ['https://github.com/company/{}'] },
+            focus: [],
+            alias: {},
+            todo: [],
+          },
         ],
       ],
     ]);
@@ -963,8 +974,8 @@ describe('Enter ("Enter opens the first row when the run searched a query … a 
     expect(location.href).toBe(PAGE);
     expect(links()).toEqual(['https://example.com/']);
     expect(JSON.parse(storage.getItem(STACKS_KEY) ?? 'null')).toEqual([
-      [['S', { targets: {}, focus: [], alias: {} }]],
-      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {} }]],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [] }]],
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo: [] }]],
     ]);
   });
 

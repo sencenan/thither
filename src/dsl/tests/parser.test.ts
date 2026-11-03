@@ -112,37 +112,46 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
           targets: { 'Git  company git': ['https://github.com/company/{}'] },
           focus: [],
           alias: {},
+          todo: [],
         },
       ]),
     );
     expect(token).toEqual([
       'S',
-      { targets: { 'company git': ['https://github.com/company/{}'] }, focus: [], alias: {} },
+      {
+        targets: { 'company git': ['https://github.com/company/{}'] },
+        focus: [],
+        alias: {},
+        todo: [],
+      },
     ]);
   });
 
   it('§3 focus is stored verbatim: neither normalized, deduped, nor reordered', () => {
     const token = parse(
       env,
-      frozen(['S', { targets: {}, focus: ['Personal', 'personal'], alias: {} }]),
+      frozen(['S', { targets: {}, focus: ['Personal', 'personal'], alias: {}, todo: [] }]),
     );
-    expect(token).toEqual(['S', { targets: {}, focus: ['Personal', 'personal'], alias: {} }]);
+    expect(token).toEqual([
+      'S',
+      { targets: {}, focus: ['Personal', 'personal'], alias: {}, todo: [] },
+    ]);
   });
 
   it('§3 focus may carry search operators', () => {
     const token = parse(
       env,
-      frozen(['S', { targets: {}, focus: ['!personal', 'git', '|', 'docs'], alias: {} }]),
+      frozen(['S', { targets: {}, focus: ['!personal', 'git', '|', 'docs'], alias: {}, todo: [] }]),
     );
     expect(token).toEqual([
       'S',
-      { targets: {}, focus: ['!personal', 'git', '|', 'docs'], alias: {} },
+      { targets: {}, focus: ['!personal', 'git', '|', 'docs'], alias: {}, todo: [] },
     ]);
   });
 
   it('§2 an empty, whitespace-bearing, or operator-only focus term is invalid', () => {
     for (const term of ['', 'a b', '!', '^$']) {
-      const token = parse(env, ['S', { targets: {}, focus: [term], alias: {} }]);
+      const token = parse(env, ['S', { targets: {}, focus: [term], alias: {}, todo: [] }]);
       expect(token[0]).toBe('E');
       expect(token[1]).toMatchObject({ type: 'parse_error' });
     }
@@ -157,6 +166,7 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
           targets: { b: ['https://b.example.com/'], a: ['https://a.example.com/'] },
           focus: [],
           alias: {},
+          todo: [],
         },
       ]),
     );
@@ -169,11 +179,14 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
   it('§2 stores the original destination text, not the parser-normalized probe', () => {
     const token = parse(
       env,
-      frozen(['S', { targets: { x: ['https://Example.COM/{}/Path'] }, focus: [], alias: {} }]),
+      frozen([
+        'S',
+        { targets: { x: ['https://Example.COM/{}/Path'] }, focus: [], alias: {}, todo: [] },
+      ]),
     );
     expect(token).toEqual([
       'S',
-      { targets: { x: ['https://Example.COM/{}/Path'] }, focus: [], alias: {} },
+      { targets: { x: ['https://Example.COM/{}/Path'] }, focus: [], alias: {}, todo: [] },
     ]);
   });
 
@@ -189,6 +202,7 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
           },
           focus: [],
           alias: {},
+          todo: [],
         },
       ]),
     );
@@ -198,7 +212,10 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
 
   it('§2 a target key carrying fzf operator syntax makes the state invalid', () => {
     for (const dim of ['!git', "'git", '^git', 'git$', '|']) {
-      const token = parse(env, ['S', { targets: { [dim]: ['https://x/'] }, focus: [], alias: {} }]);
+      const token = parse(env, [
+        'S',
+        { targets: { [dim]: ['https://x/'] }, focus: [], alias: {}, todo: [] },
+      ]);
       expect(token[0]).toBe('E');
       expect(token[1]).toMatchObject({ type: 'parse_error' });
     }
@@ -207,7 +224,10 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
   it('§2 two variants of one target sharing an arity make the state invalid', () => {
     const token = parse(
       env,
-      frozen(['S', { targets: { x: ['https://a/{}', 'https://b/{}'] }, focus: [], alias: {} }]),
+      frozen([
+        'S',
+        { targets: { x: ['https://a/{}', 'https://b/{}'] }, focus: [], alias: {}, todo: [] },
+      ]),
     );
     expect(token[0]).toBe('E');
     expect(token[1]).toMatchObject({ type: 'parse_error' });
@@ -216,11 +236,14 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
   it('§2 variants are stored in arity-ascending order regardless of supplied order', () => {
     const token = parse(
       env,
-      frozen(['S', { targets: { x: ['https://a/{}/{}', 'https://b/{}'] }, focus: [], alias: {} }]),
+      frozen([
+        'S',
+        { targets: { x: ['https://a/{}/{}', 'https://b/{}'] }, focus: [], alias: {}, todo: [] },
+      ]),
     );
     expect(token).toEqual([
       'S',
-      { targets: { x: ['https://b/{}', 'https://a/{}/{}'] }, focus: [], alias: {} },
+      { targets: { x: ['https://b/{}', 'https://a/{}/{}'] }, focus: [], alias: {}, todo: [] },
     ]);
   });
 
@@ -229,25 +252,32 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
     ['an S with only targets', { targets: {} }],
     ['an S with only focus', { focus: [] }],
     ['an S with only alias', { alias: {} }],
+    ['an S with only todo', { todo: [] }],
   ])('§2 omitted fields default to empty: %s parses as the empty state', (_name, body) => {
-    expect(parse(env, frozen(['S', body]))).toEqual(['S', { targets: {}, focus: [], alias: {} }]);
+    expect(parse(env, frozen(['S', body]))).toEqual([
+      'S',
+      { targets: {}, focus: [], alias: {}, todo: [] },
+    ]);
   });
 
   it('§2 an omitted field defaults to empty; the supplied fields are kept', () => {
-    const token = parse(env, frozen(['S', { focus: ['company'], alias: { gh: 'git' } }]));
-    expect(token).toEqual(['S', { targets: {}, focus: ['company'], alias: { gh: 'git' } }]);
+    const token = parse(env, frozen(['S', { focus: ['company'], alias: { gh: 'git' }, todo: [] }]));
+    expect(token).toEqual([
+      'S',
+      { targets: {}, focus: ['company'], alias: { gh: 'git' }, todo: [] },
+    ]);
   });
 
   it('§2 an escaped literal is a valid defined literal: .~x does not start with ~', () => {
-    const token = parse(env, frozen(['S', { alias: { ex: '.~gh' } }]));
-    expect(token).toEqual(['S', { targets: {}, focus: [], alias: { ex: '.~gh' } }]);
+    const token = parse(env, frozen(['S', { alias: { ex: '.~gh' }, todo: [] }]));
+    expect(token).toEqual(['S', { targets: {}, focus: [], alias: { ex: '.~gh' }, todo: [] }]);
   });
 
   it('§2/§4.1 a target key may carry a dimension starting with ~, as an escaped .set stores it', () => {
     const token = parse(env, frozen(['S', { targets: { '~x': ['https://x.example/'] } }]));
     expect(token).toEqual([
       'S',
-      { targets: { '~x': ['https://x.example/'] }, focus: [], alias: {} },
+      { targets: { '~x': ['https://x.example/'] }, focus: [], alias: {}, todo: [] },
     ]);
   });
 
@@ -287,14 +317,20 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
       'https://example.com/',
     ];
     for (const dest of accepted) {
-      const token = parse(env, frozen(['S', { targets: { x: [dest] }, focus: [], alias: {} }]));
-      expect(token).toEqual(['S', { targets: { x: [dest] }, focus: [], alias: {} }]);
+      const token = parse(
+        env,
+        frozen(['S', { targets: { x: [dest] }, focus: [], alias: {}, todo: [] }]),
+      );
+      expect(token).toEqual(['S', { targets: { x: [dest] }, focus: [], alias: {}, todo: [] }]);
     }
   });
 
   it('§2 rejects destinations without an explicit scheme', () => {
     for (const dest of ['example.com/path', '/path/{}', '//example.com/{}']) {
-      const token = parse(env, frozen(['S', { targets: { x: [dest] }, focus: [], alias: {} }]));
+      const token = parse(
+        env,
+        frozen(['S', { targets: { x: [dest] }, focus: [], alias: {}, todo: [] }]),
+      );
       expect(token[0]).toBe('E');
       expect(token[1]).toMatchObject({ type: 'parse_error' });
     }
@@ -303,8 +339,54 @@ describe('parse — supplied State (dsl.md §2, §3)', () => {
   it('§2 rejects a malformed State envelope', () => {
     expect(parse(env, frozen(['S', 'wrong']))[0]).toBe('E');
     expect(parse(env, frozen(['S', { targets: {}, focus: 'wrong' }]))[0]).toBe('E');
-    expect(parse(env, frozen(['S', { targets: 'wrong', focus: [], alias: {} }]))[0]).toBe('E');
-    expect(parse(env, frozen(['S', { targets: { x: [] }, focus: [], alias: {} }]))[0]).toBe('E');
+    expect(parse(env, frozen(['S', { targets: 'wrong', focus: [], alias: {}, todo: [] }]))[0]).toBe(
+      'E',
+    );
+    expect(
+      parse(env, frozen(['S', { targets: { x: [] }, focus: [], alias: {}, todo: [] }]))[0],
+    ).toBe('E');
+  });
+});
+
+describe('parse — todo lists in S and D (dsl.md §2)', () => {
+  const a = 'https://a.com';
+  const b = 'https://b.com';
+  const empty = { targets: {}, focus: [], alias: {} };
+
+  it('§2 an omitted todo field is repaired to an empty todo list', () => {
+    expect(parse(env, frozen(['S', empty]))).toEqual(['S', { ...empty, todo: [] }]);
+  });
+
+  it('§2 a supplied todo list is kept verbatim, in order', () => {
+    expect(parse(env, frozen(['S', { todo: [b, a] }]))).toEqual(['S', { ...empty, todo: [b, a] }]);
+  });
+
+  it('§2 a supplied D keeps its todo list and drops unknown fields', () => {
+    expect(parse(env, frozen(['D', { todo: [a], note: 'x' }]))).toEqual(['D', { todo: [a] }]);
+  });
+
+  it('§2 a supplied D without a todo field is malformed', () => {
+    expect(parse(env, frozen(['D', {}]))).toEqual([
+      'E',
+      expect.objectContaining({ type: 'parse_error' }),
+    ]);
+  });
+
+  it.each([
+    ['a template', ['https://a.com/{}']],
+    ['a non-URL literal', ['later']],
+    ['a URL twice', [a, b, a]],
+    ['a non-string', [1]],
+    ['an untrimmed URL', [' https://a.com']],
+  ])('§2 a todo list holding %s is invalid, in S and in D', (_name, todo) => {
+    const error = ['E', expect.objectContaining({ type: 'parse_error' })];
+    expect(parse(env, frozen(['S', { todo }]))).toEqual(error);
+    expect(parse(env, frozen(['D', { todo }]))).toEqual(error);
+  });
+
+  it('§2 a todo field that is not an array is invalid', () => {
+    expect(parse(env, frozen(['S', { todo: a }]))[0]).toBe('E');
+    expect(parse(env, frozen(['D', { todo: a }]))[0]).toBe('E');
   });
 });
 
