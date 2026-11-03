@@ -6,3 +6,4 @@
 - [x] keyboard navigation
 - [x] state merge operator
 - [ ] load S from a state URL
+- [ ] put a match row's rendered URL into the field, so a search result can be kept with `.todo`

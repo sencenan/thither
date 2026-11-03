@@ -20,7 +20,7 @@ The rightmost stack element is the top. Transition notation is:
 stack | current value or operation -> resulting stack
 ```
 
-`K` denotes an untouched stack prefix, which successful operations preserve. `S` is state, `R` a result, `E` an error, `L` an accumulated literal array, and `x` any ordinary literal (`d`, `u`, or `p`).
+`K` denotes an untouched stack prefix, which successful operations preserve. `S` is state, `R` a result, `D` a todo list, `E` an error, `L` an accumulated literal array, and `x` any ordinary literal (`d`, `u`, or `p`). Upper case marks a collection of the lower-case symbol only for `t`/`T` and `m`/`M`: `D` is not a collection of `d`.
 
 Square brackets in transition diagrams describe values, not source syntax. In particular, an accumulated literal array is an evaluator value, not an array literal that users can write.
 
@@ -35,15 +35,16 @@ Square brackets in transition diagrams describe values, not source syntax. In pa
 | `k` | Key | A target's normalized dimensions joined with single spaces (section 3). A target's identity and the text matching runs against. |
 | `t` | Target | One entry `k: [p]` of a target set: a key paired with its **variants**, destination templates of pairwise distinct **arity** (number of `{}`) in arity-ascending order. A plain URL is a variant of arity zero. |
 | `T` | Target set | `{ k: [p] }`: an object keyed by `k`, at most one target per key. |
-| `S` | State of the world | `["S", { "targets": T, "focus": [d], "alias": { string: string } }]`. |
+| `S` | State of the world | `["S", { "targets": T, "focus": [d], "alias": { string: string }, "todo": [u] }]`. `todo` is the **todo list**: **todo items**, each a `u`, in the order they were added, with no URL twice. |
 | `m` | Match | `[u_or_p, p, k, [args], hint]`: the rendered destination, the variant's template it was rendered from, the target's key, the applied arguments, and a `hint` carrying at least `argDelta`, `on`, `positions`, and `score`. Missing arguments may leave a partially rendered template in the first slot. |
 | `M` | Match set | `[m]`, including matches with missing arguments. |
 | `R` | Search result | `["R", { "matches": M, "inputs": [d], "args": [d] }]`. |
+| `D` | Todo list | `["D", { "todo": [u] }]`: the todo list as `.todo` or `.done` left it (sections 4.7 and 4.8). |
 | `E` | Error | `["E", { "type": string, "description": string }]`; additional diagnostic fields are permitted. |
 
 The `[d]` and `[args]` notation means an array, not necessarily a single element.
 
-`t` and `T` occur inside `S`; `m` and `M` occur inside `R`. They cannot appear as standalone program values; such input parses to `E`. `S`, `R`, and `E` are permitted top-level JSON values.
+`t` and `T` occur inside `S`; `m` and `M` occur inside `R`. They cannot appear as standalone program values; such input parses to `E`. `S`, `R`, `D`, and `E` are permitted top-level JSON values. `R`, `D`, and `E` are **terminal**: once one is on top of the stack, evaluation stops.
 
 A match is **one variant of a selected target**, not necessarily a fully rendered destination. Producing an `R` does not itself mean navigation can proceed.
 
@@ -54,11 +55,13 @@ Terminal rules take priority over the rest.
 | Stack before | Input | Stack after | Effect |
 | --- | --- | --- | --- |
 | `[K, R]` | Anything remaining | `[K, R]` | Stop; silently discard the remaining parsed program. |
+| `[K, D]` | Anything remaining | `[K, D]` | Stop; silently discard the remaining parsed program. |
 | `[K, E]` | Anything remaining | `[K, E]` | Stop; error is terminal. |
 | `[K, L]` | `x` | `[K, L ++ [x]]` | Append without changing spelling or order. |
 | `[K]`, top is not `L` | `x` | `[K, [x]]` | Start a literal array; also applies to an empty stack. |
 | `[K]` | `S` | `[K, S]` | Push state separately. |
 | `[K]` | `R` | `[K, R]` | Push result and stop. |
+| `[K]` | `D` | `[K, D]` | Push todo list and stop. |
 | `[K]` | `E` | `[K, E]` | Push an explicit error and stop; nothing is taken off the stack. |
 | `[K, S, L]` | `.set` | `[K, S']` | No target with the resulting key appends one; an existing target replaces or gains the variant of the destination's arity. |
 | `[K, S, L]` | `.rm` | `[K, S']` | Remove the target with the exact key, or with a separator only its variant of the arity the suffix length names; a multi-variant target without a separator, no explicit dimensions, or no such key is a no-op or error. |
@@ -68,7 +71,10 @@ Terminal rules take priority over the rest.
 | `[K, S, L]` | `.$` | `[K, S, R]` | Search, render matches, and stop. |
 | `[K, S]` | `.$` | `[K, S, R]` | Search using focus alone; empty focus selects all targets. Stop. |
 | `[K, S, L]` | `.alias` | `[K, S']` or `[K, S', L']` | Define an alias: the last two literals of `L` are its short form and literal; the literals before them stay as `L'`. A separator in `L`, or a single literal, is an error. |
-| `[K, S1, S2]` | `.merge` | `[K, S']` | Merge `S2` into `S1`: targets and alias definitions united, `S2` winning conflicts; focus is `S2`'s. |
+| `[K, S1, S2]` | `.merge` | `[K, S']` | Merge `S2` into `S1`: targets and alias definitions united, `S2` winning conflicts; focus is `S2`'s; todo lists concatenated, first occurrence kept. |
+| `[K, S, L]` | `.todo` | `[K, S', D]` | Append the one URL in `L` to the todo list unless it is there already, then stop. |
+| `[K, S]` | `.todo` | `[K, S, D]` | Show the todo list unchanged, then stop. |
+| `[K, S, L]` | `.done` | `[K, S', D]` | Remove the one URL in `L` from the todo list if it is there, then stop. |
 | Any invalid stack or operands | Operation | Push what the operation puts back, then `E` | A failed operation never loses a state it took; see section 6. |
 
 Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or deduplicate `L`: that would destroy argument spelling, ordering, and the boundary inferred by search.
@@ -84,7 +90,7 @@ Accumulation keeps literals exactly as supplied. Do not lowercase, sort, or dedu
 1. Build the program by appending parsed items in order. An unparsable item becomes an `E` value at that position; earlier items remain executable.
 2. The interpreter appends nothing. A host that wants a search to close every program appends the **operation** `.$` itself, along with any host operations of its own (see [ADR 0007](adr/0007-hosts-compose-the-program.md)). An escaped literal `..$` is not an operation.
 3. Start with an empty data stack and evaluate left to right.
-4. Stop when an `R` or explicit `E` reaches the top, discarding the rest of the program. Pushing an explicit `E` takes nothing off the stack.
+4. Stop when an `R`, a `D`, or an explicit `E` reaches the top, discarding the rest of the program. Pushing an explicit `E` takes nothing off the stack.
 5. Stop on a generated evaluation error, leaving the stack as section 6 describes.
 
 `.$` may occur earlier in a valid program; its result terminates evaluation, so later values never execute. The specification describes the final stack, without prescribing a host-language return type.
@@ -96,7 +102,7 @@ A program is built one item at a time: `pushToken(program, tokenOrValue) -> prog
 Each appended item is either:
 
 - a **string token**, interpreted as one value's textual form: an ordinary literal, the separator `.`, an escaped literal, or an operation; or
-- a **structured value** supplied as a JavaScript object, such as an `S`, `R`, or `E` envelope, normalized and validated on parse.
+- a **structured value** supplied as a JavaScript object, such as an `S`, `R`, `D`, or `E` envelope, normalized and validated on parse.
 
 Worked examples write structured values inline, such as `S company git .set`. That is notation for a supplied structured value followed by string tokens, not a claim that a host must serialize state into text.
 
@@ -109,6 +115,8 @@ Supported operations are:
 .$      search and produce a result
 .alias  define an alias
 .merge  merge two states into one
+.todo   add a URL to the todo list, or show it
+.done   remove a URL from the todo list
 ```
 
 Ordinary literals retain their spelling and order. URL literals and templates accumulate exactly like dimensions, so a URL-valued argument needs no escaping. A string token is trimmed; one that is empty after trimming, or still contains whitespace, is not a single literal and parses to `parse_error`. The core never splits it.
@@ -133,9 +141,9 @@ A leading `.~` escapes an alias the same way: the token is an ordinary literal k
 .~     -> literal .~     (resolves to ~)
 ```
 
-Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the six above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
+Escaped tokens are not interpreted again as operations. An unescaped dot-prefixed token that the interpreter's environment does not bind to an operation parses to an `E` of type `missing_operation`. The environment supplies the operation set; by default it is exactly the eight above, and a host may extend it (see [ADR 0005](adr/0005-extensible-interpreter-environment.md)). Double-quoted tokens are not a quoting mechanism, and multiword literals are not part of this version: each argument is one space-separated literal.
 
-The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them: `.$` takes the suffix as arguments, `.rm` reads only its length, and `.set` and `.@` ignore it.
+The first standalone `.` divides an input array into a **matching portion** and a **suffix**. Each operation in section 4 says what it does with them: `.$` takes the suffix as arguments, `.rm` reads only its length, and `.set` and `.@` ignore it. `.todo` and `.done` take no separator: a `.` is one more literal in their array (sections 4.7 and 4.8).
 
 ### Search operators
 
@@ -191,7 +199,7 @@ rejected:  example.com/path          /path/{}                    //example.com/{
 
 Placeholders may appear in any position, including the scheme. Merely containing a colon is not sufficient. Substituting actual arguments can still produce a different, possibly invalid, URL at navigation time; template acceptance is not a promise about every rendered result, nor permission for a host to execute every accepted scheme.
 
-This rule applies wherever a destination is accepted, including `.set` operands and every variant inside supplied state.
+This rule applies wherever a destination is accepted, including `.set` operands and every variant inside supplied state. A todo item (`.todo` and `.done` operands, and every entry of a supplied todo list) must in addition contain no `{}`: it is a `u`, never a `p`.
 
 ### Parse failures are values
 
@@ -203,7 +211,7 @@ Errors that depend on the current stack or an operation's operands are evaluatio
 
 ### Supplied structured values
 
-Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` carries only `targets`, `focus`, and `alias`: an omitted field defaults to empty (`{}`, `[]`, and `{}` respectively), so `["S", {}]` is the empty state, and any other field makes the `S` invalid, so it parses to `E`. The `alias` field holds the alias definitions: an object whose short forms and literals are each a single literal (non-empty, whitespace-free, not the separator) not starting with `~`; anything else makes the `S` invalid. A supplied `R` carries only its defined fields; unknown fields on it are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
+Validate supplied values in the core, not the browser client. Reject malformed required structures. A supplied `S` carries only `targets`, `focus`, `alias`, and `todo`: an omitted field defaults to empty (`{}`, `[]`, `{}`, and `[]` respectively), so `["S", {}]` is the empty state, and any other field makes the `S` invalid, so it parses to `E`. The `alias` field holds the alias definitions: an object whose short forms and literals are each a single literal (non-empty, whitespace-free, not the separator) not starting with `~`; anything else makes the `S` invalid. The `todo` field is an array of URLs, each valid by section 2's validation and free of `{}`, and no two identical; anything else makes the `S` invalid. A supplied `D` follows the same rule for its `todo` field and, like `R`, drops unknown fields. A supplied `R` carries only its defined fields; unknown fields on it are dropped, not preserved. An `E` payload is the exception: it may carry diagnostic fields beyond the required `type` and `description`, which are kept as uninterpreted data and never acquire execution semantics. Its `type` must still be one of section 6's vocabulary values; an `E` whose `type` is outside that vocabulary is malformed and parses to `parse_error`.
 
 Normalize each supplied `S`'s target keys by the rules of section 3: a key is split on whitespace into dimensions, each dimension normalized, and the result rejoined. A key that is empty after normalization, or that carries a search operator, is invalid. Focus is kept verbatim; a focus term that is empty, contains whitespace, or is operator-only is invalid. Normalization does not change target order, variant text, focus, argument spelling, or `R.inputs`.
 
@@ -248,7 +256,7 @@ An empty explicit query searches on focus alone; empty focus with no explicit in
 
 ## 4. Operations
 
-Each operation except `.alias`, which takes no separator (section 4.5), and `.merge`, which takes no literal array (section 4.6), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
+Each operation except `.alias`, which takes no separator (section 4.5), `.merge`, which takes no literal array (section 4.6), and `.todo` and `.done`, which take one URL (sections 4.7 and 4.8), reads the matching portion defined in section 2, normalizes dimensions by section 3, and validates destinations by section 2.
 
 ### 4.1 `.set`
 
@@ -430,6 +438,7 @@ Merge two states into one: `S2`, the top, into `S1`. `S'` holds:
 - **Target-set order**: `S1`'s targets keep their order, a key both hold included; `S2`'s other targets follow, in `S2`'s order.
 - **Focus**: `S2`'s, exactly as stored, even when empty. The two focuses are never combined.
 - **Alias definitions**: every definition of either state; `S2`'s wins a short form both define.
+- **Todo list**: `S1`'s todo items, then `S2`'s, each URL kept at its first occurrence, so a URL both hold stays where `S1` has it.
 
 With `S1` holding `jira: [https://jira.a.com, https://jira.a.com/browse/{}]` and `S2` holding `jira: [https://jira.b.com/{}, https://jira.b.com/{}/{}]`, `S'` holds `jira: [https://jira.a.com, https://jira.b.com/{}, https://jira.b.com/{}/{}]`.
 
@@ -442,6 +451,45 @@ x S .merge           [[x], S, E]
 S1 x S2 .merge       [S1, [x], S2, E]
 S x .merge           [S, [x], E]
 S1 S2 x .merge       [S1, S2, [x], E]
+```
+
+### 4.7 `.todo`
+
+```text
+[K, S, L] | .todo -> [K, S', D]
+[K, S]    | .todo -> [K, S, D]
+```
+
+Add a todo item, or show the todo list. With a literal array, `L` must hold exactly one literal, and that literal must be a URL without `{}` (section 2's validation, plus the placeholder rule for todo items). `S'` is `S` with that URL appended to the end of its todo list, or `S` itself when the list already holds the URL. Without a literal array, `S` is left as it is. Either way `.todo` then pushes a `D` carrying the resulting todo list, which ends evaluation as an `R` does.
+
+URLs are compared as text, exactly as accumulated: `https://a.com` and `https://a.com/` are two items. Focus plays no part, and `.todo` resolves no aliases: an alias is not a URL, so it is `invalid_destination` like any other non-URL literal. A `.` in `L` is a literal like the others, not a separator.
+
+An `L` holding more than one literal is `missing_operand`; a single literal that is not a valid URL, or that contains `{}`, is `invalid_destination`. Either way `L` is dropped and `S` put back beneath the error (section 6). With no state beneath `L`, or none on top of the stack, `.todo` is `missing_operand`.
+
+```text
+S https://a.com .todo                 [S', D]   todo [https://a.com]
+S' https://b.com .todo                [S'', D]  todo [https://a.com, https://b.com]
+S'' https://a.com .todo               [S'', D]  already held: unchanged
+S .todo                               [S, D]    shows the list
+S https://a.com/{} .todo              [S, E]    invalid_destination
+S ~a .todo                            [S, E]    invalid_destination
+S https://a.com later .todo           [S, E]    missing_operand
+```
+
+### 4.8 `.done`
+
+```text
+[K, S, L] | .done -> [K, S', D]
+```
+
+Remove a todo item. `L` is read exactly as for `.todo` (section 4.7): one URL without `{}`, otherwise `missing_operand` or `invalid_destination` with `S` put back. `S'` is `S` with that URL removed from its todo list, the other items keeping their order, or `S` itself when the list does not hold the URL. `.done` then pushes a `D` carrying the resulting todo list, which ends evaluation.
+
+The comparison is text equality, as for `.todo`, and focus plays no part. `.done` has no form without a literal array: `[K, S] | .done` is `missing_operand`, with `S` put back.
+
+```text
+S https://a.com .done                 [S', D]   todo without https://a.com
+S https://nope.com .done              [S, D]    not held: unchanged
+S .done                               [S, E]    missing_operand
 ```
 
 ## 5. Arguments, rendering, and match ordering
@@ -512,11 +560,11 @@ Every error carries a machine-readable `type` from this closed vocabulary, plus 
 
 | `type` | Phase | Raised when |
 | --- | --- | --- |
-| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, or `E` envelope failing validation, such as an unknown field on an `S`, an invalid alias definition, duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
+| `parse_error` | Parse | An item is not a usable value: malformed JSON, a value that is never permitted at top level such as `t`, `T`, `m`, `M`, or a literal array, a string token that is empty, whitespace-bearing, or operator-only, or a recognized `S`, `R`, `D`, or `E` envelope failing validation, such as an unknown field on an `S`, an invalid alias definition, a todo item that is not a URL, contains `{}`, or appears twice, duplicate normalized keys, an empty key, a key carrying operator syntax, two variants of one target sharing an arity, an invalid variant, or an `E` whose `type` is outside this vocabulary. |
 | `missing_operation` | Parse | A dot-prefixed token is not the separator and is not bound to an operation in the interpreter's environment. |
-| `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation. |
+| `invalid_destination` | Evaluation | An operand URL or destination template fails render-then-parse validation, or a `.todo` or `.done` operand contains `{}`. |
 | `invalid_dimension` | Evaluation | A dimension used as a key by `.set` or `.rm` carries search-operator syntax, or a `.set` or `.rm` literal array holds an alias (section 2). |
-| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, an `.alias` given a separator, a single literal, or a pair with a half starting with `~`, or a `.merge` without two states on top of the stack. |
+| `missing_operand` | Evaluation | An operation lacks a required operand: no literal array, no explicit dimension, no state to operate on, a bare `.rm` naming a multi-variant target without an arity separator, an `.alias` given a separator, a single literal, or a pair with a half starting with `~`, a `.merge` without two states on top of the stack, a `.todo` or `.done` literal array holding more than one literal, or a `.done` with no literal array. |
 | `unknown_error` | Evaluation | A catch-all for an evaluation failure that does not match a more specific type. |
 
 The phase rule decides overlapping cases: the same malformed destination reports `parse_error` inside a supplied `S` and `invalid_destination` as a `.set` operand. One is an unusable item, the other an unusable operand. `.set` treats the first literal of `L` as its destination unconditionally, so `S company git .set` is `invalid_destination` (`company` is an unusable destination), not `missing_operand`.
@@ -725,6 +773,22 @@ No key contains `browse`, so destination search matches the query against each v
 ```
 
 `jira`'s arity-0 variant did not match and is not listed. The one row is a best fit, but it is destination evidence, so it is not a direct-navigation candidate: the client shows it on the fallback page.
+
+### Keep and finish a todo item
+
+```text
+["S", {"targets": {}, "focus": []}]
+https://example.com/rfc .todo .$
+```
+
+`.todo` appends the URL to the empty todo list and pushes a `D`, which ends evaluation: the closing `.$` is never reached. The final stack is `[S', D]`:
+
+```json
+["S", {"targets": {}, "focus": [], "alias": {}, "todo": ["https://example.com/rfc"]}]
+["D", {"todo": ["https://example.com/rfc"]}]
+```
+
+Against that `S'`, `https://example.com/rfc .done .$` removes the item, and the stack ends `[S'', ["D", {"todo": []}]]`, `S''` holding an empty todo list again.
 
 ### Stop at the first result
 
