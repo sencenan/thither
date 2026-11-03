@@ -180,7 +180,7 @@ body {
   text-decoration: none;
 }
 
-/* A todo row is its badge and its URL on one line. */
+/* A todo row is its badge and its URL, the URL wrapped so all of it shows. */
 .match.todo > a {
   grid-template-columns: 28px minmax(0, 1fr);
   grid-template-areas: "badge destination";
@@ -189,6 +189,8 @@ body {
 .match.todo .destination {
   margin-top: 0;
   color: inherit;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Hover and selection are independent: Enter opens the selected row, so only it carries the accent
