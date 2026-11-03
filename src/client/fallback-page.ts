@@ -19,6 +19,7 @@ import { isNontrivial, keyTokens, searchTokens } from './program.ts';
 import { renderProgram } from './program-view.ts';
 import { compose, load, run } from './run.ts';
 import { createSettingsDialog } from './settings.ts';
+import { selectedTodo } from './todo-list.ts';
 
 export const LIVE_EXECUTION_DEBOUNCE_MS = 60;
 
@@ -35,6 +36,17 @@ const isEditable = (target: EventTarget | null): boolean =>
   target instanceof HTMLInputElement ||
   target instanceof HTMLTextAreaElement ||
   (target instanceof HTMLElement && target.isContentEditable);
+
+// What Right puts into the field: a todo row's URL as stored (a URL never starts with `.`, so it
+// needs no escape), or a match row's key as field tokens.
+const selectedFieldText = (region: Element): string | undefined => {
+  const todo = selectedTodo(region);
+  if (todo !== undefined) {
+    return todo;
+  }
+  const key = selectedKey(region);
+  return key === undefined ? undefined : keyTokens(key).join(' ');
+};
 
 export const mountFallbackPage = (
   root: Element,
@@ -126,13 +138,16 @@ export const mountFallbackPage = (
 
   // Enter on a waiting program runs it. A run that searched leaves the field holding that search
   // (dsl.md §4.4: inputs, then the separator and args), so the field and the list agree; a run
-  // that failed keeps the program as typed, beside its error, so it can be corrected.
+  // that failed keeps the program as typed, beside its error, so it can be corrected. A run that
+  // ended in a todo list empties the field: the list it shows is no search to put back.
   const runWaiting = (): void => {
     guarded(() => {
       waiting = false;
       run(interp, env.base, tokenize(field.value));
       if (env.terminal?.[0] === 'R') {
         field.value = searchTokens(env.terminal).join(' ');
+      } else if (env.terminal?.[0] === 'D') {
+        field.value = '';
       }
     });
   };
@@ -230,12 +245,13 @@ export const mountFallbackPage = (
       return;
     }
 
-    // Right puts the selected row's key into the field, ready for an operation such as `.rm` to be
-    // typed after it. In the field it acts only with the caret at the end, where it would otherwise
-    // do nothing, so moving the caret through the text is untouched.
-    const key = waiting ? undefined : selectedKey(output);
+    // Right puts the selected row's key, or a todo row's URL, into the field, ready for an
+    // operation such as `.rm` or `.done` to be typed after it. In the field it acts only with the
+    // caret at the end, where it would otherwise do nothing, so moving the caret through the text
+    // is untouched.
+    const selected = waiting ? undefined : selectedFieldText(output);
     if (
-      key !== undefined &&
+      selected !== undefined &&
       event.key === 'ArrowRight' &&
       !event.shiftKey &&
       !event.ctrlKey &&
@@ -247,7 +263,7 @@ export const mountFallbackPage = (
     ) {
       event.preventDefault();
       liveRun.cancel();
-      field.value = keyTokens(key).join(' ');
+      field.value = selected;
       field.focus();
       field.setSelectionRange(field.value.length, field.value.length);
       runField();

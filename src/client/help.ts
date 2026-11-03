@@ -33,11 +33,15 @@ const USAGE: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     'Run',
-    'A program with an operation (.set, .rm, .@, .alias) does not run as you type: it waits, showing each token it will run, until you press Enter. The field then keeps only the search it ended with. A plain search runs as you type.',
+    'A program with an operation (.set, .rm, .@, .alias, .todo, .done) does not run as you type: it waits, showing each token it will run, until you press Enter. The field then keeps only the search it ended with. A plain search runs as you type.',
   ],
   [
     'Edit key',
     'Press \u2192 to put the selected row\u2019s dimensions into the field, ready to type .rm or another operation after them.',
+  ],
+  [
+    'Todo list',
+    'Keep a page for later with its URL and .todo; .todo alone shows the list. Select a row and press \u2192 to put its URL into the field, then type .done to remove it.',
   ],
   ['Clear', 'Press Escape to empty the field and start over.'],
   [
@@ -63,6 +67,11 @@ const RULES: ReadonlyArray<readonly [string, string]> = [
     '.alias',
     'Define a short form, then the text it stands for: gh github .alias. Typing ~gh then stands for github in searches and focus, as a search term or an argument. .set and .rm reject aliases; an undefined ~name is plain text.',
   ],
+  [
+    '.todo',
+    'Add a URL (no {} placeholders) to the todo list, or with no URL show the list. A URL already there stays where it is.',
+  ],
+  ['.done', 'Remove a URL from the todo list: the exact URL, as it was added.'],
   [
     '.$',
     'Search. It runs automatically at the end of what you type, so you rarely write it yourself.',

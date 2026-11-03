@@ -194,6 +194,12 @@ const open = async (storage: StorageArea, tokens: readonly string[]) => {
 };
 
 describe('the run, end to end (browser-client.md "Execution flow")', () => {
+  it('a todo list never navigates, even holding a single URL (ADR 0017)', async () => {
+    const { register, destination } = await open(fakeStorage(), ['https://a.com', '.todo']);
+    expect(register.terminal).toEqual(['D', { todo: ['https://a.com'] }]);
+    expect(destination).toBeUndefined();
+  });
+
   it('a first empty run yields an R and no destination', async () => {
     const { register, destination } = await open(fakeStorage(), []);
     expect(destination).toBeUndefined();

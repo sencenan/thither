@@ -242,11 +242,53 @@ describe('browser env host operations', () => {
   });
 });
 
+describe('a todo run (dsl.md §4.7, §4.8; ADR 0017)', () => {
+  const a = 'https://a.com';
+
+  it('.out pops the D into the register and .save persists the changed state', () => {
+    const storage = fakeStorage();
+    const { register, stack } = runClient(storage, [a, '.todo']);
+
+    expect(register.terminal).toEqual(['D', { todo: [a] }]);
+    expect(register.state?.[1].todo).toEqual([a]);
+    expect(stack).toEqual([['S', { targets: {}, focus: [], alias: {}, todo: [a] }]]);
+    expect(record(storage)).toEqual([
+      [emptyState()],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [a] }]],
+    ]);
+  });
+
+  it('.done persists the removal', () => {
+    const storage = fakeStorage();
+    runClient(storage, [a, '.todo']);
+    const { register } = runClient(storage, [a, '.done']);
+
+    expect(register.terminal).toEqual(['D', { todo: [] }]);
+    expect(record(storage)).toEqual([
+      [emptyState()],
+      [['S', { targets: {}, focus: [], alias: {}, todo: [a] }]],
+      [emptyState()],
+    ]);
+  });
+
+  it('a failed .todo persists nothing', () => {
+    const storage = fakeStorage();
+    runClient(storage, []);
+    const before = record(storage);
+
+    const { register } = runClient(storage, ['https://a.com/{}', '.todo']);
+
+    expect(register.terminal?.[0]).toBe('E');
+    expect(record(storage)).toEqual(before);
+  });
+});
+
 // browser-client.md "Persistence" / "Bounded history" — `thither.stacks.v1` is oldest-first with the
 // current stack last; `.save` maintains it with structural-difference dedup and front eviction.
-// browser-client.md "Host operations" — `.save` persists only a run that reached its search: an `R` in
-// the register proves `.$` consumed the literals, so the stored stack is always one `.load` can read.
-describe('.save persists only when the register holds an R', () => {
+// browser-client.md "Host operations" — `.save` persists only a run that reached its search or a todo
+// operation: an `R` or a `D` in the register proves `.$`, `.todo`, or `.done` consumed the literals,
+// so the stored stack is always one `.load` can read.
+describe('.save persists only when the register holds an R or a D', () => {
   const set = (url: string, ...dims: string[]) => [url, ...dims, '.set'];
 
   it('a run ending in an unbound operation persists nothing, and the next run still loads', () => {

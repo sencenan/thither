@@ -116,6 +116,14 @@ const showTop = (top: StackValue | undefined): void => {
     if (matches.length > 1) {
       console.log(dim(`  ${matches.length} matches → fallback page`));
     }
+  } else if (top?.[0] === 'D') {
+    const { todo } = top[1];
+    if (todo.length === 0) {
+      console.log(yellow('  no todos'));
+    }
+    for (const [i, url] of todo.entries()) {
+      console.log(`  ${dim(`${i + 1}.`)} ${url}`);
+    }
   } else if (top?.[0] === 'E') {
     console.log(`${red('E')} ${bold(top[1].type)}: ${top[1].description}`);
   } else {
@@ -132,7 +140,8 @@ const execute = (tokens: readonly string[]): void => {
   const program = composed.reduce(interp.pushToken, []);
   const result = interp.execute(program, stack);
   const top = result[result.length - 1];
-  const remaining = top && (top[0] === 'R' || top[0] === 'E') ? result.slice(0, -1) : result;
+  const remaining =
+    top && (top[0] === 'R' || top[0] === 'D' || top[0] === 'E') ? result.slice(0, -1) : result;
 
   // The mutation's effect first: it happened before the search below.
   if (JSON.stringify(remaining) !== JSON.stringify(stack)) {
@@ -163,11 +172,11 @@ const load = (json: string): void => {
     console.log(`${red('refused')} ${bold(bad[1].type)}: ${bad[1].description}`);
     return;
   }
-  // A persisted stack holds only S/R/E envelopes (browser-client.md "Persistence"); a string
+  // A persisted stack holds only S/R/D/E envelopes (browser-client.md "Persistence"); a string
   // token in the array is not a stack value even though it parses.
   const values: StackValue[] = [];
   for (const token of program) {
-    if (token[0] === 'S' || token[0] === 'R' || token[0] === 'E') {
+    if (token[0] === 'S' || token[0] === 'R' || token[0] === 'D' || token[0] === 'E') {
       values.push(token);
     } else {
       console.log(

@@ -783,6 +783,109 @@ describe('Right ("Right puts the selected row\u2019s key into the field")', () =
   });
 });
 
+describe('the todo view ("A run that ends in a D shows the todo view")', () => {
+  const a = 'https://a.example/';
+  const b = 'https://b.example/';
+  const todoRecord = (todo: readonly string[]) =>
+    JSON.stringify([
+      [['S', { targets: { home: ['https://example.com/'] }, focus: [], alias: {}, todo }]],
+    ]);
+  const summary = (): string => root.querySelector('.output footer .count')?.textContent ?? '';
+  const right = (target: EventTarget): void => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }),
+    );
+  };
+
+  it('Enter on .todo empties the field and lists the todo items in stored order', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: todoRecord([a]) });
+    const { field } = open(storage, []);
+
+    type(field, `${b} .todo`);
+    enter(field);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual([a, b]);
+    expect(summary()).toBe('2 todos');
+  });
+
+  it('.todo alone shows the list without changing it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a]) }), ['.todo']);
+
+    enter(field);
+
+    expect(links()).toEqual([a]);
+    expect(summary()).toBe('1 todo');
+  });
+
+  it('an empty todo list says so, with an example', () => {
+    const { field } = open(fakeStorage(), ['.todo']);
+
+    enter(field);
+
+    expect(links()).toEqual([]);
+    expect(root.querySelector('.output .todo-empty')?.textContent).toContain(
+      'https://example.com .todo',
+    );
+  });
+
+  it('hides the setup instructions', () => {
+    const { field } = open(fakeStorage(), ['.todo']);
+
+    enter(field);
+
+    expect(root.querySelector('.setup')).toBeNull();
+  });
+
+  it('starts with no row selected; Down selects one, and Enter opens it', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) }), ['.todo']);
+    enter(field);
+    expect(root.querySelector('li.selected')).toBeNull();
+
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+    enter(field);
+
+    expect(location.href).toBe(b);
+  });
+
+  it('Ctrl+1 opens the first todo item', () => {
+    const { field } = open(fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) }), ['.todo']);
+    enter(field);
+
+    keydown(field, { key: '1', code: 'Digit1', ctrlKey: true });
+
+    expect(location.href).toBe(a);
+  });
+
+  it('Right puts the selected URL into the field, so .done can be typed after it', () => {
+    const storage = fakeStorage({ [STACKS_KEY]: todoRecord([a, b]) });
+    const { field } = open(storage, ['.todo']);
+    enter(field);
+    keydown(field, { key: 'ArrowDown', code: 'ArrowDown' });
+
+    right(field);
+    expect(field.value).toBe(a);
+
+    type(field, `${field.value} .done`);
+    enter(field);
+
+    expect(field.value).toBe('');
+    expect(links()).toEqual([b]);
+  });
+
+  it('is never navigated from at page load: .todo from the URL waits for Enter', () => {
+    const storage = fakeStorage();
+    const { field } = open(storage, [a, '.todo']);
+
+    expect(waitingNotice()).not.toBe('');
+    enter(field);
+
+    expect(location.href).toBe(PAGE);
+    expect(links()).toEqual([a]);
+  });
+});
+
 describe('Tab ("Tab is blocked on the page while no dialog is open")', () => {
   const tab = (target: EventTarget, shiftKey = false): KeyboardEvent => {
     const event = new KeyboardEvent('keydown', {

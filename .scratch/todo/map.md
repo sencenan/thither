@@ -41,6 +41,7 @@ Done when: `dsl.md`, `browser-client.md`, `CONTEXT.md`, and ADR 0017 specify the
 
 - [Specify the todo list](issues/01-spec-adr-glossary.md): [ADR 0017](../../docs/adr/0017-todo-list-in-the-state-and-a-d-terminal.md), `dsl.md` §1/§2/§4.6–§4.8/§6/§7, `browser-client.md`, `CONTEXT.md` (Todo item, Todo list), and `IDEAS.md` now specify the design above. Settled while writing: a `D` run empties the field, the selection defaults to no row, and the setup instructions are hidden in the todo view.
 - [Implement the todo list in the core](issues/02-core.md): `State.todo` is required and repaired to `[]` on parse; `D` is a terminal value; `.todo` and `.done` are in `defaultEnv`; `.merge` deduplicates. Fixed `.set`/`.rm` dropping the todo list when they rebuild `S`. Client and REPL changed only where needed to compile.
+- [Show the todo list in the client and the REPL](issues/03-client-and-repl.md): `.out` pops and `.save` persists a `D`; a new `todo-list.ts` renders the view with match-row-shaped rows, so selection and shortcuts are reused; Right puts a todo URL into the field; a `D` run empties the field; Help and the REPL know `.todo`/`.done`.
 
 ## Fog
 
